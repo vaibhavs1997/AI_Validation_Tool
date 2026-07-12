@@ -248,7 +248,7 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
   // Normalize contract: if a raw OpenAPI/Postman object was passed, parse it
   let normalizedContract = contract || {};
   try {
-    const looksLikeRaw = normalizedContract && !Array.isArray(normalizedContract.endpoints) && (normalizedContract.openapi || normalizedContract.swagger || normalizedContract.item || normalizedContract.collection);
+    const looksLikeRaw = typeof normalizedContract === 'string' || (normalizedContract && !Array.isArray(normalizedContract.endpoints) && (normalizedContract.openapi || normalizedContract.swagger || normalizedContract.item || normalizedContract.collection));
     if (looksLikeRaw) {
       normalizedContract = parseContract(normalizedContract);
     }
