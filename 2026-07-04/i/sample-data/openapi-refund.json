@@ -1,0 +1,165 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Payments API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.qa.example.com"
+    }
+  ],
+  "paths": {
+    "/payments/{paymentId}/refunds": {
+      "post": {
+        "operationId": "createRefund",
+        "summary": "Create a payment refund",
+        "tags": ["payments", "refunds"],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Refund created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefundResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Payment cannot be refunded"
+          }
+        }
+      }
+    },
+    "/payments/{paymentId}": {
+      "get": {
+        "operationId": "getPayment",
+        "summary": "Get payment details",
+        "tags": ["payments"],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Payment not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateRefundRequest": {
+        "type": "object",
+        "required": ["amount", "reason", "idempotencyKey"],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0.01,
+            "example": 50
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "example": "Customer request"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "refund-PAY-1234-001"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "requestedBy": {
+                "type": "string",
+                "example": "qa.user@example.com"
+              }
+            }
+          }
+        }
+      },
+      "RefundResponse": {
+        "type": "object",
+        "required": ["refundId", "paymentId", "status", "amount"],
+        "properties": {
+          "refundId": {
+            "type": "string"
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["CREATED", "FAILED"]
+          },
+          "amount": {
+            "type": "number"
+          }
+        }
+      },
+      "PaymentResponse": {
+        "type": "object",
+        "required": ["paymentId", "status", "capturedAmount"],
+        "properties": {
+          "paymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["CREATED", "SETTLED", "FAILED"]
+          },
+          "capturedAmount": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}

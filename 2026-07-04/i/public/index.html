@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI API Validation Tool MVP</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">AV</div>
+          <div>
+            <strong>API Validator</strong>
+            <span>MVP Workbench</span>
+          </div>
+        </div>
+
+        <nav class="side-nav" aria-label="Primary navigation">
+          <a class="active" href="#workspace" data-view-trigger="workspace">Workspace</a>
+          <a href="#history" data-view-trigger="history">Run History</a>
+          <a href="#results" data-view-trigger="results">Results</a>
+        </nav>
+
+        <div class="server-card">
+          <span>Server</span>
+          <strong id="serverState">Checking</strong>
+          <p id="configStatus">Loading configuration...</p>
+        </div>
+      </aside>
+
+      <div class="main-shell">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">QA automation console</span>
+            <h1>Ticket-to-API validation</h1>
+          </div>
+          <div class="topbar-actions">
+            <a class="link-button ghost" href="/api/health" target="_blank" rel="noreferrer">Health</a>
+            <a class="link-button ghost" href="/api/runs" target="_blank" rel="noreferrer">Runs API</a>
+          </div>
+        </header>
+
+        <section id="appMetrics" class="metrics-row" aria-label="Workspace metrics"></section>
+
+        <main id="workspace" class="workspace">
+          <section class="panel span-5" data-view-section="workspace">
+            <div class="panel-head">
+              <div>
+                <span class="step">1</span>
+                <h2>Jira Ticket</h2>
+              </div>
+            <div class="button-row">
+              <button id="loadSampleTicketBtn" type="button">Sample</button>
+              <button id="fetchJiraBtn" type="button">Fetch</button>
+            </div>
+          </div>
+          <div class="field-grid">
+            <label>
+              Ticket key
+              <input id="jiraKey" type="text" placeholder="PAY-1234">
+            </label>
+            <label>
+              Upload ticket file
+              <input id="ticketFile" type="file">
+            </label>
+          </div>
+          <label>
+            Ticket description / JSON
+            <textarea id="ticketJson" class="code-input" spellcheck="false"></textarea>
+          </label>
+            <div id="ticketSummary" class="summary-strip"></div>
+          </section>
+
+          <section class="panel span-7" data-view-section="workspace">
+            <div class="panel-head">
+              <div>
+                <span class="step">2</span>
+                <h2>API Contract</h2>
+              </div>
+            <div class="button-row">
+              <button id="loadSampleContractBtn" type="button">Sample</button>
+              <button id="parseContractBtn" type="button">Parse</button>
+            </div>
+          </div>
+          <label>
+            Upload contract file
+            <input id="contractFile" type="file" accept=".json,application/json">
+          </label>
+          <label>
+            OpenAPI / Postman collection
+            <textarea id="contractJson" class="code-input" spellcheck="false"></textarea>
+          </label>
+            <div id="contractSummary" class="summary-strip"></div>
+          </section>
+
+          <section class="panel span-12" data-view-section="workspace">
+            <div class="panel-head">
+              <div>
+                <span class="step">3</span>
+                <h2>Generated Scenarios</h2>
+              </div>
+              <div class="button-row">
+                <button id="selectAllScenariosBtn" type="button">Select all</button>
+                <button id="deselectAllScenariosBtn" type="button">Deselect all</button>
+                <label class="inline-check">
+                  <input id="useAi" type="checkbox">
+                  AI enhance
+                </label>
+                <button id="generateBtn" type="button" class="primary-action">Generate</button>
+              </div>
+            </div>
+            <div id="warnings" class="warning-list"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="select-col">Run</th>
+                    <th>Scenario</th>
+                    <th>Type</th>
+                    <th>Endpoint</th>
+                    <th>Expected</th>
+                    <th>Trace</th>
+                  </tr>
+                </thead>
+                <tbody id="scenarioRows">
+                  <tr>
+                    <td colspan="6" class="empty">No scenarios generated yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel span-4" data-view-section="workspace">
+            <div class="panel-head">
+              <div>
+                <span class="step">4</span>
+                <h2>Execution</h2>
+              </div>
+            </div>
+            <label>
+              Environment
+              <input id="envName" type="text" value="local-qa">
+            </label>
+            <label>
+              Base URL
+              <input id="baseUrl" type="url" placeholder="https://api.qa.company.com">
+            </label>
+            <label>
+              Auth type
+              <select id="authType">
+                <option value="none">None</option>
+                <option value="bearer">Bearer token</option>
+                <option value="autoBearer">Auto bearer token</option>
+                <option value="basic">Basic auth</option>
+                <option value="custom">Custom header</option>
+              </select>
+            </label>
+            <div id="authFields" class="auth-fields"></div>
+            <label class="inline-check dry-run">
+              <input id="dryRun" type="checkbox" checked>
+              Dry run
+            </label>
+            <button id="executeBtn" type="button" class="primary full-width">Execute selected</button>
+          </section>
+
+          <section id="history" class="panel span-12 history-panel" data-view-section="history">
+            <div class="panel-head">
+              <div>
+                <span class="step">H</span>
+                <h2>Run History</h2>
+              </div>
+              <div class="button-row">
+                <button id="refreshHistoryBtn" type="button">Refresh</button>
+              </div>
+            </div>
+            <div class="history-toolbar">
+              <label>
+                Search
+                <input id="historySearch" type="search" placeholder="Ticket, environment, run id">
+              </label>
+              <label>
+                Status
+                <select id="historyStatus">
+                  <option value="all">All</option>
+                  <option value="passed">Passed</option>
+                  <option value="failed">Failed</option>
+                  <option value="blocked">Blocked</option>
+                  <option value="needs_review">Needs review</option>
+                  <option value="dry_run">Dry run</option>
+                </select>
+              </label>
+            </div>
+            <div id="ticketGroups" class="ticket-groups"></div>
+            <div class="table-wrap compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ticket</th>
+                    <th>Run</th>
+                    <th>Result</th>
+                    <th>Environment</th>
+                    <th>Time</th>
+                    <th>Open</th>
+                  </tr>
+                </thead>
+                <tbody id="historyRows">
+                  <tr>
+                    <td colspan="6" class="empty">No run history yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="results" class="panel span-12" data-view-section="results">
+            <div class="panel-head">
+              <div>
+                <span class="step">5</span>
+                <h2>Run Results</h2>
+              </div>
+              <div id="reportLinks" class="button-row"></div>
+            </div>
+            <div id="runSummary" class="result-stats"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Scenario</th>
+                    <th>Status</th>
+                    <th>Actual</th>
+                    <th>Evidence</th>
+                  </tr>
+                </thead>
+                <tbody id="resultRows">
+                  <tr>
+                    <td colspan="4" class="empty">No run executed yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
