@@ -1,0 +1,18 @@
+{
+  "key": "PAY-1234",
+  "summary": "Add payment refund API",
+  "issueType": "Story",
+  "status": "Ready for QA",
+  "priority": "High",
+  "labels": ["payments", "refunds", "api"],
+  "description": "As a support user, I want to initiate a refund for a settled payment so that customers can receive money back when required.\n\nAcceptance Criteria:\n- Refund should be allowed only for settled payments.\n- Refund amount cannot exceed the captured amount.\n- Refund amount must be greater than zero.\n- Reason is mandatory for every refund request.\n- Duplicate refund request with same idempotency key should not create multiple refunds.",
+  "acceptanceCriteria": [
+    "Refund should be allowed only for settled payments.",
+    "Refund amount cannot exceed the captured amount.",
+    "Refund amount must be greater than zero.",
+    "Reason is mandatory for every refund request.",
+    "Duplicate refund request with same idempotency key should not create multiple refunds."
+  ],
+  "comments": [],
+  "fetchedAt": "2026-07-04T00:00:00.000Z"
+}

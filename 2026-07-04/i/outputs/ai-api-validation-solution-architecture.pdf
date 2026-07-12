@@ -1,0 +1,383 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+4 0 obj
+<< /Length 6058 >>
+stream
+BT 0 0 0 rg /F2 22 Tf 1 0 0 1 54.00 738.00 Tm (AI API Validation Tool) Tj ET
+BT 0.25 0.25 0.25 rg /F1 11 Tf 1 0 0 1 54.00 712.00 Tm (Solution Architecture and Delivery Structure) Tj ET
+0.15 0.35 0.55 RG 1.2 w 54.00 690.00 m 558.00 690.00 l S
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 668.00 Tm (This document describes an automated QA assistant that fetches Jira requirements, generates API test scenarios from) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 655.00 Tm (ticket descriptions and acceptance criteria, mutates request payloads, executes APIs, validates responses, and) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 642.00 Tm (produces QA-verifiable reports.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 619.00 Tm (Architecture Overview) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 610.00 m 558.00 610.00 l S
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 596.00 Tm (The platform should combine Jira requirements with deterministic API knowledge. Jira gives intent, but reliable) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 583.00 Tm (automation also needs OpenAPI or Swagger contracts, Postman collections, sample payloads, environment configuration,) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 570.00 Tm (authentication rules, reusable test data, and validation logic.) Tj ET
+0.96 0.97 0.98 rg 50 493.50 512 65.50 re f
+0.82 0.84 0.86 RG 0.6 w 50 493.50 512 65.50 re S
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 553.00 Tm (Jira Ticket -> Jira Integration Service -> Requirement Parser -> AI Test Scenario Generator) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 542.50 Tm (OpenAPI / Swagger / Postman -> API Contract Repository -> Scenario Generator) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 532.00 Tm (Scenario Generator + Test Data Repository -> Payload Builder -> API Execution Engine) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 521.50 Tm (Environment + Auth Manager -> API Execution Engine -> Response Validator) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 511.00 Tm (Response Validator -> AI Result Analyzer -> QA Review Report -> Dashboard / Jira) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 482.50 Tm (Core Components) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 473.50 m 558.00 473.50 l S
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 455.50 Tm (1. Jira Integration Service) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 440.50 Tm (Fetches Jira tickets, descriptions, acceptance criteria, labels, comments, attachments, and linked stories. It should) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 427.50 Tm (also publish generated reports back to Jira as comments or attachments.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 410.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 410.50 Tm (Authenticate with Jira using OAuth or API token.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 396.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 396.00 Tm (Fetch tickets by ticket key, JQL, sprint, status, assignee, or webhook trigger.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 381.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 381.50 Tm (Extract summary, description, acceptance criteria, business rules, attachments, and linked issues.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 367.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 367.00 Tm (Push the final QA report back to Jira for traceability.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 344.50 Tm (2. Requirement Parser) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 329.50 Tm (Converts unstructured Jira text into structured requirements that can be mapped to APIs and test scenarios.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 312.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 312.50 Tm (Identify affected feature, entities, endpoints, user actions, preconditions, and business rules.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 298.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 298.00 Tm (Classify positive flows, negative flows, boundary conditions, auth checks, and missing details.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 283.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 283.50 Tm (Produce a structured intermediate model that the test generator can use safely.) Tj ET
+0.96 0.97 0.98 rg 50 163.50 512 107.50 re f
+0.82 0.84 0.86 RG 0.6 w 50 163.50 512 107.50 re S
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 265.00 Tm ({) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 254.50 Tm ("feature": "Refund payment",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 244.00 Tm ("rules": [) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 233.50 Tm ("Refund allowed only for settled payments",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 223.00 Tm ("Refund amount must be less than or equal to captured amount") Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 212.50 Tm (],) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 202.00 Tm ("entities": ["payment", "refund"],) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 191.50 Tm ("missingInfo": ["Exact refund endpoint not mentioned"]) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 181.00 Tm (}) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 154.50 Tm (3. API Contract Repository) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 139.50 Tm (Stores the API truth source. This component helps the AI map Jira requirements to actual endpoints, request schemas,) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 126.50 Tm (response schemas, auth requirements, and expected status codes.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 109.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 109.50 Tm (Import OpenAPI or Swagger files.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 95.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 95.00 Tm (Import Postman collections and sample request/response payloads.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 80.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 80.50 Tm (Index internal API docs, historical tests, and known defect patterns.) Tj ET
+BT 0.45 0.45 0.45 rg /F1 8 Tf 1 0 0 1 292.00 24 Tm (1 / 5) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 14 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 6624 >>
+stream
+BT 0.35 0.35 0.35 rg /F1 8 Tf 1 0 0 1 54.00 762.00 Tm (AI API Validation Tool - Solution Architecture) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 722.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 722.00 Tm (Version contracts so generated tests can be traced to a specific API definition.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 699.50 Tm (4. AI Test Scenario Generator) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 684.50 Tm (Generates reviewable test scenarios using Jira requirements, API contracts, historical test patterns, and business) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 671.50 Tm (rules.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 654.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 654.50 Tm (Generate positive, negative, boundary, required-field, data-type, auth, idempotency, and state-transition scenarios.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 640.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 640.00 Tm (Trace each scenario back to a Jira acceptance criterion or business rule.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 625.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 625.50 Tm (Return structured JSON, not free-form text, so scenarios can be edited, stored, and executed.) Tj ET
+0.96 0.97 0.98 rg 50 516.00 512 97.00 re f
+0.82 0.84 0.86 RG 0.6 w 50 516.00 512 97.00 re S
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 607.00 Tm ({) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 596.50 Tm ("scenarioId": "PAY-1234-TC-004",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 586.00 Tm ("title": "Refund amount greater than captured amount",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 575.50 Tm ("type": "negative",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 565.00 Tm ("endpoint": "POST /payments/{paymentId}/refunds",) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 554.50 Tm ("payloadMutation": { "amount": 150, "reason": "Customer request" },) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 544.00 Tm ("expectedStatus": 400) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 533.50 Tm (}) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 507.00 Tm (5. Payload Builder and Mutation Engine) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 492.00 Tm (Builds executable requests from base payloads and modifies them according to each generated test case.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 475.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 475.00 Tm (Support replace, remove, nullify, empty string, invalid type, max length, boundary min/max, duplicate request, and) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 462.50 Tm (special-character mutations.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 448.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 448.00 Tm (Resolve dynamic values from previous API responses, fixtures, test data, or environment variables.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 433.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 433.50 Tm (Keep original and mutated payloads in the report so QA can inspect exactly what was sent.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 411.00 Tm (6. Test Data Manager) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 396.00 Tm (Prepares valid system state before API execution and cleans it up after test runs where possible.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 379.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 379.00 Tm (Create prerequisite users, orders, payments, tokens, accounts, and other domain records.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 364.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 364.50 Tm (Fetch valid IDs from APIs or allowed databases.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 350.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 350.00 Tm (Mask sensitive data and avoid production data by default.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 335.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 335.50 Tm (Maintain reusable fixtures for common preconditions such as settled payment or inactive user.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 313.00 Tm (7. API Execution Engine) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 298.00 Tm (Runs generated scenarios against the selected environment and captures complete evidence for review.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 281.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 281.00 Tm (Execute REST calls with generated headers, path params, query params, and payloads.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 266.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 266.50 Tm (Support chained requests, token refresh, retries for transient failures, and async job polling.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 252.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 252.00 Tm (Capture request, response, status code, headers, latency, timestamps, and correlation IDs.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 237.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 237.50 Tm (Run jobs asynchronously for large ticket batches.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 215.00 Tm (8. Response Validator) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 200.00 Tm (Uses deterministic checks wherever possible. The AI can help explain results, but pass/fail decisions should rely on) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 187.00 Tm (explicit assertions.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 170.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 170.00 Tm (Validate HTTP status code, response schema, required fields, error codes, and field values.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 155.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 155.50 Tm (Validate response time SLA and contract compliance.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 141.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 141.00 Tm (Optionally validate downstream state using read APIs or approved database checks.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 126.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 126.50 Tm (Classify results as passed, failed, blocked, skipped, or needs manual review.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 104.00 Tm (9. AI Result Analyzer) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 89.00 Tm (Summarizes execution results in QA-friendly language and explains likely causes of failures.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 72.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 72.00 Tm (Explain which acceptance criterion appears to be violated.) Tj ET
+BT 0.45 0.45 0.45 rg /F1 8 Tf 1 0 0 1 292.00 24 Tm (2 / 5) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 14 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 5761 >>
+stream
+BT 0.35 0.35 0.35 rg /F1 8 Tf 1 0 0 1 54.00 762.00 Tm (AI API Validation Tool - Solution Architecture) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 722.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 722.00 Tm (Classify failures as functional, contract, environment, data, auth, or flaky execution issues.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 707.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 707.50 Tm (Recommend specific manual QA verification steps.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 693.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 693.00 Tm (Generate defect draft text without automatically creating defects in the MVP.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 670.50 Tm (10. QA Review Dashboard) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 655.50 Tm (Provides a human review layer so QA can approve, reject, edit, rerun, or export generated scenarios and results.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 638.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 638.50 Tm (Ticket-wise run summary, generated scenarios, request/response evidence, pass/fail trend, and AI reasoning.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 624.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 624.00 Tm (Manual QA verdict with comments.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 609.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 609.50 Tm (Exportable PDF/HTML/JSON report and Jira publishing action.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 595.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 595.00 Tm (Optional integrations with Xray, Zephyr, TestRail, Slack, Teams, or CI/CD.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 570.50 Tm (End-to-End Flow) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 561.50 m 558.00 561.50 l S
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 547.50 Tm (1.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 547.50 Tm (QA selects a Jira ticket, sprint, or JQL query.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 533.00 Tm (2.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 533.00 Tm (The tool fetches ticket details and linked context from Jira.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 518.50 Tm (3.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 518.50 Tm (The requirement parser extracts structured business rules and missing information.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 504.00 Tm (4.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 504.00 Tm (The API mapper finds relevant endpoints from OpenAPI, Swagger, Postman, or indexed API docs.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 489.50 Tm (5.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 489.50 Tm (The AI generator creates structured and traceable test scenarios.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 475.00 Tm (6.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 475.00 Tm (QA optionally reviews and approves generated scenarios before execution.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 460.50 Tm (7.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 460.50 Tm (The payload engine creates valid and mutated request bodies for each scenario.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 446.00 Tm (8.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 446.00 Tm (The execution engine runs APIs in the selected non-production environment.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 431.50 Tm (9.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 431.50 Tm (Validators check status, schema, body, business assertions, and system state.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 417.00 Tm (10.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 417.00 Tm (The result analyzer summarizes failures and recommends QA follow-up.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 402.50 Tm (11.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 78.00 402.50 Tm (The dashboard shows the final report and can publish it back to Jira.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 378.00 Tm (Recommended Technology Stack) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 369.00 m 558.00 369.00 l S
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 355.00 Tm (Backend) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 355.00 Tm (Python with FastAPI, Celery or RQ workers, PostgreSQL, Redis, httpx, Pydantic, jsonschema,) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 342.50 Tm (and OpenAPI parsing libraries.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 328.00 Tm (AI Layer) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 328.00 Tm (LLM-based requirement parsing, scenario generation, result explanation, structured JSON) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 315.50 Tm (outputs, RAG over API docs and historical tests, and prompt/version governance.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 301.00 Tm (Knowledge Store) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 301.00 Tm (PostgreSQL plus pgvector or another vector database for API docs, sample payloads,) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 288.50 Tm (historical scenarios, and defect patterns.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 274.00 Tm (Frontend) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 274.00 Tm (React or Next.js dashboard for ticket selection, scenario review, execution monitoring,) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 261.50 Tm (evidence inspection, and report export.) Tj ET
+BT 0 0 0 rg /F2 9.2 Tf 1 0 0 1 54.00 247.00 Tm (Integrations) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 247.00 Tm (Jira REST API, OpenAPI/Swagger, Postman collections, CI/CD, Slack or Teams, and optional test) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 174.00 234.50 Tm (management tools such as Xray, Zephyr, or TestRail.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 214.00 Tm (Suggested Project Structure) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 205.00 m 558.00 205.00 l S
+BT 0.45 0.45 0.45 rg /F1 8 Tf 1 0 0 1 292.00 24 Tm (3 / 5) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 14 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 6452 >>
+stream
+BT 0.35 0.35 0.35 rg /F1 8 Tf 1 0 0 1 54.00 762.00 Tm (AI API Validation Tool - Solution Architecture) Tj ET
+0.96 0.97 0.98 rg 50 389.50 512 338.50 re f
+0.82 0.84 0.86 RG 0.6 w 50 389.50 512 338.50 re S
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 722.00 Tm (ai-api-validation-tool/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 711.50 Tm (backend/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 701.00 Tm (app/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 690.50 Tm (integrations/ # Jira, Postman, OpenAPI, test-management clients) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 680.00 Tm (requirements/ # Requirement parser, models, prompt templates) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 669.50 Tm (knowledge_base/ # Indexing, retrieval, embeddings) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 659.00 Tm (test_generation/ # Scenario generation and coverage classification) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 648.50 Tm (payload_engine/ # Base payloads, mutations, generated data) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 638.00 Tm (execution/ # Runner, HTTP client, auth, environments, chains) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 627.50 Tm (validation/ # Status, schema, assertion, business validators) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 617.00 Tm (analysis/ # Result analyzer, defect suggester, QA summary) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 606.50 Tm (reports/ # PDF/HTML/JSON reports and Jira publishing) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 596.00 Tm (db/ # Models, migrations, repositories) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 585.50 Tm (workers/ # Async job definitions) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 575.00 Tm (config/ # Settings and environment configs) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 564.50 Tm (tests/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 554.00 Tm (unit/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 543.50 Tm (integration/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 533.00 Tm (contract/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 522.50 Tm (frontend/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 512.00 Tm (src/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 501.50 Tm (views/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 491.00 Tm (TicketView.tsx) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 480.50 Tm (ScenarioReview.tsx) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 470.00 Tm (ExecutionReport.tsx) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 459.50 Tm (docs/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 449.00 Tm (openapi-specs/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 438.50 Tm (postman-collections/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 428.00 Tm (sample-payloads/) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 417.50 Tm (docker-compose.yml) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 407.00 Tm (README.md) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 378.50 Tm (MVP Scope) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 369.50 m 558.00 369.50 l S
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 355.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 355.50 Tm (Fetch Jira ticket details and acceptance criteria.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 341.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 341.00 Tm (Import OpenAPI or Postman definitions.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 326.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 326.50 Tm (Generate structured AI test scenarios with traceability to Jira AC.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 312.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 312.00 Tm (Review scenarios before execution.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 297.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 297.50 Tm (Mutate payloads for positive, negative, and boundary cases.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 283.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 283.00 Tm (Execute APIs against a selected non-production environment.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 268.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 268.50 Tm (Validate status code, schema, required fields, and configured assertions.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 254.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 254.00 Tm (Generate PDF/HTML/JSON reports and publish summary back to Jira.) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 235.50 Tm (Do not start with fully autonomous defect creation. In the MVP, generate a defect draft and let QA review it before) Tj ET
+BT 0 0 0 rg /F1 9.4 Tf 1 0 0 1 54.00 222.50 Tm (creating or linking bugs.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 199.50 Tm (Important Guardrails) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 190.50 m 558.00 190.50 l S
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 176.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 176.50 Tm (Do not execute generated tests against production by default.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 162.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 162.00 Tm (Require environment-level permissions and explicit execution approval.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 147.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 147.50 Tm (Use deterministic validators for pass/fail decisions wherever possible.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 133.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 133.00 Tm (Keep generated tests editable and auditable before execution.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 118.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 118.50 Tm (Store request/response evidence and mask secrets, tokens, PII, and payment data.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 104.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 104.00 Tm (Version prompts, contracts, scenarios, and execution results.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 89.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 89.50 Tm (Track which Jira acceptance criterion produced each test case.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 75.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 75.00 Tm (Classify uncertain results as needs manual review instead of forcing pass/fail.) Tj ET
+BT 0.45 0.45 0.45 rg /F1 8 Tf 1 0 0 1 292.00 24 Tm (4 / 5) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 14 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 3805 >>
+stream
+BT 0.35 0.35 0.35 rg /F1 8 Tf 1 0 0 1 54.00 762.00 Tm (AI API Validation Tool - Solution Architecture) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 716.00 Tm (Example QA Output) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 707.00 m 558.00 707.00 l S
+0.96 0.97 0.98 rg 50 528.50 512 170.50 re f
+0.82 0.84 0.86 RG 0.6 w 50 528.50 512 170.50 re S
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 693.00 Tm (Ticket: PAY-1234) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 682.50 Tm (Generated Scenarios: 18) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 672.00 Tm (Executed: 18) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 661.50 Tm (Passed: 14) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 651.00 Tm (Failed: 3) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 640.50 Tm (Blocked: 1) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 630.00 Tm () Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 619.50 Tm (Failures:) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 609.00 Tm (1. Refund amount greater than captured amount returned 201 instead of 400.) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 598.50 Tm (2. Missing reason field returned 500 instead of 400.) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 588.00 Tm (3. Duplicate refund request created two refunds instead of one.) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 577.50 Tm () Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 567.00 Tm (QA Recommendation:) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 556.50 Tm (Manual verification required for failed scenarios. Failures appear related to refund validation and) Tj ET
+BT 0.08 0.08 0.08 rg /F3 7.6 Tf 1 0 0 1 60.00 546.00 Tm (idempotency handling.) Tj ET
+BT 0.1 0.22 0.34 rg /F2 14 Tf 1 0 0 1 54.00 517.50 Tm (Delivery Roadmap) Tj ET
+0.85 0.85 0.85 RG 0.8 w 54.00 508.50 m 558.00 508.50 l S
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 490.50 Tm (Phase 1 - Foundation) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 475.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 475.50 Tm (Build Jira fetch, OpenAPI/Postman import, environment config, and basic scenario generation.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 461.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 461.00 Tm (Create report storage and a simple execution history model.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 438.50 Tm (Phase 2 - Execution) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 423.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 423.50 Tm (Implement payload mutation, API execution, auth management, and deterministic validation.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 409.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 409.00 Tm (Add request/response evidence and rerun support.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 386.50 Tm (Phase 3 - QA Workflow) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 371.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 371.50 Tm (Build scenario review, result dashboard, export, Jira publishing, and manual QA verdict.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 357.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 357.00 Tm (Add defect draft generation and integration with test management tools.) Tj ET
+BT 0.12 0.12 0.12 rg /F2 11 Tf 1 0 0 1 54.00 334.50 Tm (Phase 4 - Intelligence and Scale) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 319.50 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 319.50 Tm (Add RAG over API docs and historical tests, regression impact analysis, and CI/CD integration.) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 54.00 305.00 Tm (-) Tj ET
+BT 0 0 0 rg /F1 9.2 Tf 1 0 0 1 68.00 305.00 Tm (Improve confidence scoring, flaky test classification, and cross-ticket learning.) Tj ET
+BT 0.45 0.45 0.45 rg /F1 8 Tf 1 0 0 1 292.00 24 Tm (5 / 5) Tj ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 14 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 12 0 R >>
+endobj
+14 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R] /Count 5 >>
+endobj
+15 0 obj
+<< /Type /Catalog /Pages 14 0 R >>
+endobj
+xref
+0 16
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000154 00000 n 
+0000000222 00000 n 
+0000006332 00000 n 
+0000006479 00000 n 
+0000013155 00000 n 
+0000013302 00000 n 
+0000019115 00000 n 
+0000019262 00000 n 
+0000025767 00000 n 
+0000025916 00000 n 
+0000029774 00000 n 
+0000029923 00000 n 
+0000030007 00000 n 
+trailer
+<< /Size 16 /Root 15 0 R >>
+startxref
+30058
+%%EOF
