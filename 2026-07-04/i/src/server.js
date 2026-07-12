@@ -1,10 +1,10 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const config = require("./config");
 const storage = require("./storage");
 const jiraClient = require("./integrations/jiraClient");
-const llmClient = require("./integrations/llmClient.fixed");
+const llmClient = require("./integrations/llmClient");
 const { parseContract } = require("./contracts/contractParser");
 const { generateScenarios } = require("./scenarios/scenarioGenerator");
 const { executeRun } = require("./execution/executionEngine");
@@ -182,3 +182,4 @@ const server = http.createServer(handleRequest);
 server.listen(config.port, () => {
   console.log(`AI API Validation Tool MVP running at http://localhost:${config.port}`);
 });
+
