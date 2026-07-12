@@ -1,4 +1,4 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const config = require("./config");
@@ -182,3 +182,4 @@ const server = http.createServer(handleRequest);
 server.listen(config.port, () => {
   console.log(`AI API Validation Tool MVP running at http://localhost:${config.port}`);
 });
+

@@ -45,7 +45,6 @@ async function enhanceScenarios({ ticket, contract, localScenarios }) {
     },
     body: JSON.stringify({
       model: config.ai.model,
-      response_format: { type: "json_object" },
       messages: [
         { role: "system", content: prompt },
         {
@@ -69,9 +68,20 @@ async function enhanceScenarios({ ticket, contract, localScenarios }) {
     throw new Error(`AI request failed (${response.status}): ${text}`);
   }
 
-  const data = JSON.parse(text);
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    throw new Error(`Malformed AI response: ${err.message}`);
+  }
+
   const content = data.choices?.[0]?.message?.content || "{}";
-  const parsed = JSON.parse(content);
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    throw new Error(`AI content not JSON: ${err.message}`);
+  }
 
   if (!Array.isArray(parsed.scenarios)) {
     throw new Error("AI response did not include a scenarios array.");
