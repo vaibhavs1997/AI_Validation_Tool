@@ -1,4 +1,4 @@
-﻿const { createSampleValue } = require("../contracts/contractParser");
+﻿const { createSampleValue, parseContract } = require("../contracts/contractParser");
 const { enhanceScenarios } = require("../integrations/llmClient");
 
 const STOP_WORDS = new Set([
@@ -243,9 +243,22 @@ async function localGenerate(ticket, contract) {
 }
 
 async function generateScenarios({ ticket, contract, useAi = false }) {
-  // Do not require contract endpoints to generate Jira-based test cases; allow assignment later
-  const localScenarios = await localGenerate(ticket, contract || {});
   const warnings = [];
+
+  // Normalize contract: if a raw OpenAPI/Postman object was passed, parse it
+  let normalizedContract = contract || {};
+  try {
+    const looksLikeRaw = normalizedContract && !Array.isArray(normalizedContract.endpoints) && (normalizedContract.openapi || normalizedContract.swagger || normalizedContract.item || normalizedContract.collection);
+    if (looksLikeRaw) {
+      normalizedContract = parseContract(normalizedContract);
+    }
+  } catch (err) {
+    warnings.push(`Contract parsing failed: ${err.message}`);
+    normalizedContract = { endpoints: [] };
+  }
+
+  // Generate local scenarios from Jira test cases and assign endpoints
+  const localScenarios = await localGenerate(ticket, normalizedContract);
 
   if (!useAi) {
     return {
@@ -256,7 +269,7 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
   }
 
   try {
-    const enhanced = await enhanceScenarios({ ticket, contract, localScenarios });
+    const enhanced = await enhanceScenarios({ ticket, contract: normalizedContract, localScenarios });
     return {
       mode: enhanced.usedAi ? "ai_enhanced" : "local",
       warnings: enhanced.warning ? [enhanced.warning] : warnings,
@@ -265,7 +278,7 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
   } catch (error) {
     return {
       mode: "local",
-      warnings: [`AI enhancement failed, local scenarios were used. ${error.message}`],
+      warnings: [`AI enhancement failed, local scenarios were used. ${error.message}`, ...warnings],
       scenarios: localScenarios,
     };
   }
