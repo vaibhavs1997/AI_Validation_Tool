@@ -1,4 +1,4 @@
-const { createSampleValue } = require("../contracts/contractParser");
+﻿const { createSampleValue } = require("../contracts/contractParser");
 const { enhanceScenarios } = require("../integrations/llmClient");
 
 const STOP_WORDS = new Set([
@@ -111,7 +111,7 @@ function buildScenario(endpoint, index, overrides) {
 }
 
 function businessRuleMutation(rule, endpoint) {
-  const schema = endpoint.requestSchema;
+  const schema = endpoint?.requestSchema;
   const nums = numericFields(schema);
   const field = nums[0]?.path || firstField(schema) || "value";
 
@@ -130,102 +130,121 @@ function businessRuleMutation(rule, endpoint) {
   return field ? [{ field, operation: "replace", value: "rule-violation-value" }] : [];
 }
 
-function localGenerate(ticket, contract) {
-  const endpoints = relevantEndpoints(ticket, contract);
-  const scenarios = [];
+// New: create test cases based on Jira ticket only
+function createTestCasesFromTicket(ticket) {
+  const cases = [];
   let counter = 1;
+  const titleBase = ticket?.summary || ticket?.description || "Manual test case";
 
-  for (const endpoint of endpoints) {
-    scenarios.push(
-      buildScenario(endpoint, counter++, {
-        title: `${endpoint.method} ${endpoint.path} accepts a valid request`,
-        type: "positive",
-        expectedStatus: positiveStatus(endpoint),
-        assertions: ["Response matches success contract", "Business operation is completed"],
-        risk: "high",
-      })
-    );
+  // Happy path
+  cases.push({
+    id: `TC-${String(counter++).padStart(3, "0")}`,
+    title: `${titleBase} - happy path`,
+    type: "positive",
+    sourceAc: ticket?.summary || "",
+    description: ticket?.description || "",
+    assertions: ["Primary acceptance criteria"],
+    mutations: [],
+  });
 
-    const required = requiredFields(endpoint.requestSchema);
-    for (const field of required.slice(0, 4)) {
-      scenarios.push(
-        buildScenario(endpoint, counter++, {
-          title: `Missing required field: ${field}`,
-          type: "negative",
-          expectedStatus: negativeStatus(endpoint),
-          mutations: [{ field, operation: "remove" }],
-          assertions: [`API returns a validation error for missing ${field}`],
-          sourceAc: "Request schema",
-        })
-      );
-    }
-
-    const field = firstField(endpoint.requestSchema);
-    if (field) {
-      scenarios.push(
-        buildScenario(endpoint, counter++, {
-          title: `Invalid data type for ${field}`,
-          type: "negative",
-          expectedStatus: negativeStatus(endpoint),
-          mutations: [{ field, operation: "invalidType" }],
-          assertions: [`API rejects invalid type for ${field}`],
-          sourceAc: "Request schema",
-        })
-      );
-    }
-
-    for (const numeric of numericFields(endpoint.requestSchema).slice(0, 2)) {
-      scenarios.push(
-        buildScenario(endpoint, counter++, {
-          title: `Boundary validation for ${numeric.path}`,
-          type: "boundary",
-          expectedStatus: negativeStatus(endpoint),
-          mutations: [{ field: numeric.path, operation: "boundaryMin", value: numeric.schema.minimum ?? -1 }],
-          assertions: [`API enforces boundary rules for ${numeric.path}`],
-          sourceAc: "Boundary validation",
-        })
-      );
-    }
-
-    scenarios.push(
-      buildScenario(endpoint, counter++, {
-        title: `Missing authorization for ${endpoint.method} ${endpoint.path}`,
-        type: "auth",
-        authMode: "missing",
-        expectedStatus: authStatus(endpoint),
-        assertions: ["API rejects unauthenticated request"],
-        risk: "high",
-        sourceAc: "Security validation",
-      })
-    );
+  // Acceptance criteria driven cases
+  const acceptance = ticket?.acceptanceCriteria || [];
+  for (const rule of acceptance.slice(0, 10)) {
+    const tc = {
+      id: `TC-${String(counter++).padStart(3, "0")}`,
+      title: rule.length > 90 ? rule.slice(0, 90) : rule,
+      type: /not|cannot|invalid|only|exceed|less|greater/i.test(rule) ? "negative" : "positive",
+      sourceAc: rule,
+      description: ticket?.description || "",
+      assertions: [`Acceptance criterion: ${rule}`],
+      mutations: [],
+    };
+    cases.push(tc);
   }
 
-  const acceptanceCriteria = ticket?.acceptanceCriteria || [];
-  for (const rule of acceptanceCriteria.slice(0, 10)) {
-    const endpoint = endpoints[0];
-    if (!endpoint) break;
-    scenarios.push(
-      buildScenario(endpoint, counter++, {
-        title: `Business rule: ${rule.slice(0, 90)}`,
-        type: "business_rule",
-        expectedStatus: /not|cannot|invalid|only|exceed|less|greater/i.test(rule) ? negativeStatus(endpoint) : positiveStatus(endpoint),
-        mutations: businessRuleMutation(rule, endpoint),
-        assertions: [`Acceptance criterion is satisfied: ${rule}`],
-        sourceAc: rule,
-        risk: "high",
-      })
-    );
+  // Security/auth related
+  cases.push({
+    id: `TC-${String(counter++).padStart(3, "0")}`,
+    title: `${titleBase} - missing authorization`,
+    type: "auth",
+    authMode: "missing",
+    sourceAc: "Security",
+    description: ticket?.description || "",
+    assertions: ["API rejects unauthenticated request"],
+    mutations: [],
+  });
+
+  // Invalid payload example
+  cases.push({
+    id: `TC-${String(counter++).padStart(3, "0")}`,
+    title: `${titleBase} - invalid payload type`,
+    type: "negative",
+    sourceAc: "Derived",
+    description: ticket?.description || "",
+    assertions: ["API returns validation error for invalid type"],
+    mutations: [],
+  });
+
+  return cases;
+}
+
+function assignEndpointsToTestCases(testCases, contract, maxPerCase = 3) {
+  const scenarios = [];
+  let counter = 1;
+  const endpoints = contract?.endpoints || [];
+
+  for (const tc of testCases) {
+    // Score endpoints against the test case text
+    const text = [tc.title, tc.description, tc.sourceAc, ...(tc.assertions || [])].join(" ");
+    const scored = endpoints.map((endpoint) => ({ endpoint, score: endpointScore(text, endpoint) }));
+    scored.sort((a, b) => b.score - a.score);
+    const matched = scored.filter((s) => s.score > 0).map((s) => s.endpoint);
+    const chosen = (matched.length ? matched : endpoints.slice(0, 1)).slice(0, maxPerCase);
+
+    if (!chosen.length) {
+      // No endpoints available: create a single scenario without an endpointId
+      scenarios.push({
+        id: `${tc.id}-NOEP`,
+        title: tc.title,
+        endpointId: null,
+        method: tc.method || "GET",
+        path: tc.path || "/",
+        basePayload: {},
+        mutations: tc.mutations || [],
+        assertions: tc.assertions || [],
+        risk: tc.risk || "medium",
+        sourceAc: tc.sourceAc || "",
+      });
+      continue;
+    }
+
+    for (const endpoint of chosen) {
+      const override = {
+        title: tc.title,
+        type: tc.type,
+        expectedStatus: tc.type === "positive" ? positiveStatus(endpoint) : tc.type === "auth" ? authStatus(endpoint) : negativeStatus(endpoint),
+        assertions: tc.assertions || [],
+        mutations: tc.mutations && tc.mutations.length ? tc.mutations : tc.sourceAc ? businessRuleMutation(tc.sourceAc, endpoint) : [],
+        sourceAc: tc.sourceAc || "",
+      };
+      scenarios.push(buildScenario(endpoint, counter++, override));
+    }
   }
 
   return scenarios;
 }
 
-async function generateScenarios({ ticket, contract, useAi = false }) {
-  if (!contract?.endpoints?.length) {
-    throw new Error("No endpoints found in the API contract.");
-  }
+async function localGenerate(ticket, contract) {
+  // Create test cases based on Jira ticket only
+  const testCases = createTestCasesFromTicket(ticket || {});
+  // Assign contract endpoints to those test cases and produce per-endpoint scenarios
+  const scenarios = assignEndpointsToTestCases(testCases, contract || {});
+  return scenarios;
+}
 
-  const localScenarios = localGenerate(ticket, contract);
+async function generateScenarios({ ticket, contract, useAi = false }) {
+  // Do not require contract endpoints to generate Jira-based test cases; allow assignment later
+  const localScenarios = await localGenerate(ticket, contract || {});
   const warnings = [];
 
   if (!useAi) {
