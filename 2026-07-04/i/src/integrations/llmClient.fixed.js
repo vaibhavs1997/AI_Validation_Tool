@@ -1,4 +1,4 @@
-﻿const config = require("../config");
+const config = require("../config");
 
 function isConfigured() {
   return Boolean(config.ai.apiKey && config.ai.baseUrl && config.ai.model);
