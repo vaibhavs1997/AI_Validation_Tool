@@ -96,6 +96,19 @@ button:disabled {
   color: #fff;
 }
 
+.delete-btn {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
+  font-weight: 600;
+}
+
+.delete-btn:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
 .app-shell {
   min-height: 100vh;
   display: grid;

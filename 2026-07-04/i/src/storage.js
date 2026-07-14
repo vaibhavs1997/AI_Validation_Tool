@@ -190,8 +190,23 @@ function reportPath(id) {
   return path.join(buckets.reports, `${safeName(id)}.html`);
 }
 
+function deleteRun(id) {
+  const safeId = safeName(id);
+  const runFile = path.join(buckets.runs, `${safeId}.json`);
+  const reportFile = path.join(buckets.reports, `${safeId}.html`);
+
+  if (fs.existsSync(runFile)) {
+    fs.unlinkSync(runFile);
+  }
+  if (fs.existsSync(reportFile)) {
+    fs.unlinkSync(reportFile);
+  }
+  return { id: safeId, deleted: true };
+}
+
 module.exports = {
   buckets,
+  deleteRun,
   ensureStorage,
   listJson,
   listRunSummaries,
