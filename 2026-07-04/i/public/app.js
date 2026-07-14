@@ -56,8 +56,17 @@ function compactText(value) {
     .trim();
 }
 
+function cleanAcceptanceItem(item) {
+  if (!item) return "";
+  let s = String(item || "");
+  s = s.replace(/^(?:\s*AC(?:'s)?s?|\s*ACs|\s*Acceptance Criteria)\s*[:\-\.\s]*/i, "");
+  s = s.replace(/^[-*\s\d\.)]+/, "");
+  return s.trim();
+}
+
 function extractAcceptanceCriteria(text) {
-  const lines = compactText(text).split("\n");
+  const normalized = compactText(text);
+  const lines = normalized.split("\n");
   const headerIndex = lines.findIndex((line) =>
     /^(acceptance criteria|acceptance conditions|ac)\b/i.test(line.replace(/[:#-]/g, "").trim())
   );
@@ -65,20 +74,35 @@ function extractAcceptanceCriteria(text) {
   if (headerIndex >= 0) {
     const criteria = [];
     for (let i = headerIndex + 1; i < lines.length; i += 1) {
-      const line = lines[i].trim();
+      let line = lines[i].trim();
       if (!line) {
         if (criteria.length) break;
         continue;
       }
       if (/^[A-Z][A-Za-z ]{2,}:$/.test(line) && criteria.length) break;
-      criteria.push(line.replace(/^[-*0-9.)\s]+/, "").trim());
+      line = line.replace(/^[-*0-9.)\s]+/, "").trim();
+      if (/[,;]\s*/.test(line) && !/\bhttps?:\/\//i.test(line)) {
+        const parts = line.split(/[,;]\s*/).map((p) => p.trim()).filter(Boolean);
+        for (const p of parts) criteria.push(cleanAcceptanceItem(p));
+      } else {
+        criteria.push(cleanAcceptanceItem(line));
+      }
     }
     return criteria.filter(Boolean);
   }
 
+  // fallback: inline AC lists like "ACs: 1.foo, 2.bar"
+  const inlineMatch = normalized.match(/\b(?:acceptance criteria|ac|acs)\b\s*[:\-]\s*(.+)$/i);
+  if (inlineMatch && inlineMatch[1]) {
+    return inlineMatch[1]
+      .split(/\s*(?:\d+\.|\d+\)|,|;|\n)\s*/)
+      .map((s) => cleanAcceptanceItem(s))
+      .filter(Boolean);
+  }
+
   return lines
     .filter((line) => /^[-*]\s+/.test(line) || /^\d+[.)]\s+/.test(line))
-    .map((line) => line.replace(/^[-*0-9.)\s]+/, "").trim())
+    .map((line) => cleanAcceptanceItem(line))
     .filter(Boolean);
 }
 
@@ -294,9 +318,17 @@ async function parseContract(options = {}) {
   const raw = $("#contractJson").value.trim();
   if (!raw) return toast("Paste or upload an OpenAPI/Postman file first.");
 
+  let payload;
+  try {
+    payload = { contract: JSON.parse(raw), name: "ui-contract" };
+  } catch (err) {
+    // send raw string to server; server will attempt to parse
+    payload = { contract: raw, name: "ui-contract" };
+  }
+
   const data = await api("/api/contracts/parse", {
     method: "POST",
-    body: JSON.stringify({ contract: JSON.parse(raw), name: "ui-contract" }),
+    body: JSON.stringify(payload),
   });
   state.contract = data.contract;
   renderContractSummary();
