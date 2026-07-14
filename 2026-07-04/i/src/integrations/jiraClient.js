@@ -66,24 +66,58 @@ function compactText(value) {
     .trim();
 }
 
+function cleanAcceptanceItem(item) {
+  if (!item) return "";
+  let s = String(item || "");
+  // remove leading AC labels like "AC", "ACs", "AC`s", "Acceptance Criteria:" etc.
+  s = s.replace(/^(?:\s*AC(?:'s)?s?|\s*ACs|\s*Acceptance Criteria)\s*[:\-\.\s]*/i, "");
+  // remove leading numbering or bullets
+  s = s.replace(/^[-*\s\d\.)]+/, "");
+  return s.trim();
+}
+
 function extractAcceptanceCriteria(description) {
   const text = compactText(description);
   const lines = text.split("\n");
+  // Find a line that starts the AC section
   const startIndex = lines.findIndex((line) =>
     /^(acceptance criteria|ac|acceptance conditions)\b/i.test(line.replace(/[:#-]/g, "").trim())
   );
 
-  if (startIndex === -1) return [];
+  if (startIndex === -1) {
+    // Also support inline AC lists like "ACs: 1.foo, 2.bar" on a single line
+    const inlineMatch = text.match(/\b(?:acceptance criteria|ac|acs)\b\s*[:\-]\s*(.+)$/i);
+    if (inlineMatch && inlineMatch[1]) {
+      const tail = inlineMatch[1];
+      // Split on commas or numbered items
+      return tail
+        .split(/\s*(?:\d+\.|\d+\)|,|;|\n)\s*/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.replace(/^[:\-\s]+/, "").trim());
+    }
+    return [];
+  }
 
   const criteria = [];
   for (let i = startIndex + 1; i < lines.length; i += 1) {
-    const line = lines[i].trim();
+    let line = lines[i].trim();
     if (!line) {
       if (criteria.length) break;
       continue;
     }
+    // stop if a new heading appears after we've collected some criteria
     if (/^[A-Z][A-Za-z ]{2,}:$/.test(line) && criteria.length) break;
-    criteria.push(line.replace(/^[-*0-9.)\s]+/, "").trim());
+    // remove common list prefixes and numbering
+    line = line.replace(/^\s*(?:AC\b[:\-\s]*)?/i, "");
+    line = line.replace(/^[-*0-9.)\s]+/, "").trim();
+    // if the line contains multiple items separated by commas or semicolons, split them
+    if (/[,;]\s*/.test(line) && !/\bhttps?:\/\//i.test(line)) {
+      const parts = line.split(/[,;]\s*/).map((p) => p.trim()).filter(Boolean);
+      for (const p of parts) criteria.push(p.replace(/^[:\-\s]+/, "").trim());
+    } else {
+      criteria.push(line);
+    }
   }
   return criteria.filter(Boolean);
 }
@@ -107,7 +141,7 @@ function normalizeIssue(issue) {
   const acceptanceCriteria = [
     ...findCustomAcceptance(fields, names),
     ...extractAcceptanceCriteria(description),
-  ];
+  ].map(cleanAcceptanceItem).filter(Boolean);
 
   const comments = fields.comment?.comments || [];
 
