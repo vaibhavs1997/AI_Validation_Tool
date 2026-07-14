@@ -105,6 +105,11 @@ async function handleApi(req, res, url) {
     return run ? sendJson(res, 200, run) : notFound(res);
   }
 
+  if (req.method === "DELETE" && runMatch) {
+    const result = storage.deleteRun(runMatch[1]);
+    return sendJson(res, 200, { success: true, message: "Run deleted successfully", ...result });
+  }
+
   if (req.method !== "POST") return notFound(res);
 
   const body = await readBody(req);

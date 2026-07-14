@@ -779,6 +779,7 @@ function renderHistoryRows(runs) {
             <div class="button-row">
               <button type="button" data-load-run="${escapeHtml(run.id)}">Load</button>
               <a class="link-button" href="${escapeHtml(run.reportUrl)}" target="_blank" rel="noreferrer">Report</a>
+              <button type="button" data-delete-run="${escapeHtml(run.id)}" class="delete-btn">Delete</button>
             </div>
           </td>
         </tr>
@@ -795,6 +796,19 @@ async function loadRun(runId) {
   setActiveView("results");
   $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   toast(`Loaded run ${run.id}.`);
+}
+
+async function deleteRun(runId) {
+  if (!confirm(`Are you sure you want to delete run ${runId}?`)) {
+    return;
+  }
+
+  await api(`/api/runs/${encodeURIComponent(runId)}`, {
+    method: "DELETE",
+  });
+
+  toast(`Run ${runId} deleted successfully.`);
+  await loadRunHistory({ silent: true });
 }
 
 function bindEvents() {
@@ -822,9 +836,15 @@ function bindEvents() {
   $("#historySearch").addEventListener("input", renderHistory);
   $("#historyStatus").addEventListener("change", renderHistory);
   $("#history").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-load-run]");
-    if (!button) return;
-    loadRun(button.dataset.loadRun).catch((error) => toast(error.message));
+    const loadButton = event.target.closest("[data-load-run]");
+    if (loadButton) {
+      loadRun(loadButton.dataset.loadRun).catch((error) => toast(error.message));
+      return;
+    }
+    const deleteButton = event.target.closest("[data-delete-run]");
+    if (deleteButton) {
+      deleteRun(deleteButton.dataset.deleteRun).catch((error) => toast(error.message));
+    }
   });
 }
 
