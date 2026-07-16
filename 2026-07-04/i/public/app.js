@@ -3,6 +3,7 @@ const state = {
   ticket: null,
   contract: null,
   scenarios: [],
+  unusedEndpoints: [],
   run: null,
   reportUrl: "",
   history: {
@@ -264,7 +265,6 @@ async function loadSampleTicket(options = {}) {
   state.ticket = ticket;
   $("#jiraKey").value = ticket.key || "";
   $("#ticketJson").value = pretty(ticket);
-  renderTicketSummary();
   renderAppMetrics();
   if (!options.silent) toast("Sample ticket loaded.");
 }
@@ -279,7 +279,6 @@ async function fetchJiraTicket() {
   });
   state.ticket = data.ticket;
   $("#ticketJson").value = pretty(data.ticket);
-  renderTicketSummary();
   renderAppMetrics();
   toast(`Fetched ${data.ticket.key}.`);
 }
@@ -288,23 +287,8 @@ function getTicketFromText() {
   const raw = $("#ticketJson").value.trim();
   const ticket = parseTicketInput(raw);
   state.ticket = ticket;
-  renderTicketSummary();
   renderAppMetrics();
   return ticket;
-}
-
-function renderTicketSummary() {
-  const ticket = state.ticket;
-  if (!ticket) {
-    $("#ticketSummary").innerHTML = "";
-    return;
-  }
-
-  $("#ticketSummary").innerHTML = `
-    <span class="pill blue">${escapeHtml(ticket.key || "manual")}</span>
-    <span>${escapeHtml(ticket.summary || "")}</span>
-    <span class="pill">${(ticket.acceptanceCriteria || []).length} AC</span>
-  `;
 }
 
 async function loadSampleContract(options = {}) {
@@ -331,7 +315,6 @@ async function parseContract(options = {}) {
     body: JSON.stringify(payload),
   });
   state.contract = data.contract;
-  renderContractSummary();
   if (!options.silent) toast(`Parsed ${data.contract.endpoints.length} endpoint(s).`);
 }
 
@@ -376,7 +359,25 @@ function renderContractSummary() {
 }
 
 async function generateScenarios() {
-  const ticket = getTicketFromText();
+  // Use the currently loaded ticket (from Jira fetch, sample load, or manual input)
+  let ticket = state.ticket;
+  
+  // If no ticket is loaded but there's text in the textarea, parse it
+  if (!ticket) {
+    const raw = $("#ticketJson").value.trim();
+    if (raw) {
+      ticket = parseTicketInput(raw);
+      state.ticket = ticket;
+      renderTicketSummary();
+    }
+  }
+  
+  // If still no ticket content, fall back to textarea content
+  if (!ticket || !ticket.summary) {
+    toast("Load a Jira ticket, sample ticket, or paste ticket details first.");
+    return;
+  }
+  
   if (!state.contract) await parseContract({ silent: true });
 
   const data = await api("/api/scenarios/generate", {
@@ -389,6 +390,7 @@ async function generateScenarios() {
   });
 
   state.scenarios = data.scenarios || [];
+  state.unusedEndpoints = data.unusedEndpoints || [];
   renderWarnings(data.warnings || []);
   renderScenarios();
   renderAppMetrics();
@@ -405,10 +407,44 @@ function endpointLabel(scenario) {
   return `${scenario.method || ""} ${scenario.path || ""}`.trim();
 }
 
+function renderEndpointSummary() {
+  const used = new Map();
+  const unlinked = [];
+  for (const s of state.scenarios) {
+    if (s.unlinked || !s.endpointId) {
+      unlinked.push(s);
+      continue;
+    }
+    const key = `${s.method} ${s.path}`;
+    used.set(key, (used.get(key) || 0) + 1);
+  }
+
+  if (!used.size && !unlinked.length && !state.unusedEndpoints.length) {
+    $("#endpointSummary").innerHTML = "";
+    return;
+  }
+
+  const parts = [];
+  if (used.size) {
+    const entries = Array.from(used.entries()).sort((a, b) => b[1] - a[1]).map(([ep, count]) => `${escapeHtml(ep)}: ${count} TC(s)`).join(" · ");
+    parts.push(`<span class="pill green">Linked endpoints (${used.size})</span> ${entries}`);
+  }
+  if (unlinked.length) {
+    parts.push(`<span class="pill">Unlinked TCs: ${unlinked.length}</span>`);
+  }
+  if (state.unusedEndpoints && state.unusedEndpoints.length) {
+    const entries = state.unusedEndpoints.map((ep) => `${escapeHtml(ep.method)} ${escapeHtml(ep.path)}`).join(" · ");
+    parts.push(`<span class="pill red">Unused endpoints (${state.unusedEndpoints.length})</span> ${entries}`);
+  }
+
+  $("#endpointSummary").innerHTML = `<div class="endpoint-summary">${parts.join(" | ")}</div>`;
+}
+
 function renderScenarios() {
   const rows = $("#scenarioRows");
   if (!state.scenarios.length) {
     rows.innerHTML = '<tr><td colspan="6" class="empty">No scenarios generated yet.</td></tr>';
+    $("#endpointSummary").innerHTML = "";
     return;
   }
 
@@ -419,10 +455,10 @@ function renderScenarios() {
         <td><input class="scenario-check" type="checkbox" data-id="${escapeHtml(scenario.id)}" checked></td>
         <td>
           <strong>${escapeHtml(scenario.title)}</strong>
-          <div class="muted">${escapeHtml(scenario.id)}</div>
+          <div class="muted">${escapeHtml(scenario.id)}${scenario.unlinked ? " · unlinked" : ""}</div>
         </td>
         <td><span class="pill">${escapeHtml(scenario.type || "scenario")}</span></td>
-        <td>${escapeHtml(endpointLabel(scenario))}</td>
+        <td>${escapeHtml(endpointLabel(scenario))}${scenario.unlinked ? ' <span class="muted">(no endpoint)</span>' : ''}</td>
         <td>${escapeHtml(scenario.expectedStatus || "")}</td>
         <td>${escapeHtml(scenario.sourceAc || "")}</td>
       </tr>
@@ -434,14 +470,126 @@ function renderScenarios() {
 
   // Enable/disable the select/deselect controls depending on whether scenarios exist
   updateScenarioControls();
+  renderEndpointSummary();
 }
 
 function updateScenarioControls() {
   const has = Array.isArray(state.scenarios) && state.scenarios.length > 0;
   const selectBtn = $("#selectAllScenariosBtn");
   const deselectBtn = $("#deselectAllScenariosBtn");
+  const downloadBtn = $("#downloadScenariosBtn");
   if (selectBtn) selectBtn.disabled = !has;
   if (deselectBtn) deselectBtn.disabled = !has;
+  if (downloadBtn) downloadBtn.disabled = !has;
+}
+
+function csvCell(value) {
+  const str = String(value ?? "");
+  return str.includes(",") || str.includes('"') || str.includes("\n")
+    ? `"${str.replace(/"/g, '""')}"`
+    : str;
+}
+
+function csvLine(...cells) {
+  return cells.map(csvCell).join(",");
+}
+
+function downloadScenarios() {
+  const scenarios = state.scenarios;
+  if (!scenarios.length) return toast("No scenarios to download.");
+
+  const ticket = state.ticket;
+  const contract = state.contract;
+
+  // --- Section 1: Metadata ---
+  const parts = [];
+  parts.push("=== TEST PLAN SUMMARY ===");
+  parts.push(csvLine("Generated At", new Date().toISOString()));
+  parts.push(csvLine("Ticket Key", ticket?.key || "N/A"));
+  parts.push(csvLine("Ticket Summary", ticket?.summary || "N/A"));
+  parts.push(csvLine("Total Test Cases", scenarios.length));
+  const posCount = scenarios.filter((s) => s.type === "positive").length;
+  const negCount = scenarios.filter((s) => s.type === "negative").length;
+  const authCount = scenarios.filter((s) => s.type === "auth").length;
+  const edgeCount = scenarios.filter((s) => /edge/i.test(s.sourceAc || "") || s.title.toLowerCase().includes("edge")).length;
+  parts.push(csvLine("Positive", posCount, "Negative", negCount, "Auth", authCount, "Edge", edgeCount));
+  const linkedCount = scenarios.filter((s) => s.endpointId && !s.unlinked).length;
+  const unlinkedCount = scenarios.filter((s) => s.unlinked || !s.endpointId).length;
+  parts.push(csvLine("Linked to Endpoint", linkedCount, "Unlinked", unlinkedCount));
+  parts.push("");
+
+  // --- Section 2: Endpoint Coverage ---
+  parts.push("=== ENDPOINT COVERAGE ===");
+  parts.push(csvLine("Endpoint", "Method", "Path", "TC Count", "Status"));
+  const usedMap = new Map();
+  for (const s of scenarios) {
+    if (s.endpointId && !s.unlinked) {
+      const key = `${s.method} ${s.path}`;
+      usedMap.set(key, (usedMap.get(key) || 0) + 1);
+    }
+  }
+  if (contract?.endpoints) {
+    for (const ep of contract.endpoints) {
+      const key = `${ep.method} ${ep.path}`;
+      const count = usedMap.get(key) || 0;
+      const status = count > 0 ? "COVERED" : "NOT COVERED";
+      parts.push(csvLine(ep.operationId || key, ep.method, ep.path, count, status));
+    }
+  } else {
+    for (const [key, count] of usedMap) {
+      const [method, ...pathParts] = key.split(" ");
+      const path = pathParts.join(" ");
+      parts.push(csvLine(key, method, path, count, "COVERED"));
+    }
+  }
+  // Also show unlinked
+  if (unlinkedCount > 0) {
+    parts.push(csvLine("(no endpoint)", "", "", unlinkedCount, "UNLINKED"));
+  }
+  parts.push("");
+
+  // --- Section 3: Full Test Case Details ---
+  parts.push("=== ALL TEST CASES (Full Details) ===");
+  parts.push(csvLine(
+    "TC ID", "Title", "Type", "Endpoint", "Method", "Path",
+    "Expected Status", "Field(s)", "Mutation(s)", "Test Value(s)",
+    "Risk", "Source AC", "Linked", "Match Score", "Match Reasons"
+  ));
+  for (const s of scenarios) {
+    const method = s.method || "";
+    const path = s.path || "";
+    parts.push(csvLine(
+      s.id,
+      s.title,
+      s.type,
+      endpointLabel(s),
+      method,
+      path,
+      s.expectedStatus || "",
+      (s.mutations || []).map((m) => m.field).join("; "),
+      (s.mutations || []).map((m) => m.operation).join("; "),
+      (s.mutations || []).map((m) => m.value !== undefined ? JSON.stringify(m.value) : "").join("; "),
+      s.risk || "",
+      s.sourceAc || "",
+      s.endpointId && !s.unlinked ? "Yes" : "No",
+      s.matchScore !== undefined ? String(s.matchScore) : "",
+      (s.matchReasons || []).join("; ")
+    ));
+  }
+  parts.push("");
+
+  const csv = parts.join("\n");
+
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `scenarios-${(ticket?.key || "manual").toLowerCase()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Downloaded ${scenarios.length} scenarios as CSV (${parts.length} lines).`);
 }
 
 function setScenarioSelection(checked) {
@@ -525,9 +673,9 @@ function renderAuthFields() {
   if (type === "bearer") {
     target.innerHTML = '<label>Token<input id="authToken" type="password" autocomplete="off"></label>';
   } else if (type === "autoBearer") {
-    target.innerHTML = `
+target.innerHTML = `
       <div class="button-row auth-detect-row">
-        <button id="detectAuthEndpointBtn" type="button">Use detected token endpoint</button>
+        <button id="detectAuthEndpointBtn" type="button" class="action-btn">Use detected token endpoint</button>
       </div>
       <label>Token URL<input id="tokenUrl" type="text" placeholder="/auth/token or https://auth.company.com/token"></label>
       <label>Method
@@ -739,7 +887,7 @@ function renderTicketGroups(runs) {
             <span class="pill">Failed ${group.summary.failed || 0}</span>
           </div>
         </div>
-        <button type="button" data-load-run="${escapeHtml(group.latestRunId)}">Latest</button>
+<button type="button" data-load-run="${escapeHtml(group.latestRunId)}" class="load-btn">Latest</button>
       </div>
     `
     )
@@ -776,8 +924,8 @@ function renderHistoryRows(runs) {
           </td>
           <td>${escapeHtml(formatDate(run.createdAt))}</td>
           <td>
-            <div class="button-row">
-              <button type="button" data-load-run="${escapeHtml(run.id)}">Load</button>
+<div class="button-row">
+              <button type="button" data-load-run="${escapeHtml(run.id)}" class="load-btn">Load</button>
               <a class="link-button" href="${escapeHtml(run.reportUrl)}" target="_blank" rel="noreferrer">Report</a>
               <button type="button" data-delete-run="${escapeHtml(run.id)}" class="delete-btn">Delete</button>
             </div>
@@ -830,6 +978,7 @@ function bindEvents() {
   $("#generateBtn").addEventListener("click", () => generateScenarios().catch((error) => toast(error.message)));
   $("#selectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(true));
   $("#deselectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(false));
+  $("#downloadScenariosBtn").addEventListener("click", () => downloadScenarios());
   $("#executeBtn").addEventListener("click", () => executeSelected().catch((error) => toast(error.message)));
   $("#refreshHistoryBtn").addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
   $("#authType").addEventListener("change", renderAuthFields);

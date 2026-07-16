@@ -174,7 +174,7 @@ async function fetchIssue(issueKey) {
 }
 
 async function searchIssues(jql, maxResults = 10) {
-  const data = await jiraFetch("/rest/api/3/search", {
+  const data = await jiraFetch("/rest/api/3/search/jql", {
     method: "POST",
     body: JSON.stringify({
       jql,
