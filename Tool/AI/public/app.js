@@ -37,14 +37,51 @@ function readFileText(file) {
   });
 }
 
-function toast(message) {
+function toast(message, type = "info") {
   const el = $("#toast");
   el.textContent = message;
+  el.className = `toast ${type}`;
   el.hidden = false;
   clearTimeout(window.__toastTimer);
   window.__toastTimer = setTimeout(() => {
     el.hidden = true;
   }, 4200);
+}
+
+function showModal(title, message) {
+  // Create modal if not exists
+  let modal = document.getElementById("errorModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "errorModal";
+    modal.className = "modal-backdrop";
+    modal.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <h3 class="modal-title"></h3>
+          <button type="button" class="modal-close" aria-label="Close">×</button>
+        </div>
+        <div class="modal-body"></div>
+        <div class="modal-footer">
+          <button type="button" class="primary modal-ok">OK</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Bind close events
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal || e.target.classList.contains("modal-close") || e.target.classList.contains("modal-ok")) {
+        modal.classList.remove("show");
+        modal.hidden = true;
+      }
+    });
+  }
+  
+  modal.querySelector(".modal-title").textContent = title;
+  modal.querySelector(".modal-body").textContent = message;
+  modal.hidden = false;
+  modal.classList.add("show");
 }
 
 function compactText(value) {
@@ -295,6 +332,12 @@ async function loadSampleContract(options = {}) {
   const contract = await fetch("/sample-data/openapi-refund.json").then((res) => res.json());
   $("#contractJson").value = pretty(contract);
   await parseContract({ silent: true });
+  // Auto-fill baseUrl from contract for convenience
+  if (contract.baseUrl) {
+    $("#baseUrl").value = contract.baseUrl;
+  }
+  // Set dryRun to false by default for real API testing
+  $("#dryRun").checked = false;
   if (!options.silent) toast("Sample OpenAPI contract loaded.");
 }
 
@@ -736,9 +779,35 @@ function environmentPayload() {
 }
 
 async function executeSelected() {
+  // Validate ticket is loaded
+  if (!state.ticket) {
+    showModal("Missing Ticket", "Please load a Jira ticket or sample ticket first (click 'Sample' in section 1).");
+    return;
+  }
+  
+  // Parse contract if not loaded
+  if (!state.contract) {
+    await parseContract({ silent: true });
+  }
+  
+  // Validate contract is loaded
+  if (!state.contract || !state.contract.endpoints || state.contract.endpoints.length === 0) {
+    showModal("Missing Contract", "Please load an API contract or sample contract first (click 'Sample' in section 2).");
+    return;
+  }
+  
+  // Validate scenarios exist
+  if (!state.scenarios || state.scenarios.length === 0) {
+    showModal("No Scenarios", "Please generate test scenarios first (click 'Generate' in section 3).");
+    return;
+  }
+  
+  // Validate scenarios are selected
   const scenarios = selectedScenarios();
-  if (!scenarios.length) return toast("Select at least one scenario.");
-  if (!state.contract) return toast("Parse an API contract first.");
+  if (!scenarios.length) {
+    showModal("No Selection", "Please select at least one scenario to execute (check the boxes in the Run column).");
+    return;
+  }
 
   const data = await api("/api/runs/execute", {
     method: "POST",
@@ -787,24 +856,31 @@ function renderRun() {
     <a class="link-button" href="${state.reportUrl || `/api/reports/${encodeURIComponent(run.id)}.html`}" target="_blank" rel="noreferrer">HTML report</a>
   `;
 
-  $("#resultRows").innerHTML = (run.results || [])
+$("#resultRows").innerHTML = (run.results || [])
     .map(
-      (result) => `
+      (result) => {
+        const statusColor = result.status === "passed" ? "#238052" : result.status === "failed" ? "#b44236" : result.status === "blocked" ? "#8b6500" : "#28699a";
+        const responseTime = result.validation?.responseTimeMs ? `${result.validation.responseTimeMs}ms` : "—";
+        return `
       <tr>
         <td>
           <strong>${escapeHtml(result.title)}</strong>
           <div class="muted">${escapeHtml(result.scenarioId)}</div>
         </td>
         <td><span class="status ${escapeHtml(result.status)}">${escapeHtml(statusLabel(result.status))}</span></td>
-        <td>${escapeHtml(result.response?.status ?? result.error ?? result.status)}${result.validation?.responseTimeMs ? `<div class="muted">${result.validation.responseTimeMs}ms</div>` : ""}</td>
+        <td>
+          <span style="font-weight:600;color:${statusColor}">${result.response?.status || result.error || result.status}</span>
+          <div class="muted" style="margin-top:2px">⏱ ${responseTime}</div>
+        </td>
         <td>
           <details>
-            <summary>Evidence</summary>
-            <pre>${escapeHtml(pretty({ request: result.request, response: result.response, validation: result.validation, error: result.error }))}</pre>
+            <summary style="color:#28699a;font-weight:600">Request/Response</summary>
+            <pre style="background:#101820;color:#eef6ff;border-radius:4px;padding:8px;margin-top:4px">${escapeHtml(pretty({ request: result.request, response: result.response }))}</pre>
           </details>
         </td>
       </tr>
-    `
+    `;
+      }
     )
     .join("");
 }

@@ -54,7 +54,7 @@
         <section id="appMetrics" class="metrics-row" aria-label="Workspace metrics"></section>
 
         <main id="workspace" class="workspace">
-          <section class="panel span-5 panel-ticket" data-view-section="workspace">
+          <section class="panel span-6 panel-ticket" data-view-section="workspace">
             <div class="panel-head">
               <div>
                 <span class="step">1</span>
@@ -83,7 +83,7 @@
             </div>
           </section>
 
-          <section class="panel span-7 panel-contract" data-view-section="workspace">
+          <section class="panel span-6 panel-contract" data-view-section="workspace">
             <div class="panel-head">
               <div>
                 <span class="step">2</span>
@@ -148,7 +148,7 @@
             </div>
           </section>
 
-          <section class="panel span-4 panel-execution" data-view-section="workspace">
+          <section class="panel span-12 panel-execution" data-view-section="workspace">
             <div class="panel-head">
               <div>
                 <span class="step">4</span>
@@ -156,24 +156,26 @@
               </div>
             </div>
             <div class="panel-content">
-              <label>
-                Environment
-                <input id="envName" type="text" value="local-qa">
-              </label>
-              <label>
-                Base URL
-                <input id="baseUrl" type="url" placeholder="https://api.qa.company.com">
-              </label>
-              <label>
-                Auth type
-                <select id="authType">
-                  <option value="none">None</option>
-                  <option value="bearer">Bearer token</option>
-                  <option value="autoBearer">Auto bearer token</option>
-                  <option value="basic">Basic auth</option>
-                  <option value="custom">Custom header</option>
-                </select>
-              </label>
+              <div class="field-grid">
+                <label>
+                  Environment
+                  <input id="envName" type="text" value="local-qa">
+                </label>
+                <label>
+                  Base URL
+                  <input id="baseUrl" type="url" placeholder="https://api.qa.company.com">
+                </label>
+                <label>
+                  Auth type
+                  <select id="authType">
+                    <option value="none">None</option>
+                    <option value="bearer">Bearer token</option>
+                    <option value="autoBearer">Auto bearer token</option>
+                    <option value="basic">Basic auth</option>
+                    <option value="custom">Custom header</option>
+                  </select>
+                </label>
+              </div>
               <div id="authFields" class="auth-fields"></div>
               <label class="inline-check dry-run">
                 <input id="dryRun" type="checkbox" checked>
@@ -268,6 +270,6 @@
     </div>
 
     <div id="toast" class="toast" hidden></div>
-    <script src="/app.js?v=2"></script>
+    <script src="/app.js?v=4"></script>
   </body>
 </html>

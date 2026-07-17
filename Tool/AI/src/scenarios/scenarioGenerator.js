@@ -256,8 +256,8 @@ function createTestCasesFromTicket(ticket) {
     defaultMethod
   );
 
-  // 2. For each acceptance criterion, generate UNIQUE test scenarios
-  for (const ac of acceptance.slice(0, 15)) {
+// 2. For each acceptance criterion, generate SMART test scenarios
+  for (const ac of acceptance.slice(0, 10)) { // Limit to top 10 ACs for quality
     const acField = detectAcField(ac);
     const lower = ac.toLowerCase();
     lastDetectedField = acField;
@@ -416,31 +416,39 @@ function createTestCasesFromTicket(ticket) {
     }
   }
 
-  // 3. Generic edge cases (always unique)
-  tryAdd(`${titleBase} - [Edge] Request with empty JSON body`, "negative",
-    "Edge case - empty payload", ["API returns 400 validation error"],
-    [{ field: "body", operation: "replace", value: {} }], "medium", null);
+// 3. Generic edge cases (only if relevant to ticket content)
+  const hasSecurity = /password|auth|token|login|security/i.test(description + " " + acceptance.join(" "));
+  const hasValidation = /valid|input|data|field/i.test(description + " " + acceptance.join(" "));
+  
+  if (hasValidation) {
+    tryAdd(`${titleBase} - [Edge] Request with empty JSON body rejected`, "negative",
+      "Edge case - empty payload", ["API returns 400 validation error"],
+      [{ field: "body", operation: "replace", value: {} }], "medium", null);
+  }
 
-  tryAdd(`${titleBase} - [Edge] Request with extra unknown fields`, "negative",
-    "Edge case - unknown fields", ["API ignores or rejects unknown fields"],
-    [{ field: "extraField", operation: "replace", value: "unexpected" }], "low", null);
+  if (hasValidation) {
+    tryAdd(`${titleBase} - [Edge] Unknown fields handling`, "negative",
+      "Edge case - unknown fields", ["API ignores or rejects unknown fields"],
+      [{ field: "extraField", operation: "replace", value: "unexpected" }], "low", null);
+  }
 
-  tryAdd(`${titleBase} - [Edge] SQL injection attempt in string fields`, "negative",
-    "Edge case - injection", ["API rejects malicious input", "No SQL error exposed"],
-    [{ field: lastDetectedField, operation: "replace", value: "'; DROP TABLE users; --" }], "high", null);
+  // SQL injection/XSS only for text-heavy APIs
+  if (/text|message|content|description|name|email/i.test(description + " " + acceptance.join(" "))) {
+    tryAdd(`${titleBase} - [Edge] SQL injection prevention`, "negative",
+      "Edge case - injection", ["API rejects malicious input", "No SQL error exposed"],
+      [{ field: lastDetectedField, operation: "replace", value: "'; DROP TABLE users; --" }], "high", null);
+  }
 
-  tryAdd(`${titleBase} - [Edge] XSS attempt in string fields`, "negative",
-    "Edge case - XSS", ["API sanitizes or rejects script tags"],
-    [{ field: lastDetectedField, operation: "replace", value: "<script>alert('xss')</script>" }], "high", null);
+  // 4. AUTH / Security (only if security-related content)
+  if (hasSecurity) {
+    tryAdd(`${titleBase} - [Auth] Missing authorization rejected`, "auth",
+      "Security - missing auth", ["API returns 401 unauthorized"],
+      [{ field: "auth", operation: "remove" }], "high", "GET");
 
-  // 4. AUTH / Security
-  tryAdd(`${titleBase} - [Auth] Missing authorization header`, "auth",
-    "Security - missing auth", ["API returns 401 unauthorized"],
-    [{ field: "auth", operation: "remove" }], "high", "GET");
-
-  tryAdd(`${titleBase} - [Auth] Invalid/expired token`, "auth",
-    "Security - invalid token", ["API returns 401 or 403"],
-    [{ field: "auth", operation: "replace", value: "invalid-token" }], "high", "GET");
+    tryAdd(`${titleBase} - [Auth] Invalid token rejected`, "auth",
+      "Security - invalid token", ["API returns 401 or 403"],
+      [{ field: "auth", operation: "replace", value: "invalid-token" }], "high", "GET");
+  }
 
   return cases;
 }
@@ -557,11 +565,11 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
   const { scenarios: localScenarios, unusedEndpoints } = await localGenerate(ticket, normalizedContract);
   const prioritized = prioritizeScenarios(localScenarios);
 
-  if (!useAi) {
+if (!useAi) {
     return {
       mode: "local",
       warnings,
-      scenarios: localScenarios,
+      scenarios: prioritized,
       unusedEndpoints,
     };
   }
