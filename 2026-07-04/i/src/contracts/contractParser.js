@@ -232,11 +232,59 @@ function parsePostman(raw) {
   };
 }
 
+function parseHarRequest(entry) {
+  const request = entry.request || {};
+  const method = (request.method || "GET").toUpperCase();
+  const url = request.url || "";
+
+  let body = null;
+  const postData = request.postData || {};
+  if (postData.text) {
+    try {
+      body = JSON.parse(postData.text);
+    } catch {
+      // Non-JSON body, skip
+    }
+  }
+
+  return {
+    id: `${method}-${url.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 20)}`.replace(/_+/g, "_"),
+    method,
+    path: url.replace(/^https?:\/\/[^/]+/i, ""),
+    operationId: entry._id || "",
+    summary: entry.title || `${method} ${url}`,
+    description: entry.comment || "",
+    tags: [],
+    parameters: request.headers ? Object.entries(request.headers).map(([name, value]) => ({ name, value })) : [],
+    requestSchema: body && typeof body === "object" ? inferSchemaFromValue(body) : null,
+    responses: { 200: "OK" },
+    responseSchemas: {},
+  };
+}
+
+function parseHarLog(log) {
+  const entries = log.entries || [];
+  const endpoints = entries
+    .filter((entry) => entry.request && (entry.request.method === "GET" || entry.request.method === "POST" || entry.request.method === "PUT" || entry.request.method === "DELETE"))
+    .map(parseHarRequest)
+    .filter((ep) => ep.path && ep.path !== "/");
+
+  return {
+    type: "har",
+    title: log.version ? `HAR Log v${log.version}` : "HAR Import",
+    version: "1.0.0",
+    baseUrl: "",
+    endpoints,
+    importedAt: new Date().toISOString(),
+  };
+}
+
 function parseContract(input) {
   const raw = parseJsonInput(input);
   if (raw.openapi || raw.swagger) return parseOpenApi(raw);
   if (raw.info?._postman_id || raw.item || raw.collection?.item) return parsePostman(raw);
-  throw new Error("Unsupported contract. Provide OpenAPI/Swagger JSON or Postman collection JSON.");
+  if (raw.log && Array.isArray(raw.log.entries)) return parseHarLog(raw.log);
+  throw new Error("Unsupported contract. Provide OpenAPI/Swagger JSON, Postman collection JSON, or HAR file.");
 }
 
 function createSampleValue(schema, fieldName = "value") {

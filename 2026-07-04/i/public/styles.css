@@ -2,7 +2,7 @@
   --bg: #f3f6f8;
   --surface: #ffffff;
   --surface-alt: #f7fafc;
-  --ink: #15202b;
+  --ink: #15212b;
   --muted: #657487;
   --line: #d9e1e8;
   --line-strong: #c5d1dc;
@@ -22,6 +22,33 @@
   --violet-soft: #eeeafd;
   --shadow: 0 14px 34px rgba(21, 32, 43, 0.08);
   --shadow-soft: 0 8px 22px rgba(21, 32, 43, 0.06);
+}
+
+/* Dark Theme Variables */
+[data-theme="dark"] {
+  --bg: #0f1419;
+  --surface: #1a1f26;
+  --surface-alt: #22282f;
+  --ink: #eef6ff;
+  --muted: #a4b1c2;
+  --line: #3a4552;
+  --line-strong: #4a5766;
+  --nav: #0a0e14;
+  --nav-soft: #12181f;
+  --blue: #4aa1d8;
+  --blue-deep: #2a80c4;
+  --green: #38c172;
+  --red: #f26a5a;
+  --amber: #d4af37;
+  --violet: #8b78e8;
+  --cyan-soft: #123c46;
+  --blue-soft: #1a3b5c;
+  --green-soft: #123e26;
+  --red-soft: #3a1a16;
+  --amber-soft: #3a2e0a;
+  --violet-soft: #2a2252;
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.25);
+  --shadow-soft: 0 8px 22px rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -552,9 +579,23 @@ textarea {
   border: 1px solid var(--line-strong);
   border-radius: 6px;
   padding: 9px 10px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   outline: none;
+}
+
+/* Dark theme inputs */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #1d242c;
+  border-color: #3a4552;
+  color: #eef6ff;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #8a9ba8;
 }
 
 input:focus,
@@ -715,6 +756,11 @@ tr:last-child td {
 
 tbody tr:hover td {
   background: #fbfdff;
+}
+
+/* Dark theme table hover */
+[data-theme="dark"] tbody tr:hover td {
+  background: #2a3441;
 }
 
 .select-col {

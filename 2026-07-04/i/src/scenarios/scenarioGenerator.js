@@ -526,6 +526,18 @@ async function localGenerate(ticket, contract) {
   return { scenarios, unusedEndpoints };
 }
 
+function prioritizeScenarios(scenarios) {
+  const riskScores = { high: 3, medium: 2, low: 1 };
+  return [...scenarios].sort((a, b) => {
+    const aRisk = riskScores[a.risk] || 2;
+    const bRisk = riskScores[b.risk] || 2;
+    if (bRisk !== aRisk) return bRisk - aRisk;
+    // Then by match score (better matches first)
+    if ((b.matchScore || 0) !== (a.matchScore || 0)) return (b.matchScore || 0) - (a.matchScore || 0);
+    return (a.title || "").localeCompare(b.title || "");
+  });
+}
+
 async function generateScenarios({ ticket, contract, useAi = false }) {
   const warnings = [];
 
@@ -543,6 +555,7 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
   }
 
   const { scenarios: localScenarios, unusedEndpoints } = await localGenerate(ticket, normalizedContract);
+  const prioritized = prioritizeScenarios(localScenarios);
 
   if (!useAi) {
     return {

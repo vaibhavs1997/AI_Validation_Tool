@@ -6,6 +6,7 @@ const storage = require("./storage");
 const jiraClient = require("./integrations/jiraClient");
 const llmClient = require("./integrations/llmClient");
 const { parseContract } = require("./contracts/contractParser");
+const { compareContracts } = require("./contracts/openapiDiff");
 const { generateScenarios } = require("./scenarios/scenarioGenerator");
 const { executeRun } = require("./execution/executionEngine");
 const { generateHtmlReport } = require("./reporting/reportGenerator");
@@ -129,6 +130,13 @@ async function handleApi(req, res, url) {
     const contract = parseContract(body.contract || body.content);
     storage.saveJson("contracts", body.name || contract.title || "contract", contract);
     return sendJson(res, 200, { contract });
+  }
+
+  if (url.pathname === "/api/contracts/diff") {
+    const oldContract = parseContract(body.oldContract || body.old);
+    const newContract = parseContract(body.newContract || body.new);
+    const diff = compareContracts(oldContract, newContract);
+    return sendJson(res, 200, { diff });
   }
 
   if (url.pathname === "/api/scenarios/generate") {

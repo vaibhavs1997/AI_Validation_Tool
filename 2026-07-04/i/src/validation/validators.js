@@ -48,13 +48,28 @@ function validateStatus(actualStatus, expectedStatus) {
   };
 }
 
-function validateResponse({ scenario, endpoint, status, body }) {
+function validateResponseTime(responseTimeMs, maxMs) {
+  return {
+    name: `Response time under ${maxMs}ms`,
+    passed: responseTimeMs <= maxMs,
+    actual: responseTimeMs,
+    expected: maxMs,
+  };
+}
+
+function validateResponse({ scenario, endpoint, status, body, responseTimeMs }) {
   const assertions = [];
   if (scenario.expectedStatus) assertions.push(validateStatus(status, scenario.expectedStatus));
 
   const responseSchema = endpoint?.responseSchemas?.[String(status)] || endpoint?.responseSchemas?.default;
   if (responseSchema && body !== undefined && body !== null) {
     assertions.push(...validateSchema(body, responseSchema));
+  }
+
+  // Performance validation
+  if (responseTimeMs !== undefined) {
+    const threshold = scenario.maxResponseTimeMs || endpoint?.performanceThreshold || 5000;
+    assertions.push(validateResponseTime(responseTimeMs, threshold));
   }
 
   for (const assertion of scenario.assertions || []) {
@@ -72,6 +87,7 @@ function validateResponse({ scenario, endpoint, status, body }) {
     assertions,
     passed: deterministic.length > 0 && failed.length === 0,
     failed: failed.length > 0,
+    responseTimeMs: responseTimeMs || null,
   };
 }
 
@@ -79,4 +95,5 @@ module.exports = {
   validateResponse,
   validateSchema,
   validateStatus,
+  validateResponseTime,
 };

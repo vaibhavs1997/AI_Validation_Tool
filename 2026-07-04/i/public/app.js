@@ -478,9 +478,11 @@ function updateScenarioControls() {
   const selectBtn = $("#selectAllScenariosBtn");
   const deselectBtn = $("#deselectAllScenariosBtn");
   const downloadBtn = $("#downloadScenariosBtn");
+  const exportPostmanBtn = $("#exportPostmanBtn");
   if (selectBtn) selectBtn.disabled = !has;
   if (deselectBtn) deselectBtn.disabled = !has;
   if (downloadBtn) downloadBtn.disabled = !has;
+  if (exportPostmanBtn) exportPostmanBtn.disabled = !has;
 }
 
 function csvCell(value) {
@@ -770,6 +772,11 @@ function renderRun() {
     ["Dry Run", summary.dry_run || 0],
   ];
   if (run.authStatus) stats.push(["Auth", statusLabel(run.authStatus.status)]);
+  
+  // Calculate average response time
+  const responseTimes = (run.results || []).map(r => r.validation?.responseTimeMs).filter(Boolean);
+  const avgTime = responseTimes.length ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
+  if (avgTime > 0) stats.push(["Avg Time", `${avgTime}ms`]);
 
   $("#runSummary").innerHTML = stats
     .map(([label, value]) => `<span class="stat-pill">${label} <strong>${value}</strong></span>`)
@@ -789,7 +796,7 @@ function renderRun() {
           <div class="muted">${escapeHtml(result.scenarioId)}</div>
         </td>
         <td><span class="status ${escapeHtml(result.status)}">${escapeHtml(statusLabel(result.status))}</span></td>
-        <td>${escapeHtml(result.response?.status ?? result.error ?? result.status)}</td>
+        <td>${escapeHtml(result.response?.status ?? result.error ?? result.status)}${result.validation?.responseTimeMs ? `<div class="muted">${result.validation.responseTimeMs}ms</div>` : ""}</td>
         <td>
           <details>
             <summary>Evidence</summary>
@@ -959,6 +966,19 @@ async function deleteRun(runId) {
   await loadRunHistory({ silent: true });
 }
 
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+  const nextTheme = currentTheme === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", nextTheme);
+  localStorage.setItem("theme", nextTheme);
+  $("#themeToggle").textContent = nextTheme === "dark" ? "☀️" : "🌙";
+}
+
+function initTheme() {
+  const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+  $("#themeToggle").textContent = currentTheme === "dark" ? "☀️" : "🌙";
+}
+
 function bindEvents() {
   $$("[data-view-trigger]").forEach((trigger) => {
     trigger.addEventListener("click", (event) => {
@@ -979,11 +999,13 @@ function bindEvents() {
   $("#selectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(true));
   $("#deselectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(false));
   $("#downloadScenariosBtn").addEventListener("click", () => downloadScenarios());
+  $("#exportPostmanBtn").addEventListener("click", () => generatePostmanCollection());
   $("#executeBtn").addEventListener("click", () => executeSelected().catch((error) => toast(error.message)));
   $("#refreshHistoryBtn").addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
   $("#authType").addEventListener("change", renderAuthFields);
   $("#historySearch").addEventListener("input", renderHistory);
   $("#historyStatus").addEventListener("change", renderHistory);
+  $("#themeToggle").addEventListener("click", toggleTheme);
   $("#history").addEventListener("click", (event) => {
     const loadButton = event.target.closest("[data-load-run]");
     if (loadButton) {
@@ -997,8 +1019,64 @@ function bindEvents() {
   });
 }
 
+function generatePostmanCollection() {
+  const scenarios = state.scenarios;
+  if (!scenarios.length) return toast("No scenarios to export.");
+
+  const ticket = state.ticket;
+  const contract = state.contract;
+
+  const collection = {
+    info: {
+      name: `${ticket?.key || "manual"} - API Tests`,
+      version: "1.0.0",
+      description: ticket?.summary || "Generated from AI API Validation Tool",
+    },
+    item: scenarios
+      .filter((s) => s.endpointId && s.method && s.path)
+      .map((s) => ({
+        name: s.title.slice(0, 80),
+        request: {
+          method: s.method,
+          header: [
+            { key: "Content-Type", value: "application/json", type: "text" },
+          ],
+          url: {
+            raw: s.path,
+            host: "",
+            path: s.path.split("/").filter(Boolean),
+          },
+          body: {
+            mode: "raw",
+            raw: JSON.stringify(s.basePayload || {}, null, 2),
+          },
+        },
+        response: [],
+      })),
+  };
+
+  if (contract?.baseUrl) {
+    collection.info.schema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
+    collection.item.forEach((item) => {
+      item.request.url.raw = `${contract.baseUrl}${item.request.url.raw}`;
+    });
+  }
+
+  const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `postman-${(ticket?.key || "manual").toLowerCase()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`Exported ${collection.item.length} requests to Postman collection.`);
+}
+
 async function boot() {
   bindEvents();
+  initTheme();
   renderAuthFields();
   setActiveView(initialViewFromHash(), { skipHash: true });
   renderAppMetrics();
