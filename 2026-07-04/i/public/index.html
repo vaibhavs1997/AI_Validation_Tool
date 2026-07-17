@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
+    <script>
+      // Theme initialization before CSS load
+      (function() {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+      })();
+    </script>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
@@ -37,6 +45,7 @@
             <h1>Ticket-to-API validation</h1>
           </div>
           <div class="topbar-actions">
+            <button id="themeToggle" type="button" class="link-button ghost" title="Toggle dark mode">🌙</button>
             <a class="link-button ghost" href="/api/health" target="_blank" rel="noreferrer">Health</a>
             <a class="link-button ghost" href="/api/runs" target="_blank" rel="noreferrer">Runs API</a>
           </div>
@@ -112,6 +121,7 @@
                 </label>
                 <button id="generateBtn" type="button" class="primary-action">Generate</button>
                 <button id="downloadScenariosBtn" type="button" class="secondary-action" disabled>Download CSV</button>
+                <button id="exportPostmanBtn" type="button" class="secondary-action" disabled>Export Postman</button>
               </div>
             </div>
             <div class="panel-content">

@@ -179,6 +179,8 @@ async function executeScenario({ scenario, endpoint, environment }) {
     body: hasBody ? payload : null,
   };
 
+  const requestStarted = Date.now();
+
   if (environment.dryRun) {
     return {
       scenarioId: scenario.id,
@@ -210,11 +212,13 @@ async function executeScenario({ scenario, endpoint, environment }) {
 
     const text = await response.text();
     const body = parseResponseBody(text, response.headers.get("content-type"));
-    const validation = validateResponse({
+  const responseTimeMs = Date.now() - requestStarted;
+  const validation = validateResponse({
       scenario,
       endpoint,
       status: response.status,
       body,
+      responseTimeMs,
     });
 
     return {
@@ -251,6 +255,25 @@ async function executeScenario({ scenario, endpoint, environment }) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function executeScenarioParallel(scenarios, endpointMap, contract, environment) {
+  // Execute scenarios in parallel batches for better performance
+  const results = [];
+  const batchSize = 5; // Process 5 at a time to avoid overwhelming servers
+  
+  for (let i = 0; i < scenarios.length; i += batchSize) {
+    const batch = scenarios.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(async (scenario) => {
+        const endpoint = endpointMap.get(scenario.endpointId) || contract.endpoints?.[0];
+        return executeScenario({ scenario, endpoint, environment });
+      })
+    );
+    results.push(...batchResults);
+  }
+  
+  return results;
 }
 
 async function executeRun({ ticket, contract, scenarios, environment }) {
@@ -303,10 +326,9 @@ async function executeRun({ ticket, contract, scenarios, environment }) {
     };
   }
 
-  for (const scenario of scenarios) {
-    const endpoint = endpointMap.get(scenario.endpointId) || contract.endpoints?.[0];
-    results.push(await executeScenario({ scenario, endpoint, environment: effectiveEnvironment }));
-  }
+  // Use parallel execution for speed
+  const parallelResults = await executeScenarioParallel(scenarios, endpointMap, contract, effectiveEnvironment);
+  results.push(...parallelResults);
 
   const summary = results.reduce(
     (acc, result) => {

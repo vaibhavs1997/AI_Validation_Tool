@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  ai-validator:
+    build: .
+    ports:
+      - "4173:4173"
+    environment:
+      - NODE_ENV=production
+      - PORT=4173
+    volumes:
+      - ./data:/app/data
+      - ./sample-data:/app/sample-data
+    restart: unless-stopped
