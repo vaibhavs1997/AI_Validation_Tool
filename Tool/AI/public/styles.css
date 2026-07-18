@@ -74,7 +74,7 @@ button,
 .link-button {
   min-height: 34px;
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   border-radius: 6px;
   padding: 7px 12px;
@@ -85,6 +85,18 @@ button,
   justify-content: center;
   gap: 6px;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+/* Dark theme link-button fix - visible on dark background */
+[data-theme="dark"] .link-button {
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .link-button:not(.ghost):hover {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
 }
 
 button:hover,
@@ -680,8 +692,14 @@ textarea:focus {
 }
 
 .pill {
-  background: #edf2f6;
-  color: #33485c;
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+/* Dark theme pill fix */
+[data-theme="dark"] .pill {
+  background: var(--surface-alt);
+  color: var(--muted);
 }
 
 .pill.blue {
@@ -873,13 +891,18 @@ tbody tr:hover td {
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 800;
 }
 
 .stat-pill strong {
   color: var(--ink);
+}
+
+/* Dark theme stat-pill fix */
+[data-theme="dark"] .stat-pill {
+  background: var(--surface-alt);
 }
 
 details summary {

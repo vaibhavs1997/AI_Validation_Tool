@@ -27,8 +27,8 @@
 
         <nav class="side-nav" aria-label="Primary navigation">
           <a class="active" href="#workspace" data-view-trigger="workspace">Workspace</a>
+          <a href="#results" data-view-trigger="results">Recent Run</a>
           <a href="#history" data-view-trigger="history">Run History</a>
-          <a href="#results" data-view-trigger="results">Results</a>
         </nav>
 
         <div class="server-card">
@@ -181,7 +181,39 @@
                 <input id="dryRun" type="checkbox" checked>
                 Dry run
               </label>
-              <button id="executeBtn" type="button" class="primary full-width">Execute selected</button>
+<div class="button-row">
+  <button id="runAllBtn" type="button" class="secondary-action">Run All (Auto)</button>
+  <button id="executeBtn" type="button" class="primary">Execute selected</button>
+            </div>
+          </section>
+
+          <section id="results" class="panel span-12 panel-results" data-view-section="results">
+            <div class="panel-head">
+              <div>
+                <span class="step">5</span>
+                <h2>Recent Run Results</h2>
+              </div>
+              <div id="reportLinks" class="button-row"></div>
+            </div>
+            <div class="panel-content">
+              <div id="runSummary" class="result-stats"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Scenario</th>
+                      <th>Status</th>
+                      <th>Actual</th>
+                      <th>Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody id="resultRows">
+                    <tr>
+                      <td colspan="4" class="empty">No run executed yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </section>
 
@@ -229,36 +261,6 @@
                   <tbody id="historyRows">
                     <tr>
                       <td colspan="6" class="empty">No run history yet.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-
-          <section id="results" class="panel span-12 panel-results" data-view-section="results">
-            <div class="panel-head">
-              <div>
-                <span class="step">5</span>
-                <h2>Run Results</h2>
-              </div>
-              <div id="reportLinks" class="button-row"></div>
-            </div>
-            <div class="panel-content">
-              <div id="runSummary" class="result-stats"></div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Scenario</th>
-                      <th>Status</th>
-                      <th>Actual</th>
-                      <th>Evidence</th>
-                    </tr>
-                  </thead>
-                  <tbody id="resultRows">
-                    <tr>
-                      <td colspan="4" class="empty">No run executed yet.</td>
                     </tr>
                   </tbody>
                 </table>
