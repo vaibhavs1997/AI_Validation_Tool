@@ -74,7 +74,7 @@ button,
 .link-button {
   min-height: 34px;
   border: 1px solid var(--line-strong);
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
   border-radius: 6px;
   padding: 7px 12px;
@@ -85,6 +85,18 @@ button,
   justify-content: center;
   gap: 6px;
   transition: border-color 140ms ease, background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+/* Dark theme link-button fix - visible on dark background */
+[data-theme="dark"] .link-button {
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .link-button:not(.ghost):hover {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
 }
 
 button:hover,
@@ -198,6 +210,27 @@ button:disabled {
   background: var(--red);
   color: #fff;
   border-color: var(--red);
+}
+
+/* Dark theme button fixes */
+[data-theme="dark"] .delete-btn {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+[data-theme="dark"] .delete-btn:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+[data-theme="dark"] .load-btn {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+[data-theme="dark"] .load-btn:hover {
+  background: var(--green);
+  color: #fff;
 }
 
 .app-shell {
@@ -544,6 +577,10 @@ button:disabled {
   grid-column: span 5;
 }
 
+.span-6 {
+  grid-column: span 6;
+}
+
 .span-7 {
   grid-column: span 7;
 }
@@ -655,8 +692,14 @@ textarea:focus {
 }
 
 .pill {
-  background: #edf2f6;
-  color: #33485c;
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+
+/* Dark theme pill fix */
+[data-theme="dark"] .pill {
+  background: var(--surface-alt);
+  color: var(--muted);
 }
 
 .pill.blue {
@@ -848,13 +891,18 @@ tbody tr:hover td {
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface);
   color: var(--muted);
   font-weight: 800;
 }
 
 .stat-pill strong {
   color: var(--ink);
+}
+
+/* Dark theme stat-pill fix */
+[data-theme="dark"] .stat-pill {
+  background: var(--surface-alt);
 }
 
 details summary {
@@ -897,6 +945,77 @@ pre {
   background: #17212b;
   color: #fff;
   box-shadow: var(--shadow);
+}
+
+/* Modal Styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+}
+
+.modal-backdrop:not(.show) {
+  display: none;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: var(--shadow);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-alt);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+}
+
+.modal-close:hover {
+  color: var(--ink);
+}
+
+.modal-body {
+  padding: 20px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-alt);
 }
 
 @media (max-width: 1180px) {

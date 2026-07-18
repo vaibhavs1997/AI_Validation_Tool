@@ -15,8 +15,8 @@ for /f "tokens=5" %%i in ('netstat -ano ^| findstr :4173') do (
 
 REM Start the server
 echo Starting server...
-cd /d "2026-07-04\i"
-npm run dev
+cd /d "Tool\AI"
+node src/server.js
 
 echo.
 echo Server started! Open http://localhost:4173 in your browser.
