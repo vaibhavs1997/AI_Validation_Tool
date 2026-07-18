@@ -417,11 +417,22 @@ async function generateScenarios() {
   
   // If still no ticket content, fall back to textarea content
   if (!ticket || !ticket.summary) {
-    toast("Load a Jira ticket, sample ticket, or paste ticket details first.");
+    showModal("Step 1: No Ticket Loaded", "Cannot generate scenarios without a ticket. Click the 'Sample' button in the Jira Ticket section to load a demo ticket, or paste ticket JSON/description into the text area.");
     return;
   }
   
-  if (!state.contract) await parseContract({ silent: true });
+  if (!state.contract) {
+    const raw = $("#contractJson").value.trim();
+    if (!raw) {
+      showModal("Step 2: No Contract Loaded", "Cannot generate scenarios without an API contract. Click the 'Sample' button in the API Contract section to load a demo OpenAPI contract, or paste an OpenAPI/Postman JSON into the text area.");
+      return;
+    }
+    await parseContract({ silent: true });
+    if (!state.contract) {
+      showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed. Make sure it is valid OpenAPI, Postman collection, or HAR format.");
+      return;
+    }
+  }
 
   const data = await api("/api/scenarios/generate", {
     method: "POST",
@@ -778,37 +789,173 @@ function environmentPayload() {
   };
 }
 
-async function executeSelected() {
-  // Validate ticket is loaded
+async function runAll() {
+  // Auto-load sample ticket if none loaded
   if (!state.ticket) {
-    showModal("Missing Ticket", "Please load a Jira ticket or sample ticket first (click 'Sample' in section 1).");
-    return;
+    await loadSampleTicket({ silent: true });
   }
   
-  // Parse contract if not loaded
+  // Auto-parse contract if not loaded
   if (!state.contract) {
-    await parseContract({ silent: true });
+    const raw = $("#contractJson").value.trim();
+    if (!raw) {
+      await loadSampleContract({ silent: true });
+    } else {
+      await parseContract({ silent: true });
+    }
   }
-  
-  // Validate contract is loaded
-  if (!state.contract || !state.contract.endpoints || state.contract.endpoints.length === 0) {
-    showModal("Missing Contract", "Please load an API contract or sample contract first (click 'Sample' in section 2).");
-    return;
-  }
-  
-  // Validate scenarios exist
-  if (!state.scenarios || state.scenarios.length === 0) {
-    showModal("No Scenarios", "Please generate test scenarios first (click 'Generate' in section 3).");
-    return;
-  }
-  
-  // Validate scenarios are selected
-  const scenarios = selectedScenarios();
-  if (!scenarios.length) {
-    showModal("No Selection", "Please select at least one scenario to execute (check the boxes in the Run column).");
+  if (!state.contract) {
+    showModal("Run All Failed", "Could not load API contract.");
     return;
   }
 
+  // Auto-generate scenarios
+  await generateScenarios();
+  
+  // Wait a tick for state to update
+  await new Promise(r => setTimeout(r, 100));
+
+  if (!state.scenarios || state.scenarios.length === 0) {
+    showModal("Run All Failed", "No scenarios generated.");
+    return;
+  }
+
+  // Auto-unselect dry run
+  $("#dryRun").checked = false;
+
+  // Execute all scenarios
+  const scenarios = state.scenarios;
+  const env = environmentPayload();
+  
+  toast("Running all scenarios...");
+  
+  const data = await api("/api/runs/execute", {
+    method: "POST",
+    body: JSON.stringify({
+      ticket: state.ticket,
+      contract: state.contract,
+      scenarios,
+      environment: env,
+    }),
+  });
+
+  state.run = data.run;
+  state.reportUrl = data.reportUrl;
+  renderRun();
+  await loadRunHistory({ silent: true });
+  setActiveView("results");
+  $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
+  toast(`Run All complete: ${data.run.summary.passed} passed, ${data.run.summary.failed} failed`);
+}
+
+async function executeSelected() {
+  // ---- Step 1: Ticket Validation ----
+  if (!state.ticket) {
+    showModal("Step 1: No Ticket Loaded", "You need a Jira ticket to generate test scenarios. Click the 'Sample' button in the Jira Ticket section to load a demo ticket, or paste ticket JSON/plain text into the text area.");
+    return;
+  }
+  
+  // ---- Step 2: Contract Validation ----
+  if (!state.contract) {
+    const raw = $("#contractJson").value.trim();
+    if (!raw) {
+      showModal("Step 2: No Contract Loaded", "You need an API contract to proceed. Click the 'Sample' button in the API Contract section to load a demo OpenAPI contract, or paste an OpenAPI/Postman JSON into the text area.");
+      return;
+    }
+    await parseContract({ silent: true });
+    if (!state.contract) {
+      showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed. Make sure it is valid OpenAPI, Postman collection v2.1, or HAR format.");
+      return;
+    }
+  }
+  if (!state.contract.endpoints || state.contract.endpoints.length === 0) {
+    showModal("Step 2: No Endpoints in Contract", "The contract was parsed successfully but contains no API endpoints. Check that your OpenAPI spec has path definitions or your Postman collection has request items.");
+    return;
+  }
+  
+  // ---- Step 3: Scenarios Validation ----
+  if (!state.scenarios || state.scenarios.length === 0) {
+    showModal("Step 3: No Scenarios Generated", "You need to generate test scenarios first. Click the 'Generate' button in the Generated Scenarios section to create scenarios from your ticket and contract. Ensure your ticket has acceptance criteria defined.");
+    return;
+  }
+  
+  const scenarios = selectedScenarios();
+  if (!scenarios.length) {
+    showModal("Step 3: No Scenarios Selected", "At least one scenario must be selected for execution. Check the checkbox(es) in the 'Run' column next to the scenarios you want to execute. Use 'Select all' to quickly select all scenarios.");
+    return;
+  }
+
+  // ---- Step 4: Execution Section Field Validation ----
+  const envName = $("#envName").value.trim();
+  const baseUrl = $("#baseUrl").value.trim();
+  const authType = $("#authType").value;
+  const isDryRun = $("#dryRun").checked;
+
+  if (!envName) {
+    showModal("Step 4: Environment Name Required", "The 'Environment' field in the Execution section is empty. Enter a name to identify this test run (e.g. 'local-qa', 'staging', 'production').");
+    $("#envName").focus();
+    return;
+  }
+
+  if (!baseUrl) {
+    showModal("Step 4: Base URL Required", "The 'Base URL' field in the Execution section is empty. Enter the API base URL where requests will be sent (e.g. https://api.qa.company.com). This URL is combined with endpoint paths to form complete request URLs.");
+    $("#baseUrl").focus();
+    return;
+  }
+
+  if (!/^https?:\/\/.+/i.test(baseUrl)) {
+    showModal("Step 4: Invalid Base URL Format", "The Base URL must start with http:// or https://. Example: https://api.qa.company.com");
+    $("#baseUrl").focus();
+    return;
+  }
+
+  if (authType === "bearer") {
+    const token = ($("#authToken")?.value || "").trim();
+    if (!token) {
+      showModal("Step 4: Bearer Token Missing", "Auth type is 'Bearer token' but no token value was entered. Provide a valid token in the Token field, or change the Auth type to 'None' if the API does not require authentication.");
+      $("#authToken").focus();
+      return;
+    }
+  }
+
+  if (authType === "autoBearer") {
+    const tokenUrl = ($("#tokenUrl")?.value || "").trim();
+    if (!tokenUrl) {
+      showModal("Step 4: Token URL Missing", "Auth type is 'Auto bearer token' but no Token URL was provided. Enter the authentication endpoint path (e.g. /auth/token) or click 'Use detected token endpoint' to auto-fill from the contract.");
+      $("#tokenUrl").focus();
+      return;
+    }
+  }
+
+  if (authType === "basic") {
+    const username = ($("#authUsername")?.value || "").trim();
+    const password = ($("#authPassword")?.value || "").trim();
+    if (!username) {
+      showModal("Step 4: Basic Auth Username Missing", "Auth type is 'Basic auth' but the Username field is empty. Enter a username for basic HTTP authentication.");
+      $("#authUsername").focus();
+      return;
+    }
+    if (!password) {
+      showModal("Step 4: Basic Auth Password Missing", "Auth type is 'Basic auth' but the Password field is empty. Enter a password for basic HTTP authentication.");
+      $("#authPassword").focus();
+      return;
+    }
+  }
+
+  if (authType === "custom") {
+    const headerName = ($("#authHeaderName")?.value || "").trim();
+    const headerValue = ($("#authHeaderValue")?.value || "").trim();
+    if (!headerName) {
+      showModal("Step 4: Custom Header Name Missing", "Auth type is 'Custom header' but the Header Name field is empty. Enter the header name (e.g. X-API-Key).");
+      $("#authHeaderName").focus();
+      return;
+    }
+    if (!headerValue) {
+      showModal("Step 4: Custom Header Value Missing", "Auth type is 'Custom header' but the Header Value field is empty. Enter the value for the custom authentication header.");
+      $("#authHeaderValue").focus();
+      return;
+    }
+  }
   const data = await api("/api/runs/execute", {
     method: "POST",
     body: JSON.stringify({
@@ -1076,6 +1223,7 @@ function bindEvents() {
   $("#deselectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(false));
   $("#downloadScenariosBtn").addEventListener("click", () => downloadScenarios());
   $("#exportPostmanBtn").addEventListener("click", () => generatePostmanCollection());
+$("#runAllBtn").addEventListener("click", () => runAll().catch((error) => toast(error.message)));
   $("#executeBtn").addEventListener("click", () => executeSelected().catch((error) => toast(error.message)));
   $("#refreshHistoryBtn").addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
   $("#authType").addEventListener("change", renderAuthFields);
