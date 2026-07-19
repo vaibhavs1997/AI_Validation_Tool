@@ -306,10 +306,6 @@ function createSampleValue(schema, fieldName = "value") {
   if (type === "number") return schema.minimum ?? 10.5;
   if (type === "boolean") return true;
 
-  if (/email/i.test(fieldName)) return "qa.user@example.com";
-  if (/id$/i.test(fieldName)) return "sample-id";
-  if (/date/i.test(fieldName)) return "2026-07-04";
-  if (/amount|price|total/i.test(fieldName)) return 10;
   return `sample-${fieldName}`;
 }
 

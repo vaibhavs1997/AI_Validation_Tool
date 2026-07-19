@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI API Validation Tool MVP</title>
+    <title>Ticket-to-API Validation</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
@@ -21,7 +22,7 @@
           <div class="brand-mark">AV</div>
           <div>
             <strong>API Validator</strong>
-            <span>MVP Workbench</span>
+            <span>QA Automation Platform</span>
           </div>
         </div>
 
@@ -41,106 +42,256 @@
       <div class="main-shell">
         <header class="topbar">
           <div>
-            <span class="eyebrow">QA automation console</span>
-            <h1>Ticket-to-API validation</h1>
+            <span class="eyebrow">QA automation platform</span>
+            <h1>Ticket-to-API Validation</h1>
           </div>
           <div class="topbar-actions">
             <button id="themeToggle" type="button" class="link-button ghost" title="Toggle dark mode">🌙</button>
-            <a class="link-button ghost" href="/api/health" target="_blank" rel="noreferrer">Health</a>
-            <a class="link-button ghost" href="/api/runs" target="_blank" rel="noreferrer">Runs API</a>
+            <details class="dev-dropdown">
+              <summary class="dev-trigger link-button ghost" title="Developer tools">Dev</summary>
+              <div class="dev-menu">
+                <a href="/api/health" target="_blank" rel="noreferrer" class="dev-item">Health</a>
+                <a href="/api/runs" target="_blank" rel="noreferrer" class="dev-item">Runs API</a>
+              </div>
+            </details>
           </div>
         </header>
 
-        <section id="appMetrics" class="metrics-row" aria-label="Workspace metrics"></section>
+        <!-- Compact workflow status -->
+        <div id="compactWorkflow" class="compact-workflow" aria-label="Workflow status"></div>
 
         <main id="workspace" class="workspace">
-          <section class="panel span-6 panel-ticket" data-view-section="workspace">
-            <div class="panel-head">
+
+          <!-- ═══════ SECTION 1: REQUIREMENTS ═══════ -->
+          <section class="panel span-6 panel-requirements" data-view-section="workspace" data-section="requirements">
+            <div class="panel-head" data-toggle-section>
               <div>
                 <span class="step">1</span>
-                <h2>Jira Ticket</h2>
+                <h2>Requirements</h2>
               </div>
-              <div class="button-row">
-                <button id="loadSampleTicketBtn" type="button" class="sample-btn">Sample</button>
-                <button id="fetchJiraBtn" type="button" class="action-btn">Fetch</button>
+              <div class="panel-head-right">
+                <span id="reqStatusBadge" class="status-badge"></span>
+                <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
               </div>
             </div>
-            <div class="panel-content">
-              <div class="field-grid">
-                <label>
-                  Ticket key
-                  <input id="jiraKey" type="text" placeholder="PAY-1234">
-                </label>
-                <label>
-                  Upload ticket file
-                  <input id="ticketFile" type="file">
-                </label>
+
+            <!-- Expanded state: input form -->
+            <div class="panel-body panel-body-expanded">
+              <div class="source-selector">
+                <label class="source-label">Source</label>
+                <div class="source-options">
+                  <span class="source-chip active" data-source="jira">Jira</span>
+                  <span class="source-chip" data-source="manual">Manual</span>
+                </div>
               </div>
-              <label>
-                Ticket description / JSON
-                <textarea id="ticketJson" class="code-input" spellcheck="false"></textarea>
-              </label>
+
+              <!-- Jira source inputs -->
+              <div class="source-panel source-jira">
+                <div class="field-grid cols-2">
+                  <label>
+                    Ticket key
+                    <input id="jiraKey" type="text" placeholder="e.g. PROJ-1234">
+                  </label>
+                  <label class="file-upload">
+                    Upload file
+                    <input id="ticketFile" type="file">
+                  </label>
+                </div>
+                <div class="button-row">
+                  <button id="loadSampleTicketBtn" type="button" class="sample-btn">Sample</button>
+                  <button id="fetchJiraBtn" type="button" class="action-btn">Fetch</button>
+                </div>
+              </div>
+
+              <!-- Manual source inputs -->
+              <div class="source-panel source-manual" hidden>
+                <label>
+                  Requirement description / JSON
+                  <textarea id="ticketJson" class="code-input" spellcheck="false" placeholder="Paste ticket JSON or description text..."></textarea>
+                </label>
+                <div class="button-row">
+                  <button id="applyManualTicketBtn" type="button" class="action-btn">Apply</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Collapsed state: summary -->
+            <div class="panel-body panel-body-summary" hidden>
+              <div class="summary-row">
+                <div class="summary-primary">
+                  <strong id="reqSummaryKey">—</strong>
+                  <span id="reqSummaryText">No requirements loaded</span>
+                </div>
+                <div class="summary-stats">
+                  <span class="stat-chip"><span id="reqSummaryCount">0</span> requirements</span>
+                  <span class="stat-chip"><span id="reqSummaryAcCount">0</span> ACs</span>
+                  <span class="stat-chip" id="reqGapChip" hidden><span id="reqSummaryGapCount">0</span> gaps</span>
+                </div>
+                <div class="summary-actions">
+                  <button id="viewRequirementsBtn" type="button" class="link-button">View Details</button>
+                  <button id="viewRawTicketBtn" type="button" class="link-button">View Raw</button>
+                  <button id="changeTicketBtn" type="button" class="link-button">Change</button>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section class="panel span-6 panel-contract" data-view-section="workspace">
-            <div class="panel-head">
+          <!-- ═══════ SECTION 2: API COLLECTION ═══════ -->
+          <section class="panel span-6 panel-collection" data-view-section="workspace" data-section="collection">
+            <div class="panel-head" data-toggle-section>
               <div>
                 <span class="step">2</span>
-                <h2>API Contract</h2>
+                <h2>API Collection</h2>
               </div>
+              <div class="panel-head-right">
+                <span id="collectionStatusBadge" class="status-badge"></span>
+                <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
+              </div>
+            </div>
+
+            <!-- Expanded state: input form -->
+            <div class="panel-body panel-body-expanded">
+              <div class="field-grid">
+                <label class="file-upload">
+                  Upload collection
+                  <input id="contractFile" type="file" accept=".json,application/json">
+                </label>
+              </div>
+              <div class="format-hint">
+                Supported: OpenAPI 3.x · Swagger · Postman Collection v2.1 · HAR
+              </div>
+              <label>
+                OpenAPI / Postman JSON
+                <textarea id="contractJson" class="code-input" spellcheck="false" placeholder="Paste OpenAPI or Postman collection JSON..."></textarea>
+              </label>
               <div class="button-row">
                 <button id="loadSampleContractBtn" type="button" class="sample-btn">Sample</button>
                 <button id="parseContractBtn" type="button" class="action-btn">Parse</button>
               </div>
             </div>
-            <div class="panel-content">
-              <label>
-                Upload contract file
-                <input id="contractFile" type="file" accept=".json,application/json">
-              </label>
-              <label>
-                OpenAPI / Postman collection
-                <textarea id="contractJson" class="code-input" spellcheck="false"></textarea>
-              </label>
+
+            <!-- Collapsed state: summary -->
+            <div class="panel-body panel-body-summary" hidden>
+              <div class="summary-row">
+                <div class="summary-primary">
+                  <strong id="collectionSummaryTitle">—</strong>
+                  <span id="collectionSummaryFormat"></span>
+                </div>
+                <div class="summary-stats">
+                  <span class="stat-chip"><span id="collectionSummaryCount">0</span> operations</span>
+                  <span class="stat-chip" id="collectionVariableChip" hidden><span id="collectionSummaryVars">0</span> variables</span>
+                  <span class="stat-chip" id="collectionAuthChip" hidden><span id="collectionSummaryAuth"></span> auth</span>
+                  <span class="stat-chip" id="collectionWarnChip" hidden><span id="collectionSummaryWarns">0</span> warnings</span>
+                </div>
+                <div class="summary-actions">
+                  <button id="viewCatalogBtn" type="button" class="link-button">View API Catalog</button>
+                  <button id="viewRawContractBtn" type="button" class="link-button">View Raw</button>
+                  <button id="changeContractBtn" type="button" class="link-button">Change</button>
+                </div>
+              </div>
+              <!-- Method breakdown -->
+              <div id="methodBreakdown" class="method-breakdown"></div>
             </div>
           </section>
 
-          <section class="panel span-12 panel-scenarios" data-view-section="workspace">
+          <!-- ═══════ SECTION 3: TEST SCENARIOS ═══════ -->
+          <section class="panel span-12 panel-scenarios" data-view-section="workspace" data-section="scenarios">
             <div class="panel-head">
               <div>
                 <span class="step">3</span>
-                <h2>Generated Scenarios</h2>
+                <h2>Test Scenarios</h2>
               </div>
-              <div class="button-row">
-                <button id="selectAllScenariosBtn" type="button" class="action-btn">Select all</button>
-                <button id="deselectAllScenariosBtn" type="button" class="action-btn">Deselect all</button>
-                <label class="inline-check">
-                  <input id="useAi" type="checkbox">
-                  AI enhance
-                </label>
-                <button id="generateBtn" type="button" class="primary-action">Generate</button>
-                <button id="downloadScenariosBtn" type="button" class="secondary-action" disabled>Download CSV</button>
-                <button id="exportPostmanBtn" type="button" class="secondary-action" disabled>Export Postman</button>
+              <div class="panel-head-right">
+                <span id="scenariosStatusBadge" class="status-badge"></span>
               </div>
             </div>
-            <div class="panel-content">
+            <div class="panel-body">
+              <!-- Summary bar -->
+              <div id="scenariosSummary" class="scenarios-summary" hidden>
+                <div class="scenario-metrics">
+                  <span class="scenario-metric"><strong id="scTotal">0</strong> Total</span>
+                  <span class="scenario-metric" id="scPosMetric"><strong id="scPos">0</strong> Positive</span>
+                  <span class="scenario-metric" id="scNegMetric"><strong id="scNeg">0</strong> Negative</span>
+                  <span class="scenario-metric" id="scBoundMetric"><strong id="scBound">0</strong> Boundary</span>
+                  <span class="scenario-metric" id="scEdgeMetric"><strong id="scEdge">0</strong> Edge</span>
+                  <span class="scenario-metric" id="scSecMetric"><strong id="scSec">0</strong> Security</span>
+                </div>
+                <div class="scenario-mapping-summary">
+                  <span class="mapping-stat" id="mapHigh"><span class="map-dot map-high"></span> <span id="mapHighCount">0</span> HIGH</span>
+                  <span class="mapping-stat" id="mapMedium"><span class="map-dot map-medium"></span> <span id="mapMediumCount">0</span> MEDIUM</span>
+                  <span class="mapping-stat" id="mapLow"><span class="map-dot map-low"></span> <span id="mapLowCount">0</span> LOW</span>
+                  <span class="mapping-stat" id="mapAmbiguous"><span class="map-dot map-ambiguous"></span> <span id="mapAmbigCount">0</span> AMBIGUOUS</span>
+                  <span class="mapping-stat" id="mapUnmapped"><span class="map-dot map-unmapped"></span> <span id="mapUnmapCount">0</span> UNMAPPED</span>
+                </div>
+              </div>
+
+              <!-- Empty state -->
+              <div id="scenariosEmpty" class="empty-state">
+                <div class="empty-icon">🧪</div>
+                <strong>No test scenarios yet</strong>
+                <p>Complete Requirements and API Collection, then generate tests.</p>
+              </div>
+
               <div id="warnings" class="warning-list"></div>
+
+              <!-- Controls -->
+              <div id="scenariosControls" class="scenarios-controls" hidden>
+                <div class="controls-primary">
+                  <button id="generateBtn" type="button" class="primary-action">Generate Tests</button>
+                  <label class="inline-check">
+                    <input id="useAi" type="checkbox">
+                    AI enhance
+                  </label>
+                </div>
+                <div class="controls-secondary">
+                  <button id="selectAllScenariosBtn" type="button" class="action-btn" disabled>Select All</button>
+                  <button id="deselectAllScenariosBtn" type="button" class="action-btn" disabled>Deselect All</button>
+                </div>
+                <div class="controls-tertiary">
+                  <details class="inline-details">
+                    <summary>Export</summary>
+                    <div class="inline-menu">
+                      <button id="downloadScenariosBtn" type="button" class="menu-item" disabled>Download CSV</button>
+                      <button id="exportPostmanBtn" type="button" class="menu-item" disabled>Export Postman</button>
+                    </div>
+                  </details>
+                </div>
+              </div>
+
+              <!-- Filter bar -->
+              <div id="scenariosFilters" class="scenarios-filters" hidden>
+                <input id="scenarioSearch" type="search" placeholder="Search scenarios..." class="filter-search">
+                <select id="scenarioTypeFilter" class="filter-select">
+                  <option value="all">All types</option>
+                </select>
+                <select id="scenarioMapFilter" class="filter-select">
+                  <option value="all">All mapping</option>
+                  <option value="high">HIGH</option>
+                  <option value="medium">MEDIUM</option>
+                  <option value="low">LOW</option>
+                  <option value="ambiguous">AMBIGUOUS</option>
+                  <option value="unmapped">UNMAPPED</option>
+                </select>
+                <span id="scenarioFilterCount" class="filter-count"></span>
+              </div>
+
+              <!-- Scenario table -->
               <div class="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th class="select-col">Run</th>
-                      <th>Scenario</th>
+                      <th>Test Scenario</th>
                       <th>Type</th>
-                      <th>Endpoint</th>
-                      <th>Expected</th>
-                      <th>Trace</th>
+                      <th>Target API</th>
+                      <th>Mapping</th>
+                      <th>Priority</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody id="scenarioRows">
                     <tr>
-                      <td colspan="6" class="empty">No scenarios generated yet.</td>
+                      <td colspan="7" class="empty">No scenarios generated yet.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -148,54 +299,117 @@
             </div>
           </section>
 
-          <section class="panel span-12 panel-execution" data-view-section="workspace">
+          <!-- ═══════ SECTION 4: TEST EXECUTION ═══════ -->
+          <section class="panel span-12 panel-execution" data-view-section="workspace" data-section="execution">
             <div class="panel-head">
               <div>
                 <span class="step">4</span>
-                <h2>Execution</h2>
+                <h2>Test Execution</h2>
+              </div>
+              <div class="panel-head-right">
+                <span id="executionStatusBadge" class="status-badge"></span>
               </div>
             </div>
-            <div class="panel-content">
-              <div class="field-grid">
-                <label>
-                  Environment
-                  <input id="envName" type="text" value="local-qa">
-                </label>
-                <label>
-                  Base URL
-                  <input id="baseUrl" type="url" placeholder="https://api.qa.company.com">
-                </label>
-                <label>
-                  Auth type
-                  <select id="authType">
-                    <option value="none">None</option>
-                    <option value="bearer">Bearer token</option>
-                    <option value="autoBearer">Auto bearer token</option>
-                    <option value="basic">Basic auth</option>
-                    <option value="custom">Custom header</option>
-                  </select>
-                </label>
+            <div class="panel-body">
+              <!-- Empty state -->
+              <div id="execEmpty" class="empty-state">
+                <div class="empty-icon">⚡</div>
+                <strong>No tests ready to execute</strong>
+                <p>Generate tests with API mappings first, then configure execution.</p>
               </div>
-              <div id="authFields" class="auth-fields"></div>
-              <label class="inline-check dry-run">
-                <input id="dryRun" type="checkbox" checked>
-                Dry run
-              </label>
-<div class="button-row">
-  <button id="runAllBtn" type="button" class="secondary-action">Run All (Auto)</button>
-  <button id="executeBtn" type="button" class="primary">Execute selected</button>
+
+              <div id="execContent" hidden>
+                <!-- Readiness checks -->
+                <div class="readiness-section">
+                  <h3 class="readiness-title">Execution Readiness</h3>
+                  <div class="readiness-grid">
+                    <div class="readiness-item" id="readinessEnv">
+                      <span class="readiness-label">Environment</span>
+                      <span class="readiness-value" id="readinessEnvVal">—</span>
+                      <span class="readiness-check" id="readinessEnvIcon">◯</span>
+                    </div>
+                    <div class="readiness-item" id="readinessUrl">
+                      <span class="readiness-label">Base URL</span>
+                      <span class="readiness-value" id="readinessUrlVal">—</span>
+                      <span class="readiness-check" id="readinessUrlIcon">◯</span>
+                    </div>
+                    <div class="readiness-item" id="readinessAuth">
+                      <span class="readiness-label">Authentication</span>
+                      <span class="readiness-value" id="readinessAuthVal">—</span>
+                      <span class="readiness-check" id="readinessAuthIcon">◯</span>
+                    </div>
+                    <div class="readiness-item" id="readinessMappings">
+                      <span class="readiness-label">API Mappings</span>
+                      <span class="readiness-value" id="readinessMappingVal">—</span>
+                      <span class="readiness-check" id="readinessMappingIcon">◯</span>
+                    </div>
+                    <div class="readiness-item" id="readinessBlocked">
+                      <span class="readiness-label">Blocked Tests</span>
+                      <span class="readiness-value" id="readinessBlockedVal">—</span>
+                      <span class="readiness-check" id="readinessBlockedIcon">◯</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Configuration -->
+                <details class="advanced-config">
+                  <summary class="advanced-summary">Advanced Execution Settings</summary>
+                  <div class="advanced-body">
+                    <div class="field-grid cols-3">
+                      <label>
+                        Environment
+                        <input id="envName" type="text" value="local-qa">
+                      </label>
+                      <label>
+                        Base URL
+                        <input id="baseUrl" type="url" placeholder="https://api.qa.company.com">
+                      </label>
+                      <label>
+                        Auth type
+                        <select id="authType">
+                          <option value="none">None</option>
+                          <option value="bearer">Bearer token</option>
+                          <option value="autoBearer">Auto bearer token</option>
+                          <option value="basic">Basic auth</option>
+                          <option value="custom">Custom header</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div id="authFields" class="auth-fields"></div>
+                  </div>
+                </details>
+
+                <!-- Run controls -->
+                <div class="run-controls">
+                  <div class="run-stats">
+                    <span class="ready-count"><strong id="readyCount">0</strong> ready</span>
+                    <span class="blocked-count"><strong id="blockedCount">0</strong> blocked</span>
+                    <span class="selected-count" id="selectedCountSpan" hidden><strong id="selectedCount">0</strong> selected</span>
+                  </div>
+                  <div class="run-buttons">
+                    <label class="inline-check dry-run-check">
+                      <input id="dryRun" type="checkbox" checked>
+                      <span title="Validate request construction without executing against real API">Dry run</span>
+                    </label>
+                    <button id="runAllBtn" type="button" class="secondary-action" title="Run all ready tests automatically">Run <span id="readyCountBtn">0</span> Ready Tests</button>
+                    <button id="executeBtn" type="button" class="primary-action">Run Selected Tests</button>
+                    <button id="viewBlockedBtn" type="button" class="link-button" hidden>View Blocked</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
+          <!-- ═══════ RESULTS (inline, no separate view section) ═══════ -->
           <section id="results" class="panel span-12 panel-results" data-view-section="results">
             <div class="panel-head">
               <div>
-                <span class="step">5</span>
+                <span class="step">R</span>
                 <h2>Recent Run Results</h2>
               </div>
               <div id="reportLinks" class="button-row"></div>
             </div>
-            <div class="panel-content">
+            <div class="panel-body">
               <div id="runSummary" class="result-stats"></div>
               <div class="table-wrap">
                 <table>
@@ -217,6 +431,7 @@
             </div>
           </section>
 
+          <!-- ═══════ RUN HISTORY ═══════ -->
           <section id="history" class="panel span-12 panel-history" data-view-section="history">
             <div class="panel-head">
               <div>
@@ -227,7 +442,7 @@
                 <button id="refreshHistoryBtn" type="button" class="refresh-btn">Refresh</button>
               </div>
             </div>
-            <div class="panel-content">
+            <div class="panel-body">
               <div class="history-toolbar">
                 <label>
                   Search
@@ -267,11 +482,12 @@
               </div>
             </div>
           </section>
+
         </main>
       </div>
     </div>
 
     <div id="toast" class="toast" hidden></div>
-    <script src="/app.js?v=4"></script>
+    <script src="/app.js?v=5"></script>
   </body>
 </html>

@@ -3,7 +3,10 @@ const path = require("path");
 
 const rootDir = path.resolve(__dirname, "..");
 
+let dotEnvLoaded = false;
+
 function loadDotEnv() {
+  if (dotEnvLoaded) return;
   const envPath = path.join(rootDir, ".env");
   if (!fs.existsSync(envPath)) return;
 
@@ -26,6 +29,7 @@ function loadDotEnv() {
 
     if (!process.env[key]) process.env[key] = value;
   }
+  dotEnvLoaded = true;
 }
 
 loadDotEnv();
@@ -62,3 +66,7 @@ const config = {
 };
 
 module.exports = config;
+
+config.init = function () {
+  if (!dotEnvLoaded) loadDotEnv();
+};
