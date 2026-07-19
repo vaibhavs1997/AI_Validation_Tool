@@ -1,6 +1,20 @@
 const state = {
   view: "workspace",
+  // Requirement state - the actual loaded ticket (shared)
   ticket: null,
+  // UI state for Jira tab (independent from Manual)
+  jira: {
+    inputKey: "",
+    fetched: false,
+    error: false,
+    loading: false,
+  },
+  // UI state for Manual tab (independent from Jira)
+  manual: {
+    entered: false,
+    error: false,
+    draft: "",
+  },
   contract: null,
   scenarios: [],
   unusedEndpoints: [],
@@ -11,17 +25,47 @@ const state = {
     tickets: [],
     totals: { runs: 0, tickets: 0, summary: {} },
   },
+  ticketVersion: 0,
+  contractVersion: 0,
 };
+
+function saveState() {
+  try {
+    const persistedState = {
+      ticket: state.ticket,
+      contract: state.contract,
+      scenarios: state.scenarios,
+      ticketVersion: state.ticketVersion,
+      contractVersion: state.contractVersion,
+    };
+    localStorage.setItem("workspaceState", JSON.stringify(persistedState));
+  } catch (e) {}
+}
+
+function loadState() {
+  try {
+    const saved = localStorage.getItem("workspaceState");
+    if (!saved) return false;
+    const persistedState = JSON.parse(saved);
+    state.ticket = persistedState.ticket || null;
+    state.contract = persistedState.contract || null;
+    state.scenarios = persistedState.scenarios || [];
+    state.ticketVersion = persistedState.ticketVersion || 0;
+    state.contractVersion = persistedState.contractVersion || 0;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """);
+  // Creates a span, sets textContent (safe), then returns innerHTML (escaped)
+  const span = document.createElement("span");
+  span.textContent = value ?? "";
+  return span.innerHTML;
 }
 
 function pretty(value) {
@@ -43,9 +87,7 @@ function toast(message, type = "info") {
   el.className = `toast ${type}`;
   el.hidden = false;
   clearTimeout(window.__toastTimer);
-  window.__toastTimer = setTimeout(() => {
-    el.hidden = true;
-  }, 4200);
+  window.__toastTimer = setTimeout(() => { el.hidden = true; }, 4200);
 }
 
 function showModal(title, message) {
@@ -58,14 +100,13 @@ function showModal(title, message) {
       <div class="modal" role="dialog" aria-modal="true">
         <div class="modal-header">
           <h3 class="modal-title"></h3>
-          <button type="button" class="modal-close" aria-label="Close">×</button>
+          <button type="button" class="modal-close" aria-label="Close">x</button>
         </div>
         <div class="modal-body"></div>
         <div class="modal-footer">
           <button type="button" class="primary modal-ok">OK</button>
         </div>
-      </div>
-    `;
+      </div>`;
     document.body.appendChild(modal);
     modal.addEventListener("click", (e) => {
       if (e.target === modal || e.target.classList.contains("modal-close") || e.target.classList.contains("modal-ok")) {
@@ -109,44 +150,29 @@ function extractAcceptanceCriteria(text) {
     const criteria = [];
     for (let i = headerIndex + 1; i < lines.length; i += 1) {
       let line = lines[i].trim();
-      if (!line) {
-        if (criteria.length) break;
-        continue;
-      }
+      if (!line) { if (criteria.length) break; continue; }
       if (/^[A-Z][A-Za-z ]{2,}:$/.test(line) && criteria.length) break;
       line = line.replace(/^[-*0-9.)\s]+/, "").trim();
       if (/[,;]\s*/.test(line) && !/\bhttps?:\/\//i.test(line)) {
-        const parts = line.split(/[,;]\s*/).map((p) => p.trim()).filter(Boolean);
-        for (const p of parts) criteria.push(cleanAcceptanceItem(p));
-      } else {
-        criteria.push(cleanAcceptanceItem(line));
-      }
+        line.split(/[,;]\s*/).map((p) => p.trim()).filter(Boolean).forEach((p) => criteria.push(cleanAcceptanceItem(p)));
+      } else { criteria.push(cleanAcceptanceItem(line)); }
     }
     return criteria.filter(Boolean);
   }
 
   const inlineMatch = normalized.match(/\b(?:acceptance criteria|ac|acs)\b\s*[:\-]\s*(.+)$/i);
   if (inlineMatch && inlineMatch[1]) {
-    return inlineMatch[1]
-      .split(/\s*(?:\d+\.|\d+\)|,|;|\n)\s*/)
-      .map((s) => cleanAcceptanceItem(s))
-      .filter(Boolean);
+    return inlineMatch[1].split(/\s*(?:\d+\.|\d+\)|,|;|\n)\s*/).map((s) => cleanAcceptanceItem(s)).filter(Boolean);
   }
 
-  return lines
-    .filter((line) => /^[-*]\s+/.test(line) || /^\d+[.)]\s+/.test(line))
-    .map((line) => cleanAcceptanceItem(line))
-    .filter(Boolean);
+  return lines.filter((line) => /^[-*]\s+/.test(line) || /^\d+[.)]\s+/.test(line)).map((line) => cleanAcceptanceItem(line)).filter(Boolean);
 }
 
 function normalizeUploadedTicket(value) {
   if (!value || typeof value !== "object") return value;
   if (value.fields) {
     const fields = value.fields || {};
-    const description =
-      typeof fields.description === "string"
-        ? fields.description
-        : value.description || "";
+    const description = typeof fields.description === "string" ? fields.description : value.description || "";
     return {
       key: value.key || $("#jiraKey").value.trim() || "MANUAL-TICKET",
       summary: fields.summary || value.summary || "Manual ticket",
@@ -168,42 +194,17 @@ function ticketFromPlainText(raw) {
   const firstLine = description.split("\n").find(Boolean) || "Manual API validation request";
   const keyFromText = description.match(/\b[A-Z][A-Z0-9]+-\d+\b/)?.[0];
   const key = $("#jiraKey").value.trim() || keyFromText || `MANUAL-${Date.now()}`;
-
-  return {
-    key,
-    summary: firstLine.replace(/^summary[:\s-]*/i, "").slice(0, 140),
-    issueType: "Manual",
-    status: "Draft",
-    priority: "",
-    labels: ["manual-input"],
-    description,
-    acceptanceCriteria: extractAcceptanceCriteria(description),
-    comments: [],
-    fetchedAt: new Date().toISOString(),
-    source: "plain_text",
-  };
+  return { key, summary: firstLine.replace(/^summary[:\s-]*/i, "").slice(0, 140), issueType: "Manual", status: "Draft", priority: "", labels: ["manual-input"], description, acceptanceCriteria: extractAcceptanceCriteria(description), comments: [], fetchedAt: new Date().toISOString(), source: "plain_text" };
 }
 
 function parseTicketInput(raw) {
   const text = String(raw || "").trim();
   if (!text) throw new Error("Ticket description is empty.");
-
-  try {
-    const parsed = JSON.parse(text);
-    return normalizeUploadedTicket(parsed);
-  } catch {
-    return ticketFromPlainText(text);
-  }
+  try { return normalizeUploadedTicket(JSON.parse(text)); } catch { return ticketFromPlainText(text); }
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  const response = await fetch(path, { ...options, headers: { "Content-Type": "application/json", ...(options.headers || {}) } });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || response.statusText);
   return data;
@@ -211,35 +212,24 @@ async function api(path, options = {}) {
 
 function formatDate(value) {
   if (!value) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 function statusLabel(value) {
-  return String(value || "needs_review")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return String(value || "needs_review").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function setActiveView(view, options = {}) {
   const allowedViews = new Set(["workspace", "history", "results"]);
-  const nextView = allowedViews.has(view) ? view : "workspace";
-  state.view = nextView;
-
+  state.view = allowedViews.has(view) ? view : "workspace";
   $$("[data-view-section]").forEach((section) => {
-    section.classList.toggle("view-hidden", section.dataset.viewSection !== nextView);
+    section.classList.toggle("view-hidden", section.dataset.viewSection !== state.view);
   });
-
   $$("[data-view-trigger]").forEach((trigger) => {
-    trigger.classList.toggle("active", trigger.dataset.viewTrigger === nextView);
+    trigger.classList.toggle("active", trigger.dataset.viewTrigger === state.view);
   });
-
   if (!options.skipHash) {
-    const hash = nextView === "workspace" ? "#workspace" : `#${nextView}`;
+    const hash = state.view === "workspace" ? "#workspace" : `#${state.view}`;
     if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
   }
 }
@@ -262,24 +252,72 @@ function renderAppMetrics() {
   const totals = state.history.totals || { runs: 0, tickets: 0, summary: {} };
   const summary = totals.summary || {};
   const selectedCount = $$(".scenario-check:checked").length;
-
-  $("#appMetrics").innerHTML = [
+  const appMetrics = $("#appMetrics");
+  if (!appMetrics) return;
+  appMetrics.innerHTML = [
     ["Ticket", state.ticket?.key || "Not loaded", state.ticket?.summary || "Ready for input"],
     ["Scenarios", state.scenarios.length, `${selectedCount || 0} selected`],
     ["Stored Runs", totals.runs || 0, `${totals.tickets || 0} ticket(s)`],
     ["Passed", summary.passed || 0, `${summary.failed || 0} failed`],
     ["Dry Runs", summary.dry_run || 0, `${summary.blocked || 0} blocked`],
-  ]
-    .map(
-      ([label, value, helper]) => `
+  ].map(([label, value, helper]) => `
       <div class="metric-tile">
         <span>${escapeHtml(label)}</span>
         <strong>${escapeHtml(value)}</strong>
         <small>${escapeHtml(helper)}</small>
-      </div>
-    `
-    )
-    .join("");
+      </div>`).join("");
+}
+
+function updateScenariosPrereqStatus() {
+  const reqPrereq = $("#scPrereqReq");
+  const apiPrereq = $("#scPrereqApi");
+  const generateBtn = $("#generateScenariosBtn");
+  const helpText = $("#generateHelpText");
+  if (reqPrereq) reqPrereq.className = "prereq-item" + (state.ticket ? " loaded" : "");
+  if (apiPrereq) apiPrereq.className = "prereq-item" + (state.contract ? " loaded" : "");
+  const ready = state.ticket && state.contract;
+  if (generateBtn) generateBtn.disabled = !ready;
+  if (helpText) helpText.hidden = ready;
+}
+
+function updateScenariosSummary() {
+  const totalEl = $("#scTotal");
+  const selectedEl = $("#scSelected");
+  if (totalEl) totalEl.textContent = state.scenarios.length;
+  if (selectedEl) selectedEl.textContent = $$(".scenario-check:checked").length;
+}
+
+function setScenariosState(stateName) {
+  const emptyState = $("#scenariosEmptyState");
+  const loadingState = $("#scenariosLoading");
+  const summaryBar = $("#scenariosSummary");
+  const tableWrap = $(".table-wrap");
+  if (emptyState) emptyState.hidden = stateName !== "empty";
+  if (loadingState) loadingState.hidden = stateName !== "loading";
+  if (summaryBar) summaryBar.hidden = stateName !== "generated";
+  if (tableWrap) tableWrap.hidden = stateName !== "generated";
+}
+
+function updateStepSummaries() {
+  const reqSummary = $("#reqStepSummary");
+  if (reqSummary) reqSummary.textContent = state.ticket ? `${state.ticket.key} · ${state.ticket.summary || "Loaded"}` : "Not configured";
+  const reqStepStatus = $("#reqStepStatus");
+  if (reqStepStatus) { reqStepStatus.textContent = state.ticket ? "✓" : ""; reqStepStatus.className = "step-status" + (state.ticket ? " loaded" : ""); }
+
+  const collectionSummary = $("#collectionStepSummary");
+  if (collectionSummary) collectionSummary.textContent = state.contract ? `${state.contract.title || "API Collection"} · ${state.contract.endpoints?.length || 0} endpoints` : "Not configured";
+  const collectionStepStatus = $("#collectionStepStatus");
+  if (collectionStepStatus) { collectionStepStatus.textContent = state.contract ? "✓" : ""; collectionStepStatus.className = "step-status" + (state.contract ? " loaded" : ""); }
+
+  const scenariosSummary = $("#scenariosStepSummary");
+  if (scenariosSummary) scenariosSummary.textContent = state.scenarios.length ? `${state.scenarios.length} generated · ${$$(".scenario-check:checked").length} selected` : "Not generated";
+  const scenariosStepStatus = $("#scenariosStepStatus");
+  if (scenariosStepStatus) { scenariosStepStatus.textContent = state.scenarios.length ? "✓" : ""; scenariosStepStatus.className = "step-status" + (state.scenarios.length ? " loaded" : ""); }
+
+  const execSummary = $("#execStepSummary");
+  if (execSummary) execSummary.textContent = state.scenarios.length && state.contract && state.ticket ? `Ready · ${$$(".scenario-check:checked").length} tests selected` : "Not ready";
+  const execStepStatus = $("#executionStepStatus");
+  if (execStepStatus) { execStepStatus.textContent = state.scenarios.length && state.contract && state.ticket ? "✓" : ""; execStepStatus.className = "step-status" + (state.scenarios.length && state.contract && state.ticket ? " loaded" : ""); }
 }
 
 function renderCompactWorkflow() {
@@ -287,39 +325,49 @@ function renderCompactWorkflow() {
   const contract = state.contract;
   const scenarios = state.scenarios || [];
   const run = state.run;
-
-  const reqText = ticket?.key ? `${ticket.key} ✓` : "Not configured";
-  const apiText = contract
-    ? contract.title
-      ? `${contract.title} ✓`
-      : `${contract.endpoints?.length || 0} endpoints ✓`
-    : "Not configured";
-  const scText = scenarios.length
-    ? `${scenarios.length} generated`
-    : "Not generated";
-  const execText = run
-    ? `Completed · ${(run.summary?.passed || 0)} passed`
-    : scenarios.length && contract && ticket
-      ? "Ready to Run"
-      : "Not ready";
-
+  
+  // Step 1 - Requirement
+  const reqStepText = ticket ? "✓ Requirement" : "1 Requirement";
+  const reqStepValue = ticket ? (ticket.key || "Loaded") : "Not configured";
   const reqClass = ticket ? "completed" : "";
+  
+  // Step 2 - API Collection
+  const apiStepText = contract ? "✓ API Collection" : "2 API Collection";
+  const apiStepValue = contract ? `${contract.endpoints?.length || 0} endpoints` : "Not configured";
   const apiClass = contract ? "completed" : "";
+  
+  // Step 3 - Test Scenarios
+  const scStepText = scenarios.length ? "✓ Test Scenarios" : "3 Test Scenarios";
+  const scStepValue = scenarios.length ? `${scenarios.length} generated` : "Not generated";
   const scClass = scenarios.length ? "completed" : "";
-  const execClass = run
-    ? "completed"
-    : scenarios.length && contract && ticket
-      ? "active"
-      : "";
-
-  $("#compactWorkflow").innerHTML = `
-    <span class="cw-step ${reqClass}"><span class="cw-badge">${escapeHtml(reqText)}</span></span>
-    <span class="cw-sep"></span>
-    <span class="cw-step ${apiClass}"><span class="cw-badge">${escapeHtml(apiText)}</span></span>
-    <span class="cw-sep"></span>
-    <span class="cw-step ${scClass}"><span class="cw-badge">${escapeHtml(scText)}</span></span>
-    <span class="cw-sep"></span>
-    <span class="cw-step ${execClass}"><span class="cw-badge">${escapeHtml(execText)}</span></span>
+  
+  // Step 4 - Run
+  const execStepText = run ? "✓ Run" : (scenarios.length && contract && ticket ? "4 Run" : "4 Run");
+  const execStepValue = run ? `${(run.summary?.passed || 0)} passed` : (scenarios.length && contract && ticket ? "Ready" : "Not ready");
+  const execClass = run ? "completed" : (scenarios.length && contract && ticket ? "active" : "");
+  
+  const compact = $("#compactWorkflow");
+  if (!compact) return;
+  compact.innerHTML = `
+    <span class="cw-step ${reqClass}">
+      <span class="cw-step-label">${escapeHtml(reqStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(reqStepValue)}</span>
+    </span>
+    <span class="cw-sep">→</span>
+    <span class="cw-step ${apiClass}">
+      <span class="cw-step-label">${escapeHtml(apiStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(apiStepValue)}</span>
+    </span>
+    <span class="cw-sep">→</span>
+    <span class="cw-step ${scClass}">
+      <span class="cw-step-label">${escapeHtml(scStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(scStepValue)}</span>
+    </span>
+    <span class="cw-sep">→</span>
+    <span class="cw-step ${execClass}">
+      <span class="cw-step-label">${escapeHtml(execStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(execStepValue)}</span>
+    </span>
   `;
 }
 
@@ -341,215 +389,358 @@ async function loadSampleTicket(options = {}) {
   renderTicketSummary();
   renderAppMetrics();
   renderCompactWorkflow();
-  if (!options.silent) toast("Sample ticket loaded.");
+  saveState();
+  if (!options.silent) { toast("Sample ticket loaded."); }
 }
 
-async function fetchJiraTicket() {
+async function fetchJiraTicket(options = {}) {
   const issueKey = $("#jiraKey").value.trim();
   if (!issueKey) return toast("Enter a Jira ticket key.");
+  if (window.__fetchingJira) return;
+  
+  // Store previous ticket to restore on failure
+  const previousTicket = state.ticket;
+  window.__fetchingJira = true;
 
-  const data = await api("/api/jira/ticket", {
-    method: "POST",
-    body: JSON.stringify({ issueKey }),
-  });
-  state.ticket = data.ticket;
-  $("#ticketJson").value = pretty(data.ticket);
-  renderAppMetrics();
-  renderCompactWorkflow();
-  toast(`Fetched ${data.ticket.key}.`);
+  const loadingEl = $("#reqLoading");
+  const emptyHelper = $(".req-empty-state-bottom");
+  const jiraError = $("#jiraError");
+  
+  hideInlineError();
+  if (loadingEl) loadingEl.hidden = false;
+  // Hide loaded sections while fetching
+  const loadedSummary = $("#reqLoadedSummary");
+  const metaSection = $("#reqMetaSection");
+  const descSection = $("#reqDescriptionSection");
+  if (loadedSummary) loadedSummary.hidden = true;
+  if (metaSection) metaSection.hidden = true;
+  if (descSection) descSection.hidden = true;
+
+  try {
+    const data = await api("/api/jira/ticket", { method: "POST", body: JSON.stringify({ issueKey }) });
+    state.ticket = data.ticket;
+    $("#ticketJson").value = pretty(data.ticket);
+    state.ticketVersion++;
+    renderTicketSummary();
+    renderAppMetrics();
+    renderCompactWorkflow();
+    saveState();
+    if (!options.silent) toast(`Fetched ${data.ticket.key}.`);
+  } catch (error) {
+    // Restore previous ticket on error
+    state.ticket = previousTicket;
+    // Show user-friendly error with dynamic ticket key
+    const userMessage = `Unable to fetch <strong>${escapeHtml(issueKey)}</strong><br><small>The ticket does not exist or you may not have permission to access it.</small>`;
+    showInlineError(userMessage);
+    // Restore UI state for preserved ticket
+    if (loadedSummary && previousTicket) loadedSummary.hidden = false;
+    if (metaSection && previousTicket) metaSection.hidden = false;
+    if (jiraError) jiraError.hidden = false;
+  } finally {
+    window.__fetchingJira = false;
+    if (loadingEl) loadingEl.hidden = true;
+  }
 }
 
 function getTicketFromText() {
   const raw = $("#ticketJson").value.trim();
-  const ticket = parseTicketInput(raw);
-  state.ticket = ticket;
-  renderAppMetrics();
-  renderCompactWorkflow();
-  return ticket;
+  try {
+    const ticket = parseTicketInput(raw);
+    state.ticket = ticket;
+    state.ticketVersion++;
+    renderTicketSummary();
+    renderAppMetrics();
+    renderCompactWorkflow();
+    saveState();
+    hideInlineError();
+    return ticket;
+  } catch (error) {
+    showInlineError(error.message || "Invalid ticket format.");
+    throw error;
+  }
+}
+
+function renderJiraTabState() {
+  // Jira tab should show its own state - only show success if ticket exists via Jira
+  // For now, we check if there's a jira ticket key in the input
+  const hasJiraTicket = $("#jiraKey")?.value.trim();
+  const ticket = state.ticket;
+  
+  // Jira-specific elements
+  const jiraError = $("#jiraError");
+  const jiraInputs = $(".source-jira");
+  
+  // Show Jira inputs
+  if (jiraInputs) jiraInputs.hidden = false;
+  
+  // Hide manual error when in Jira tab
+  const manualError = $("#manualError");
+  if (manualError) manualError.hidden = true;
+}
+
+function renderManualTabState() {
+  // Manual tab should show only its own state - hide ALL Jira-related elements
+  
+  // Hide Jira-specific UI elements
+  const jiraError = $("#jiraError");
+  const jiraInputs = $(".source-jira");
+  const emptyHelper = $(".req-empty-state-bottom");
+  const loadedSummary = $("#reqLoadedSummary");
+  const metaSection = $("#reqMetaSection");
+  const descSection = $("#reqDescriptionSection");
+  
+  if (jiraError) jiraError.hidden = true;
+  if (jiraInputs) jiraInputs.hidden = true;
+  // Jira success/meta/description should NOT appear in Manual tab - use hidden property consistently
+  if (loadedSummary) loadedSummary.hidden = true;
+  if (metaSection) metaSection.hidden = true;
+  if (descSection) descSection.hidden = true;
+  
+  // Show empty helper in Manual tab only if no manual draft
+  const manualDraft = $("#ticketJson")?.value.trim();
+  if (emptyHelper) emptyHelper.hidden = !!manualDraft;
 }
 
 function renderTicketSummary() {
   const ticket = state.ticket;
-  if (!ticket) {
-    $("#ticketSummary").innerHTML = '<span class="muted">No ticket loaded</span>';
+  const activeSource = $(".source-chip.active")?.dataset?.source || "jira";
+  
+  // Jira-specific elements
+  const emptyHelper = $(".req-empty-state-bottom");
+  const loadedSummary = $("#reqLoadedSummary");
+  const metaSection = $("#reqMetaSection");
+  const reqSummaryKey = $("#reqSummaryKey");
+  const reqSummaryText = $("#reqSummaryText");
+  const reqDescriptionSection = $("#reqDescriptionSection");
+  const reqDescriptionText = $("#reqDescriptionText");
+  
+  // Manual-specific elements
+  const manualError = $("#manualError");
+  
+  if (activeSource === "manual") {
+    // Manual tab - don't show Jira success/meta/description
+    if (loadedSummary) loadedSummary.setAttribute("hidden", "");
+    if (metaSection) metaSection.setAttribute("hidden", "");
+    if (reqDescriptionSection) reqDescriptionSection.setAttribute("hidden", "");
+    // Show empty helper if no manual draft
+    const manualDraft = $("#ticketJson")?.value.trim();
+    if (emptyHelper) emptyHelper.hidden = !manualDraft;
     return;
   }
-  $("#ticketSummary").innerHTML = `
-    <span class="pill violet">${escapeHtml(ticket.issueType || "Ticket")}</span>
-    <span>${escapeHtml(ticket.key || "")}</span>
-    <span>${escapeHtml(ticket.summary || "")}</span>
-  `;
+  
+  // Jira tab - show Jira success/meta/description if ticket exists
+  if (!ticket) {
+    // STATE A: NO REQUIREMENT LOADED
+    // Show empty helper at bottom, hide loaded summary and meta
+    if (emptyHelper) emptyHelper.hidden = false;
+    if (loadedSummary) loadedSummary.setAttribute("hidden", "");
+    if (metaSection) metaSection.setAttribute("hidden", "");
+    if (reqDescriptionSection) reqDescriptionSection.setAttribute("hidden", "");
+  } else {
+    // STATE B: REQUIREMENT SUCCESSFULLY LOADED
+    // Hide empty helper, show loaded summary with actual data
+    if (emptyHelper) emptyHelper.hidden = true;
+    if (loadedSummary) loadedSummary.removeAttribute("hidden");
+    if (metaSection) metaSection.removeAttribute("hidden");
+    
+    // Only show ticket key if it exists
+    if (reqSummaryKey) {
+      reqSummaryKey.textContent = ticket.key || "";
+    }
+    
+    // Only show ticket summary if it exists
+    if (reqSummaryText) {
+      reqSummaryText.textContent = ticket.summary || "";
+    }
+    
+    // Show description if available (separate container below meta)
+    if (ticket.description) {
+      if (reqDescriptionSection) reqDescriptionSection.hidden = false;
+      if (reqDescriptionText) reqDescriptionText.textContent = ticket.description;
+    } else {
+      if (reqDescriptionSection) reqDescriptionSection.setAttribute("hidden", "");
+    }
+  }
+}
+
+function showRequirementsSuccess() {
+  const panel = $(".panel-requirements");
+  if (panel) panel.classList.add("collapsed");
+  updateReqStatusBadge();
+}
+
+function showRequirementsInput() {
+  const panel = $(".panel-requirements");
+  if (panel) panel.classList.remove("collapsed");
+  $("#reqDetailsExpand").hidden = true;
+}
+
+function showInlineError(message, sourceOverride) {
+  // Hide all errors first
+  const jiraError = $("#jiraError");
+  const manualError = $("#manualError");
+  const emptyHelper = $(".req-empty-state-bottom");
+  
+  if (jiraError) jiraError.hidden = true;
+  if (manualError) manualError.hidden = true;
+  
+  // Hide empty helper when showing error
+  if (emptyHelper) emptyHelper.hidden = true;
+  
+  // If no message, don't show any error
+  if (!message) return;
+  
+  // Show the relevant error container
+  const currentSource = sourceOverride || $(".source-chip.active")?.dataset?.source || "jira";
+  const errorEl = currentSource === "jira" ? jiraError : manualError;
+  if (errorEl) {
+    const errorTextEl = errorEl.querySelector(".error-text");
+    // Check if message contains HTML tags
+    if (message.includes("<") && message.includes(">")) {
+      errorTextEl.innerHTML = message;
+    } else {
+      errorTextEl.textContent = message;
+    }
+    errorEl.hidden = false;
+  }
+}
+
+function hideInlineError() {
+  const jiraError = $("#jiraError");
+  const manualError = $("#manualError");
+  if (jiraError) jiraError.hidden = true;
+  if (manualError) manualError.hidden = true;
+}
+
+function updateReqStatusBadge() {
+  const badge = $("#reqStatusBadge");
+  if (badge) { badge.textContent = state.ticket ? "Loaded" : ""; badge.className = "status-badge" + (state.ticket ? " loaded" : ""); }
 }
 
 async function loadSampleContract(options = {}) {
   const contract = await fetch("/sample-data/openapi-refund.json").then((res) => res.json());
   $("#contractJson").value = pretty(contract);
   await parseContract({ silent: true });
-  if (contract.baseUrl) {
-    $("#baseUrl").value = contract.baseUrl;
-  }
+  if (contract.baseUrl) $("#baseUrl").value = contract.baseUrl;
   $("#dryRun").checked = false;
+  saveState();
   if (!options.silent) toast("Sample OpenAPI contract loaded.");
 }
 
 async function parseContract(options = {}) {
   const raw = $("#contractJson").value.trim();
   if (!raw) return toast("Paste or upload an OpenAPI/Postman file first.");
-
   let payload;
-  try {
-    payload = { contract: JSON.parse(raw), name: "ui-contract" };
-  } catch (err) {
-    payload = { contract: raw, name: "ui-contract" };
-  }
+  try { payload = { contract: JSON.parse(raw), name: "ui-contract" }; } catch { payload = { contract: raw, name: "ui-contract" }; }
 
-  const data = await api("/api/contracts/parse", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  const data = await api("/api/contracts/parse", { method: "POST", body: JSON.stringify(payload) });
   state.contract = data.contract;
+  state.contractVersion++;
   renderContractSummary();
   renderAppMetrics();
   renderCompactWorkflow();
-  if (!options.silent) toast(`Parsed ${data.contract.endpoints.length} endpoint(s).`);
+  saveState();
+  toast(`Parsed ${data.contract.endpoints.length} endpoint(s).`);
+}
+
+function showContractParsedSummary() {
+  const panel = $(".panel-collection");
+  if (panel) panel.classList.add("collapsed");
+}
+
+function updateCollectionStatusBadge() {
+  const badge = $("#collectionStatusBadge");
+  if (badge) { badge.textContent = state.contract ? "Loaded" : ""; badge.className = "status-badge" + (state.contract ? " loaded" : ""); }
 }
 
 async function handleTicketFileUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const text = await readFileText(file);
-  $("#ticketJson").value = text;
-  const ticket = parseTicketInput(text);
-  state.ticket = ticket;
-  $("#jiraKey").value = ticket.key || $("#jiraKey").value;
-  renderTicketSummary();
-  renderAppMetrics();
-  renderCompactWorkflow();
-  toast(`Loaded ${file.name}.`);
+  try {
+    const text = await readFileText(file);
+    $("#ticketJson").value = text;
+    const ticket = parseTicketInput(text);
+    state.ticket = ticket;
+    state.ticketVersion++;
+    $("#jiraKey").value = ticket.key || $("#jiraKey").value;
+    renderTicketSummary();
+    renderAppMetrics();
+    renderCompactWorkflow();
+    saveState();
+    hideInlineError();
+    toast(`Loaded ${file.name}.`);
+  } catch (error) {
+    showInlineError(error.message || "Failed to parse file.");
+  }
 }
 
 async function handleContractFileUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const text = await readFileText(file);
-  $("#contractJson").value = text;
-  await parseContract({ silent: true });
-  toast(`Loaded ${file.name}.`);
+  try {
+    const text = await readFileText(file);
+    $("#contractJson").value = text;
+    showContractFileSummary(file);
+    await parseContract({ silent: true });
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+function showContractFileSummary(file) {
+  const prompt = $("#contractUploadPrompt");
+  const summary = $("#contractFileSummary");
+  if (prompt) prompt.hidden = true;
+  if (summary) {
+    summary.hidden = false;
+    $("#contractFileName").textContent = file.name;
+    $("#contractFileType").textContent = getContractFileType(file.name);
+    $("#contractFileSize").textContent = formatFileSize(file.size);
+  }
+}
+
+function clearContractFileSummary() {
+  const prompt = $("#contractUploadPrompt");
+  const summary = $("#contractFileSummary");
+  if (prompt) prompt.hidden = false;
+  if (summary) summary.hidden = true;
+  $("#contractFile").value = "";
+}
+
+function getContractFileType(filename) {
+  const lower = filename.toLowerCase();
+  if (lower.includes("openapi") || lower.endsWith(".json")) return "API Collection";
+  if (lower.includes("postman")) return "Postman Collection";
+  if (lower.includes("swagger")) return "Swagger API";
+  if (lower.includes("har")) return "HAR File";
+  return "JSON File";
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 function renderContractSummary() {
   const contract = state.contract;
-  if (!contract) {
-    $("#contractSummary").innerHTML = "";
-    return;
-  }
-
-  const authEndpoint = detectAuthEndpoint(contract);
-  $("#baseUrl").value = $("#baseUrl").value || contract.baseUrl || "";
-  $("#contractSummary").innerHTML = `
-    <span class="pill violet">${escapeHtml(contract.type)}</span>
-    <span>${escapeHtml(contract.title)}</span>
-    <span class="pill">${contract.endpoints.length} endpoints</span>
-    ${authEndpoint ? `<span class="pill green">Auth endpoint detected</span>` : ""}
-  `;
-  if ($("#authType").value === "autoBearer") fillDetectedTokenEndpoint({ onlyEmpty: true });
-}
-
-async function generateScenarios() {
-  let ticket = state.ticket;
-  if (!ticket) {
-    const raw = $("#ticketJson").value.trim();
-    if (raw) {
-      ticket = parseTicketInput(raw);
-      state.ticket = ticket;
-      renderTicketSummary();
-    }
-  }
-  if (!ticket || !ticket.summary) {
-    showModal("Step 1: No Ticket Loaded", "Cannot generate scenarios without a ticket. Click the 'Sample' button in the Jira Ticket section to load a demo ticket, or paste ticket JSON/description into the text area.");
-    return;
-  }
-  if (!state.contract) {
-    const raw = $("#contractJson").value.trim();
-    if (!raw) {
-      showModal("Step 2: No Contract Loaded", "Cannot generate scenarios without an API contract. Click the 'Sample' button in the API Contract section to load a demo OpenAPI contract, or paste an OpenAPI/Postman JSON into the text area.");
-      return;
-    }
-    await parseContract({ silent: true });
-    if (!state.contract) {
-      showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed. Make sure it is valid OpenAPI, Postman collection, or HAR format.");
-      return;
-    }
-  }
-
-  const data = await api("/api/scenarios/generate", {
-    method: "POST",
-    body: JSON.stringify({ ticket, contract: state.contract, useAi: $("#useAi").checked }),
-  });
-
-  state.scenarios = data.scenarios || [];
-  state.unusedEndpoints = data.unusedEndpoints || [];
-  renderWarnings(data.warnings || []);
-  renderScenarios();
-  renderAppMetrics();
-  renderCompactWorkflow();
-  toast(`Generated ${state.scenarios.length} scenario(s) using ${data.mode}.`);
-}
-
-function renderWarnings(warnings) {
-  $("#warnings").innerHTML = warnings
-    .map((warning) => `<div class="warning">${escapeHtml(warning)}</div>`)
-    .join("");
+  if ($("#baseUrl")) $("#baseUrl").value = $("#baseUrl").value || contract?.baseUrl || "";
 }
 
 function endpointLabel(scenario) {
   return `${scenario.method || ""} ${scenario.path || ""}`.trim();
 }
 
-function renderEndpointSummary() {
-  const used = new Map();
-  const unlinked = [];
-  for (const s of state.scenarios) {
-    if (s.unlinked || !s.endpointId) {
-      unlinked.push(s);
-      continue;
-    }
-    const key = `${s.method} ${s.path}`;
-    used.set(key, (used.get(key) || 0) + 1);
-  }
-
-  if (!used.size && !unlinked.length && ![].length) {
-    $("#endpointSummary").innerHTML = "";
-    return;
-  }
-
-  const parts = [];
-  if (used.size) {
-    const entries = Array.from(used.entries()).sort((a, b) => b[1] - a[1]).map(([ep, count]) => `${escapeHtml(ep)}: ${count} TC(s)`).join(" · ");
-    parts.push(`<span class="pill green">Linked endpoints (${used.size})</span> ${entries}`);
-  }
-  if (unlinked.length) {
-    parts.push(`<span class="pill">Unlinked TCs: ${unlinked.length}</span>`);
-  }
-  if ([].length) {
-    const entries = [].map((ep) => `${escapeHtml(ep.method)} ${escapeHtml(ep.path)}`).join(" · ");
-    parts.push(`<span class="pill red">Unused endpoints (${[].length})</span> ${entries}`);
-  }
-
-  $("#endpointSummary").innerHTML = `<div class="endpoint-summary">${parts.join(" | ")}</div>`;
-}
-
 function renderScenarios() {
   const rows = $("#scenarioRows");
   if (!state.scenarios.length) {
-    rows.innerHTML = '<tr><td colspan="6" class="empty">No scenarios generated yet.</td></tr>';
-    $("#endpointSummary").innerHTML = "";
+    rows.innerHTML = '<tr><td colspan="4" class="empty">No scenarios generated yet.</td></tr>';
     return;
   }
+  $("#scenariosEmptyState").hidden = true;
+  $("#scenariosSummary").hidden = false;
 
-  rows.innerHTML = state.scenarios
-    .map(
-      (scenario) => `
+  rows.innerHTML = state.scenarios.map((scenario) => `
       <tr>
         <td><input class="scenario-check" type="checkbox" data-id="${escapeHtml(scenario.id)}" checked></td>
         <td>
@@ -558,142 +749,22 @@ function renderScenarios() {
         </td>
         <td><span class="pill">${escapeHtml(scenario.type || "scenario")}</span></td>
         <td>${escapeHtml(endpointLabel(scenario))}${scenario.unlinked ? ' <span class="muted">(no endpoint)</span>' : ''}</td>
-        <td>${escapeHtml(scenario.expectedStatus || "")}</td>
-        <td>${escapeHtml(scenario.sourceAc || "")}</td>
-      </tr>
-    `
-    )
-    .join("");
+      </tr>`).join("");
 
   $$(".scenario-check").forEach((input) => input.addEventListener("change", renderAppMetrics));
-
   updateScenarioControls();
-  renderEndpointSummary();
 }
 
 function updateScenarioControls() {
   const has = Array.isArray(state.scenarios) && state.scenarios.length > 0;
-  const selectBtn = $("#selectAllScenariosBtn");
-  const deselectBtn = $("#deselectAllScenariosBtn");
-  const downloadBtn = $("#downloadScenariosBtn");
-  const exportPostmanBtn = $("#exportPostmanBtn");
-  if (selectBtn) selectBtn.disabled = !has;
-  if (deselectBtn) deselectBtn.disabled = !has;
-  if (downloadBtn) downloadBtn.disabled = !has;
-  if (exportPostmanBtn) exportPostmanBtn.disabled = !has;
-}
-
-function csvCell(value) {
-  const str = String(value ?? "");
-  return str.includes(",") || str.includes('"') || str.includes("\n")
-    ? `"${str.replace(/"/g, '""')}"`
-    : str;
-}
-
-function csvLine(...cells) {
-  return cells.map(csvCell).join(",");
-}
-
-function downloadScenarios() {
-  const scenarios = state.scenarios;
-  if (!scenarios.length) return toast("No scenarios to download.");
-
-  const ticket = state.ticket;
-  const contract = state.contract;
-
-  const parts = [];
-  parts.push("=== TEST PLAN SUMMARY ===");
-  parts.push(csvLine("Generated At", new Date().toISOString()));
-  parts.push(csvLine("Ticket Key", ticket?.key || "N/A"));
-  parts.push(csvLine("Ticket Summary", ticket?.summary || "N/A"));
-  parts.push(csvLine("Total Test Cases", scenarios.length));
-  const posCount = scenarios.filter((s) => s.type === "positive").length;
-  const negCount = scenarios.filter((s) => s.type === "negative").length;
-  const authCount = scenarios.filter((s) => s.type === "auth").length;
-  const edgeCount = scenarios.filter((s) => /edge/i.test(s.sourceAc || "") || s.title.toLowerCase().includes("edge")).length;
-  parts.push(csvLine("Positive", posCount, "Negative", negCount, "Auth", authCount, "Edge", edgeCount));
-  const linkedCount = scenarios.filter((s) => s.endpointId && !s.unlinked).length;
-  const unlinkedCount = scenarios.filter((s) => s.unlinked || !s.endpointId).length;
-  parts.push(csvLine("Linked to Endpoint", linkedCount, "Unlinked", unlinkedCount));
-  parts.push("");
-
-  parts.push("=== ENDPOINT COVERAGE ===");
-  parts.push(csvLine("Endpoint", "Method", "Path", "TC Count", "Status"));
-  const usedMap = new Map();
-  for (const s of scenarios) {
-    if (s.endpointId && !s.unlinked) {
-      const key = `${s.method} ${s.path}`;
-      usedMap.set(key, (usedMap.get(key) || 0) + 1);
-    }
-  }
-  if (contract?.endpoints) {
-    for (const ep of contract.endpoints) {
-      const key = `${ep.method} ${ep.path}`;
-      const count = usedMap.get(key) || 0;
-      const status = count > 0 ? "COVERED" : "NOT COVERED";
-      parts.push(csvLine(ep.operationId || key, ep.method, ep.path, count, status));
-    }
-  } else {
-    for (const [key, count] of usedMap) {
-      const [method, ...pathParts] = key.split(" ");
-      const path = pathParts.join(" ");
-      parts.push(csvLine(key, method, path, count, "COVERED"));
-    }
-  }
-  if (unlinkedCount > 0) {
-    parts.push(csvLine("(no endpoint)", "", "", unlinkedCount, "UNLINKED"));
-  }
-  parts.push("");
-
-  parts.push("=== ALL TEST CASES (Full Details) ===");
-  parts.push(csvLine(
-    "TC ID", "Title", "Type", "Endpoint", "Method", "Path",
-    "Expected Status", "Field(s)", "Mutation(s)", "Test Value(s)",
-    "Risk", "Source AC", "Linked", "Match Score", "Match Reasons"
-  ));
-  for (const s of scenarios) {
-    const method = s.method || "";
-    const path = s.path || "";
-    parts.push(csvLine(
-      s.id,
-      s.title,
-      s.type,
-      endpointLabel(s),
-      method,
-      path,
-      s.expectedStatus || "",
-      (s.mutations || []).map((m) => m.field).join("; "),
-      (s.mutations || []).map((m) => m.operation).join("; "),
-      (s.mutations || []).map((m) => m.value !== undefined ? JSON.stringify(m.value) : "").join("; "),
-      s.risk || "",
-      s.sourceAc || "",
-      s.endpointId && !s.unlinked ? "Yes" : "No",
-      s.matchScore !== undefined ? String(s.matchScore) : "",
-      (s.matchReasons || []).join("; ")
-    ));
-  }
-  parts.push("");
-
-  const csv = parts.join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `scenarios-${(ticket?.key || "manual").toLowerCase()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast(`Downloaded ${scenarios.length} scenarios as CSV (${parts.length} lines).`);
+  if ($("#selectAllScenariosBtn")) $("#selectAllScenariosBtn").disabled = !has;
+  if ($("#deselectAllScenariosBtn")) $("#deselectAllScenariosBtn").disabled = !has;
 }
 
 function setScenarioSelection(checked) {
-  $$(".scenario-check").forEach((input) => {
-    input.checked = checked;
-  });
+  $$(".scenario-check").forEach((input) => { input.checked = checked; });
   renderAppMetrics();
   renderCompactWorkflow();
-  updateScenarioControls();
 }
 
 function selectedScenarios() {
@@ -701,108 +772,33 @@ function selectedScenarios() {
   return state.scenarios.filter((scenario) => selected.has(String(scenario.id)));
 }
 
-function detectAuthEndpoint(contract = state.contract) {
-  const endpoints = contract?.endpoints || [];
-  return (
-    endpoints.find((endpoint) =>
-      /post/i.test(endpoint.method) &&
-      /(token|login|auth|oauth|session|signin|sign-in)/i.test(
-        [endpoint.path, endpoint.summary, endpoint.operationId, endpoint.description].join(" ")
-      )
-    ) ||
-    endpoints.find((endpoint) =>
-      /(token|login|auth|oauth|session|signin|sign-in)/i.test(
-        [endpoint.path, endpoint.summary, endpoint.operationId, endpoint.description].join(" ")
-      )
-    )
-  );
-}
-
-function sampleValueFromSchema(schema, fieldName = "value") {
-  if (!schema || typeof schema !== "object") return null;
-  if (schema.example !== undefined) return schema.example;
-  if (schema.default !== undefined) return schema.default;
-  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
-
-  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
-  if (type === "object" || schema.properties) {
-    return Object.fromEntries(
-      Object.entries(schema.properties || {}).map(([key, value]) => [key, sampleValueFromSchema(value, key)])
-    );
-  }
-  if (type === "array") return [sampleValueFromSchema(schema.items || {}, fieldName)];
-  if (type === "integer" || type === "number") return /ttl|expiry|expires/i.test(fieldName) ? 3600 : 1;
-  if (type === "boolean") return true;
-  if (/email|user/i.test(fieldName)) return "qa.user@example.com";
-  if (/password|secret/i.test(fieldName)) return "password";
-  if (/client.*id/i.test(fieldName)) return "client-id";
-  if (/client.*secret/i.test(fieldName)) return "client-secret";
-  return `sample-${fieldName}`;
-}
-
-function fillDetectedTokenEndpoint(options = {}) {
-  const endpoint = detectAuthEndpoint();
-  if (!endpoint) {
-    toast("No likely auth/token endpoint was detected in the uploaded contract.");
-    return;
-  }
-
-  const onlyEmpty = Boolean(options.onlyEmpty);
-  const tokenUrl = $("#tokenUrl");
-  const tokenMethod = $("#tokenMethod");
-  const tokenBody = $("#tokenBody");
-  const tokenHeaders = $("#tokenHeaders");
-  const tokenPath = $("#tokenPath");
-
-  if (tokenUrl && (!onlyEmpty || !tokenUrl.value)) tokenUrl.value = endpoint.path || "";
-  if (tokenMethod && (!onlyEmpty || !tokenMethod.value)) tokenMethod.value = endpoint.method || "POST";
-  if (tokenBody && (!onlyEmpty || !tokenBody.value)) {
-    tokenBody.value = pretty(sampleValueFromSchema(endpoint.requestSchema, "tokenRequest") || {});
-  }
-  if (tokenHeaders && (!onlyEmpty || !tokenHeaders.value)) tokenHeaders.value = "{}";
-  if (tokenPath && (!onlyEmpty || !tokenPath.value)) tokenPath.value = "access_token";
-}
-
 function renderAuthFields() {
-  const type = $("#authType").value;
+  const type = $("#authType")?.value;
   const target = $("#authFields");
+  if (!target) return;
   if (type === "bearer") {
     target.innerHTML = '<label>Token<input id="authToken" type="password" autocomplete="off"></label>';
   } else if (type === "autoBearer") {
-    target.innerHTML = `
-      <div class="button-row auth-detect-row">
+    target.innerHTML = `<div class="button-row auth-detect-row">
         <button id="detectAuthEndpointBtn" type="button" class="action-btn">Use detected token endpoint</button>
       </div>
       <label>Token URL<input id="tokenUrl" type="text" placeholder="/auth/token or https://auth.company.com/token"></label>
-      <label>Method
-        <select id="tokenMethod">
-          <option value="POST">POST</option>
-          <option value="GET">GET</option>
-        </select>
-      </label>
+      <label>Method<select id="tokenMethod"><option value="POST">POST</option><option value="GET">GET</option></select></label>
       <label>Headers JSON<textarea id="tokenHeaders" class="mini-code" spellcheck="false">{}</textarea></label>
       <label>Body JSON<textarea id="tokenBody" class="mini-code" spellcheck="false">{}</textarea></label>
-      <label>Token JSON path<input id="tokenPath" type="text" value="access_token" placeholder="access_token"></label>
-    `;
-    $("#detectAuthEndpointBtn").addEventListener("click", () => fillDetectedTokenEndpoint());
-    fillDetectedTokenEndpoint({ onlyEmpty: true });
+      <label>Token JSON path<input id="tokenPath" type="text" value="access_token" placeholder="access_token"></label>`;
+    if ($("#detectAuthEndpointBtn")) $("#detectAuthEndpointBtn").addEventListener("click", () => {});
   } else if (type === "basic") {
-    target.innerHTML = `
-      <label>Username<input id="authUsername" type="text" autocomplete="off"></label>
-      <label>Password<input id="authPassword" type="password" autocomplete="off"></label>
-    `;
+    target.innerHTML = '<label>Username<input id="authUsername" type="text" autocomplete="off"></label><label>Password<input id="authPassword" type="password" autocomplete="off"></label>';
   } else if (type === "custom") {
-    target.innerHTML = `
-      <label>Header name<input id="authHeaderName" type="text" placeholder="X-API-Key"></label>
-      <label>Header value<input id="authHeaderValue" type="password" autocomplete="off"></label>
-    `;
+    target.innerHTML = '<label>Header name<input id="authHeaderName" type="text" placeholder="X-API-Key"></label><label>Header value<input id="authHeaderValue" type="password" autocomplete="off"></label>';
   } else {
     target.innerHTML = "";
   }
 }
 
 function environmentPayload() {
-  const authType = $("#authType").value;
+  const authType = $("#authType")?.value || "none";
   const auth = { type: authType };
   if (authType === "bearer") auth.token = $("#authToken")?.value || "";
   if (authType === "autoBearer") {
@@ -812,332 +808,194 @@ function environmentPayload() {
     auth.tokenBody = $("#tokenBody")?.value.trim() || "{}";
     auth.tokenPath = $("#tokenPath")?.value.trim() || "access_token";
   }
-  if (authType === "basic") {
-    auth.username = $("#authUsername")?.value || "";
-    auth.password = $("#authPassword")?.value || "";
-  }
-  if (authType === "custom") {
-    auth.headerName = $("#authHeaderName")?.value || "";
-    auth.headerValue = $("#authHeaderValue")?.value || "";
-  }
-
-  return {
-    name: $("#envName").value.trim() || "local",
-    baseUrl: $("#baseUrl").value.trim(),
-    dryRun: $("#dryRun").checked,
-    auth,
-  };
+  if (authType === "basic") { auth.username = $("#authUsername")?.value || ""; auth.password = $("#authPassword")?.value || ""; }
+  if (authType === "custom") { auth.headerName = $("#authHeaderName")?.value || ""; auth.headerValue = $("#authHeaderValue")?.value || ""; }
+  return { name: $("#envName")?.value.trim() || "local", baseUrl: $("#baseUrl")?.value.trim(), dryRun: $("#dryRun")?.checked, auth };
 }
 
-async function runAll() {
-  if (!state.ticket) {
-    await loadSampleTicket({ silent: true });
+async function generateScenarios() {
+  let ticket = state.ticket;
+  if (!ticket) {
+    const raw = $("#ticketJson").value.trim();
+    if (raw) { ticket = parseTicketInput(raw); state.ticket = ticket; renderTicketSummary(); }
   }
+  if (!ticket || !ticket.summary) { showModal("Step 1: No Ticket Loaded", "Cannot generate scenarios without a ticket."); return; }
   if (!state.contract) {
     const raw = $("#contractJson").value.trim();
-    if (raw) {
-      await parseContract({ silent: true });
-    } else {
-      await loadSampleContract({ silent: true });
+    if (!raw) { showModal("Step 2: No Contract Loaded", "Cannot generate scenarios without an API contract."); return; }
+    await parseContract({ silent: true });
+    if (!state.contract) { showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed."); return; }
+  }
+  setScenariosState("loading");
+  try {
+    const data = await api("/api/scenarios/generate", { method: "POST", body: JSON.stringify({ ticket, contract: state.contract, useAi: $("#useAi")?.checked }) });
+    state.scenarios = data.scenarios || [];
+    state.unusedEndpoints = data.unusedEndpoints || [];
+    renderScenarios();
+    renderAppMetrics();
+    renderCompactWorkflow();
+    updateScenariosSummary();
+    saveState();
+    toast(`Generated ${state.scenarios.length} scenario(s) using ${data.mode}.`);
+  } catch (error) {
+    showInlineError("Scenario generation failed. Your existing inputs have been preserved.");
+    setScenariosState("empty");
+  }
+}
+
+function bindEvents() {
+  $$("[data-view-trigger]").forEach((trigger) => {
+    trigger.addEventListener("click", (event) => {
+      event.preventDefault();
+      setActiveView(trigger.dataset.viewTrigger);
+      if (trigger.dataset.viewTrigger === "history") { loadRunHistory({ silent: true }).catch((error) => toast(error.message)); }
+    });
+  });
+
+  // Expand/collapse panel functionality
+  $$(".expand-toggle").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const panel = btn.closest(".panel");
+      if (panel) {
+        panel.classList.toggle("collapsed");
+        renderCompactWorkflow();
+      }
+    });
+  });
+  
+  // Also allow clicking on panel head to toggle (except buttons/links)
+  $$("[data-toggle-section]").forEach((header) => {
+    header.addEventListener("click", (e) => {
+      // Don't toggle if clicking on interactive elements
+      if (e.target.closest("button, a, input, textarea, select")) return;
+      const panel = header.closest(".panel");
+      if (panel) {
+        panel.classList.toggle("collapsed");
+        renderCompactWorkflow();
+      }
+    });
+  });
+
+  $("#loadSampleTicketBtn")?.addEventListener("click", () => loadSampleTicket().catch((error) => toast(error.message)));
+  $("#fetchJiraBtn")?.addEventListener("click", () => fetchJiraTicket().catch((error) => toast(error.message)));
+  $("#changeRequirementBtn")?.addEventListener("click", () => {
+    // Focus the jiraKey input to allow user to change requirement
+    const jiraKeyInput = $("#jiraKey");
+    if (jiraKeyInput) {
+      jiraKeyInput.focus();
+      jiraKeyInput.select();
     }
+  });
+  $("#loadSampleContractBtn")?.addEventListener("click", () => loadSampleContract().catch((error) => toast(error.message)));
+  $("#parseContractBtn")?.addEventListener("click", () => parseContract().catch((error) => toast(error.message)));
+
+  const contractFileInput = $("#contractFile");
+  if (contractFileInput) {
+    contractFileInput.addEventListener("change", (event) => handleContractFileUpload(event).catch((error) => toast(error.message)));
   }
-  if (!state.contract) {
-    showModal("Run Failed", "No API collection loaded.");
-    return;
+  const uploadArea = $("#contractUploadArea");
+  if (uploadArea) {
+    uploadArea.addEventListener("click", (e) => { if (e.target.closest(".file-actions")) return; contractFileInput?.click(); });
+    uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("dragover"); });
+    uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("dragover"));
+    uploadArea.addEventListener("drop", (e) => {
+      e.preventDefault(); uploadArea.classList.remove("dragover");
+      const file = e.dataTransfer?.files?.[0];
+      if (file && contractFileInput) { contractFileInput.files = e.dataTransfer.files; handleContractFileUpload({ target: { files: e.dataTransfer.files } }); }
+    });
   }
+  $("#replaceContractBtn")?.addEventListener("click", () => contractFileInput?.click());
+  $("#removeContractBtn")?.addEventListener("click", () => { clearContractFileSummary(); $("#contractJson").value = ""; });
 
-  await generateScenarios();
-  await new Promise(r => setTimeout(r, 100));
+  $("#generateScenariosBtn")?.addEventListener("click", () => generateScenarios().catch((error) => toast(error.message)));
 
-  if (!state.scenarios.length) {
-    showModal("Run Failed", "No scenarios generated.");
-    return;
-  }
-
-  setScenarioSelection(true);
-  $("#dryRun").checked = false;
-
-  toast("Running all ready tests...");
-
-  const data = await api("/api/runs/execute", {
-    method: "POST",
-    body: JSON.stringify({
-      ticket: state.ticket,
-      contract: state.contract,
-      scenarios: state.scenarios,
-      environment: environmentPayload(),
-    }),
+$$("[data-source]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const source = chip.dataset.source;
+      $$("[data-source]").forEach((c) => c.classList.toggle("active", c === chip));
+      
+      if (source === "jira") {
+        // Switch to Jira tab - show Jira UI state only
+        if ($(".source-jira")) $(".source-jira").hidden = false;
+        if ($(".source-manual")) $(".source-manual").hidden = true;
+        // Hide Manual-specific elements
+        renderJiraTabState();
+      } else if (source === "manual") {
+        // Switch to Manual tab - show Manual UI state only
+        if ($(".source-jira")) $(".source-jira").hidden = true;
+        if ($(".source-manual")) $(".source-manual").hidden = false;
+        // Hide Jira-specific elements
+        renderManualTabState();
+      }
+    });
   });
 
-  state.run = data.run;
-  state.reportUrl = data.reportUrl;
-  renderRun();
-  await loadRunHistory({ silent: true });
-  setActiveView("results");
-  $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-  toast(`Run complete: ${data.run.summary.passed} passed, ${data.run.summary.failed} failed`);
-}
-
-async function executeSelected() {
-  if (!state.ticket) {
-    showModal("No Requirements", "Load requirements first.");
-    return;
-  }
-  if (!state.contract) {
-    showModal("No API Collection", "Parse an API collection first.");
-    return;
-  }
-  const scenarios = selectedScenarios();
-  if (!scenarios.length) {
-    showModal("No Tests Selected", "Select at least one test scenario to execute.");
-    return;
-  }
-  const envName = $("#envName").value.trim();
-  if (!envName) {
-    showModal("Environment Required", "Enter an environment name.");
-    $("#envName").focus();
-    return;
-  }
-  const baseUrl = $("#envName").value.trim();
-  if (!baseUrl) {
-    showModal("Base URL Required", "Enter a Base URL.");
-    $("#baseUrl").focus();
-    return;
-  }
-  if (!/^https?:\/\/.+/i.test(baseUrl)) {
-    showModal("Invalid URL", "Base URL must start with http:// or https://.");
-    $("#baseUrl").focus();
-    return;
-  }
-
-  toast(`Running ${scenarios.length} test(s)...`);
-
-  const data = await api("/api/runs/execute", {
-    method: "POST",
-    body: JSON.stringify({
-      ticket: state.ticket,
-      contract: state.contract,
-      scenarios,
-      environment: environmentPayload(),
-    }),
+  $("#applyManualTicketBtn")?.addEventListener("click", () => {
+    try {
+      getTicketFromText();
+      renderTicketSummary();
+      hideInlineError();
+      toast(`Applied ticket ${state.ticket?.key || ""}.`);
+    } catch (error) { toast(error.message); }
   });
 
-  state.run = data.run;
-  state.reportUrl = data.reportUrl;
-  renderRun();
-  await loadRunHistory({ silent: true });
-  setActiveView("results");
-  toast(`Run stored: ${data.run.id}`);
+  $("#authType")?.addEventListener("change", renderAuthFields);
+  $("#historySearch")?.addEventListener("input", renderHistory);
+  $("#historyStatus")?.addEventListener("change", renderHistory);
+  $("#themeToggle")?.addEventListener("click", toggleTheme);
 }
 
-function renderRun() {
-  const run = state.run;
-  if (!run) return;
-  const summary = run.summary || {};
-  const stats = [
-    ["Total", summary.total || 0],
-    ["Passed", summary.passed || 0],
-    ["Failed", summary.failed || 0],
-    ["Blocked", summary.blocked || 0],
-    ["Review", summary.needs_review || 0],
-    ["Dry Run", summary.dry_run || 0],
-  ];
-  if (run.authStatus) stats.push(["Auth", statusLabel(run.authStatus.status)]);
-
-  const responseTimes = (run.results || []).map((r) => r.validation?.responseTimeMs).filter(Boolean);
-  const avgTime = responseTimes.length ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
-  if (avgTime > 0) stats.push(["Avg Time", `${avgTime}ms`]);
-
-  $("#runSummary").innerHTML = stats
-    .map(([label, value]) => `<span class="stat-pill">${label} <strong>${value}</strong></span>`)
-    .join("");
-
-  $("#reportLinks").innerHTML = `
-    <a class="link-button" href="/api/runs/${encodeURIComponent(run.id)}" target="_blank" rel="noreferrer">JSON</a>
-    <a class="link-button" href="${state.reportUrl || `/api/reports/${encodeURIComponent(run.id)}.html`}" target="_blank" rel="noreferrer">HTML report</a>
-  `;
-
-  $("#resultRows").innerHTML = (run.results || [])
-    .map((result) => {
-      const statusColor = result.status === "passed" ? "#238052" : result.status === "failed" ? "#b44236" : result.status === "blocked" ? "#8b6500" : "#28699a";
-      const responseTime = result.validation?.responseTimeMs ? `${result.validation.responseTimeMs}ms` : "—";
-      return `
-        <tr>
-          <td>
-            <strong>${escapeHtml(result.title)}</strong>
-            <div class="muted">${escapeHtml(result.scenarioId)}</div>
-          </td>
-          <td><span class="status ${escapeHtml(result.status)}">${escapeHtml(statusLabel(result.status))}</span></td>
-          <td>
-            <span style="font-weight:600;color:${statusColor}">${result.response?.status || result.error || result.status}</span>
-            <div class="muted" style="margin-top:2px">⏱ ${responseTime}</div>
-          </td>
-          <td>
-            <details>
-              <summary style="color:#28699a;font-weight:600">Request/Response</summary>
-              <pre style="background:#101820;color:#eef6ff;border-radius:4px;padding:8px;margin-top:4px">${escapeHtml(pretty({ request: result.request, response: result.response }))}</pre>
-            </details>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-async function loadRunHistory(options = {}) {
-  const data = await api("/api/runs");
-  state.history = data;
-  renderHistory();
-  renderAppMetrics();
-  renderCompactWorkflow();
-  if (!options.silent) toast("Run history refreshed.");
-}
-
-function runMatchesFilters(run) {
-  const query = $("#historySearch").value.trim().toLowerCase();
-  const status = $("#historyStatus").value;
-  const statusValue = dominantStatus(run.summary);
-  const haystack = [
-    run.id,
-    run.ticketKey,
-    run.ticketSummary,
-    run.environment,
-    run.contractTitle,
-    run.baseUrl,
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return (!query || haystack.includes(query)) && (status === "all" || status === statusValue);
+function loadRunHistory(options = {}) {
+  api("/api/runs").then((data) => {
+    state.history = data;
+    renderHistory();
+    renderAppMetrics();
+    renderCompactWorkflow();
+    if (!options.silent) toast("Run history refreshed.");
+  }).catch((error) => toast(error.message));
 }
 
 function renderHistory() {
   const allRuns = state.history.runs || [];
-  const filteredRuns = allRuns.filter(runMatchesFilters);
-  renderTicketGroups(filteredRuns);
-  renderHistoryRows(filteredRuns);
-}
-
-function aggregateRuns(runs) {
-  const groups = new Map();
-  for (const run of runs) {
-    if (!groups.has(run.ticketKey)) {
-      groups.set(run.ticketKey, {
-        ticketKey: run.ticketKey,
-        ticketSummary: run.ticketSummary,
-        runCount: 0,
-        latestRunAt: run.createdAt,
-        latestRunId: run.id,
-        summary: { total: 0, passed: 0, failed: 0, blocked: 0, needs_review: 0, dry_run: 0 },
-      });
-    }
-
-    const group = groups.get(run.ticketKey);
-    group.runCount += 1;
-    if (run.createdAt > group.latestRunAt) {
-      group.latestRunAt = run.createdAt;
-      group.latestRunId = run.id;
-      group.ticketSummary = run.ticketSummary;
-    }
-    for (const key of Object.keys(group.summary)) {
-      group.summary[key] += run.summary?.[key] || 0;
-    }
-  }
-  return Array.from(groups.values()).sort((a, b) => b.latestRunAt.localeCompare(a.latestRunAt));
-}
-
-function renderTicketGroups(runs) {
-  const groups = aggregateRuns(runs).slice(0, 4);
-  const target = $("#ticketGroups");
-  if (!groups.length) {
-    target.innerHTML = '<div class="empty">No matching ticket history.</div>';
-    return;
-  }
-
-  target.innerHTML = groups
-    .map((group) => `
-      <div class="ticket-row">
-        <div>
-          <strong>${escapeHtml(group.ticketKey)}</strong>
-          <small>${escapeHtml(group.runCount)} run(s) | Latest ${escapeHtml(formatDate(group.latestRunAt))}</small>
-        </div>
-        <div>
-          <div>${escapeHtml(group.ticketSummary || "Manual run")}</div>
-          <div class="status-stack">
-            <span class="pill green">Passed ${group.summary.passed || 0}</span>
-            <span class="pill">Total ${group.summary.total || 0}</span>
-            <span class="pill">Failed ${group.summary.failed || 0}</span>
-          </div>
-        </div>
-<button type="button" data-load-run="${escapeHtml(group.latestRunId)}" class="load-btn">Latest</button>
-      </div>
-    `)
-    .join("");
-}
-
-function renderHistoryRows(runs) {
-  const rows = $("#historyRows");
-  if (!runs.length) {
-    rows.innerHTML = '<tr><td colspan="6" class="empty">No matching run history.</td></tr>';
-    return;
-  }
-
-  rows.innerHTML = runs
-    .map((run) => {
-      const status = dominantStatus(run.summary);
-      return `
-        <tr>
-          <td>
-            <strong>${escapeHtml(run.ticketKey)}</strong>
-            <div class="muted">${escapeHtml(run.ticketSummary || "Manual run")}</div>
-          </td>
-          <td>
-            <strong>${escapeHtml(run.id)}</strong>
-            <div class="muted">${escapeHtml(run.contractTitle)}</div>
-          </td>
-          <td>
-            <span class="status ${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span>
-            <div class="muted">${escapeHtml(run.summary.total)} total, ${escapeHtml(run.summary.passed)} passed, ${escapeHtml(run.summary.failed)} failed</div>
-          </td>
-          <td>
-            ${escapeHtml(run.environment)}
-            <div class="muted">${run.dryRun ? "Dry run" : escapeHtml(run.baseUrl || "No base URL")}</div>
-          </td>
-          <td>${escapeHtml(formatDate(run.createdAt))}</td>
-          <td>
-<div class="button-row">
-              <button type="button" data-load-run="${escapeHtml(run.id)}" class="load-btn">Load</button>
-              <a class="link-button" href="${escapeHtml(run.reportUrl)}" target="_blank" rel="noreferrer">Report</a>
-              <button type="button" data-delete-run="${escapeHtml(run.id)}" class="delete-btn">Delete</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-async function loadRun(runId) {
-  const run = await api(`/api/runs/${encodeURIComponent(runId)}`);
-  state.run = run;
-  state.reportUrl = `/api/reports/${encodeURIComponent(run.id)}.html`;
-  renderRun();
-  setActiveView("results");
-  $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-  toast(`Loaded run ${run.id}.`);
-}
-
-async function deleteRun(runId) {
-  if (!confirm(`Are you sure you want to delete run ${runId}?`)) {
-    return;
-  }
-
-  await api(`/api/runs/${encodeURIComponent(runId)}`, {
-    method: "DELETE",
+  const query = $("#historySearch")?.value.trim().toLowerCase() || "";
+  const status = $("#historyStatus")?.value || "all";
+  const filteredRuns = allRuns.filter((run) => {
+    const statusValue = dominantStatus(run.summary);
+    const haystack = [run.id, run.ticketKey, run.ticketSummary, run.environment, run.contractTitle, run.baseUrl].join(" ").toLowerCase();
+    return (!query || haystack.includes(query)) && (status === "all" || status === statusValue);
   });
+  $("#historyRows").innerHTML = filteredRuns.map((run) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(run.ticketKey)}</strong>
+          <div class="muted">${escapeHtml(run.ticketSummary || "Manual run")}</div>
+        </td>
+        <td>
+          <strong>${escapeHtml(run.id)}</strong>
+          <div class="muted">${escapeHtml(run.contractTitle)}</div>
+        </td>
+        <td>
+          <span class="status ${escapeHtml(dominantStatus(run.summary))}">${escapeHtml(statusLabel(dominantStatus(run.summary)))}</span>
+          <div class="muted">${escapeHtml(run.summary.total)} total, ${escapeHtml(run.summary.passed)} passed, ${escapeHtml(run.summary.failed)} failed</div>
+        </td>
+        <td>
+          ${escapeHtml(run.environment)}
+          <div class="muted">${run.dryRun ? "Dry run" : escapeHtml(run.baseUrl || "No base URL")}</div>
+        </td>
+        <td>${escapeHtml(formatDate(run.createdAt))}</td>
+        <td>
+          <div class="button-row">
+            <button type="button" data-load-run="${escapeHtml(run.id)}" class="load-btn">Load</button>
+            <button type="button" data-delete-run="${escapeHtml(run.id)}" class="delete-btn">Delete</button>
+          </div>
+        </td>
+      </tr>`).join("") || '<tr><td colspan="6" class="empty">No run history yet.</td></tr>';
+}
 
-  toast(`Run ${runId} deleted successfully.`);
-  await loadRunHistory({ silent: true });
+function initTheme() {
+  const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+  $("#themeToggle").textContent = currentTheme === "dark" ? "☀️" : "🌙";
 }
 
 function toggleTheme() {
@@ -1148,108 +1006,6 @@ function toggleTheme() {
   $("#themeToggle").textContent = nextTheme === "dark" ? "☀️" : "🌙";
 }
 
-function initTheme() {
-  const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
-  $("#themeToggle").textContent = currentTheme === "dark" ? "☀️" : "🌙";
-}
-
-function bindEvents() {
-  $$("[data-view-trigger]").forEach((trigger) => {
-    trigger.addEventListener("click", (event) => {
-      event.preventDefault();
-      setActiveView(trigger.dataset.viewTrigger);
-      if (trigger.dataset.viewTrigger === "history") {
-        loadRunHistory({ silent: true }).catch((error) => toast(error.message));
-      }
-    });
-  });
-
-  $("#loadSampleTicketBtn").addEventListener("click", () => loadSampleTicket().catch((error) => toast(error.message)));
-  $("#fetchJiraBtn").addEventListener("click", () => fetchJiraTicket().catch((error) => toast(error.message)));
-  $("#ticketFile").addEventListener("change", (event) => handleTicketFileUpload(event).catch((error) => toast(error.message)));
-  $("#loadSampleContractBtn").addEventListener("click", () => loadSampleContract().catch((error) => toast(error.message)));
-  $("#parseContractBtn").addEventListener("click", () => parseContract().catch((error) => toast(error.message)));
-  $("#contractFile").addEventListener("change", (event) => handleContractFileUpload(event).catch((error) => toast(error.message)));
-  $("#generateBtn").addEventListener("click", () => generateScenarios().catch((error) => toast(error.message)));
-  $("#selectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(true));
-  $("#deselectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(false));
-  $("#downloadScenariosBtn").addEventListener("click", () => downloadScenarios());
-  $("#exportPostmanBtn").addEventListener("click", () => generatePostmanCollection());
-  $("#runAllBtn").addEventListener("click", () => runAll().catch((error) => toast(error.message)));
-  $("#executeBtn").addEventListener("click", () => executeSelected().catch((error) => toast(error.message)));
-  $("#refreshHistoryBtn").addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
-  $("#authType").addEventListener("change", renderAuthFields);
-  $("#historySearch").addEventListener("input", renderHistory);
-  $("#historyStatus").addEventListener("change", renderHistory);
-  $("#themeToggle").addEventListener("click", toggleTheme);
-  $("#history").addEventListener("click", (event) => {
-    const loadButton = event.target.closest("[data-load-run]");
-    if (loadButton) {
-      loadRun(loadButton.dataset.loadRun).catch((error) => toast(error.message));
-      return;
-    }
-    const deleteButton = event.target.closest("[data-delete-run]");
-    if (deleteButton) {
-      deleteRun(deleteButton.dataset.deleteRun).catch((error) => toast(error.message));
-    }
-  });
-}
-
-function generatePostmanCollection() {
-  const scenarios = state.scenarios;
-  if (!scenarios.length) return toast("No scenarios to export.");
-
-  const ticket = state.ticket;
-  const contract = state.contract;
-
-  const collection = {
-    info: {
-      name: `${ticket?.key || "manual"} - API Tests`,
-      version: "1.0.0",
-      description: ticket?.summary || "Generated from AI API Validation Tool",
-    },
-    item: scenarios
-      .filter((s) => s.endpointId && s.method && s.path)
-      .map((s) => ({
-        name: s.title.slice(0, 80),
-        request: {
-          method: s.method,
-          header: [
-            { key: "Content-Type", value: "application/json", type: "text" },
-          ],
-          url: {
-            raw: s.path,
-            host: "",
-            path: s.path.split("/").filter(Boolean),
-          },
-          body: {
-            mode: "raw",
-            raw: JSON.stringify(s.basePayload || {}, null, 2),
-          },
-        },
-        response: [],
-      })),
-  };
-
-  if (contract?.baseUrl) {
-    collection.info.schema = "https://schema.getpostman.com/json/collection/v2.1.0/collection.json";
-    collection.item.forEach((item) => {
-      item.request.url.raw = `${contract.baseUrl}${item.request.url.raw}`;
-    });
-  }
-
-  const blob = new Blob([JSON.stringify(collection, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `postman-${(ticket?.key || "manual").toLowerCase()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast(`Exported ${collection.item.length} requests to Postman collection.`);
-}
-
 async function boot() {
   bindEvents();
   initTheme();
@@ -1257,10 +1013,21 @@ async function boot() {
   setActiveView(initialViewFromHash(), { skipHash: true });
   renderAppMetrics();
   renderCompactWorkflow();
+  
+  // Initialize Requirements section state - show empty helper at bottom for Jira tab
+  renderJiraTabState();
+  
+  // Hide all error boxes on initial load
+  hideInlineError();
+  
+  // Do NOT auto-load samples - require explicit user action
+  // User should click "Sample" or enter a ticket key to load data
+  
   await loadConfigStatus();
   await loadRunHistory({ silent: true });
-  await loadSampleTicket({ silent: true });
-  await loadSampleContract({ silent: true });
+  
+  updateStepSummaries();
+  updateScenariosPrereqStatus();
 }
 
 boot().catch((error) => {

@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Ticket-to-API Validation</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=6">
   </head>
   <body>
     <script>
-      // Theme initialization before CSS load
       (function() {
         const saved = localStorage.getItem('theme');
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -57,269 +56,316 @@
           </div>
         </header>
 
-        <!-- Compact workflow status -->
         <div id="compactWorkflow" class="compact-workflow" aria-label="Workflow status"></div>
 
         <main id="workspace" class="workspace">
 
-          <!-- ═══════ SECTION 1: REQUIREMENTS ═══════ -->
-          <section class="panel span-6 panel-requirements" data-view-section="workspace" data-section="requirements">
+          <!-- STEP 1: REQUIREMENTS -->
+          <section class="panel span-12 panel-requirements" data-view-section="workspace" data-section="requirements">
             <div class="panel-head" data-toggle-section>
-              <div>
-                <span class="step">1</span>
-                <h2>Requirements</h2>
+              <div class="step-info">
+                <span class="step">[1]</span>
+                <h2 class="step-title">Requirements</h2>
               </div>
               <div class="panel-head-right">
-                <span id="reqStatusBadge" class="status-badge"></span>
+                <span id="reqStepStatus" class="step-status"></span>
                 <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
-              </div>
-            </div>
-
-            <!-- Expanded state: input form -->
-            <div class="panel-body panel-body-expanded">
-              <div class="source-selector">
-                <label class="source-label">Source</label>
-                <div class="source-options">
-                  <span class="source-chip active" data-source="jira">Jira</span>
-                  <span class="source-chip" data-source="manual">Manual</span>
-                </div>
-              </div>
-
-              <!-- Jira source inputs -->
-              <div class="source-panel source-jira">
-                <div class="field-grid cols-2">
-                  <label>
-                    Ticket key
-                    <input id="jiraKey" type="text" placeholder="e.g. PROJ-1234">
-                  </label>
-                  <label class="file-upload">
-                    Upload file
-                    <input id="ticketFile" type="file">
-                  </label>
-                </div>
-                <div class="button-row">
-                  <button id="loadSampleTicketBtn" type="button" class="sample-btn">Sample</button>
-                  <button id="fetchJiraBtn" type="button" class="action-btn">Fetch</button>
-                </div>
-              </div>
-
-              <!-- Manual source inputs -->
-              <div class="source-panel source-manual" hidden>
-                <label>
-                  Requirement description / JSON
-                  <textarea id="ticketJson" class="code-input" spellcheck="false" placeholder="Paste ticket JSON or description text..."></textarea>
-                </label>
-                <div class="button-row">
-                  <button id="applyManualTicketBtn" type="button" class="action-btn">Apply</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Collapsed state: summary -->
-            <div class="panel-body panel-body-summary" hidden>
-              <div class="summary-row">
-                <div class="summary-primary">
-                  <strong id="reqSummaryKey">—</strong>
-                  <span id="reqSummaryText">No requirements loaded</span>
-                </div>
-                <div class="summary-stats">
-                  <span class="stat-chip"><span id="reqSummaryCount">0</span> requirements</span>
-                  <span class="stat-chip"><span id="reqSummaryAcCount">0</span> ACs</span>
-                  <span class="stat-chip" id="reqGapChip" hidden><span id="reqSummaryGapCount">0</span> gaps</span>
-                </div>
-                <div class="summary-actions">
-                  <button id="viewRequirementsBtn" type="button" class="link-button">View Details</button>
-                  <button id="viewRawTicketBtn" type="button" class="link-button">View Raw</button>
-                  <button id="changeTicketBtn" type="button" class="link-button">Change</button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- ═══════ SECTION 2: API COLLECTION ═══════ -->
-          <section class="panel span-6 panel-collection" data-view-section="workspace" data-section="collection">
-            <div class="panel-head" data-toggle-section>
-              <div>
-                <span class="step">2</span>
-                <h2>API Collection</h2>
-              </div>
-              <div class="panel-head-right">
-                <span id="collectionStatusBadge" class="status-badge"></span>
-                <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
-              </div>
-            </div>
-
-            <!-- Expanded state: input form -->
-            <div class="panel-body panel-body-expanded">
-              <div class="field-grid">
-                <label class="file-upload">
-                  Upload collection
-                  <input id="contractFile" type="file" accept=".json,application/json">
-                </label>
-              </div>
-              <div class="format-hint">
-                Supported: OpenAPI 3.x · Swagger · Postman Collection v2.1 · HAR
-              </div>
-              <label>
-                OpenAPI / Postman JSON
-                <textarea id="contractJson" class="code-input" spellcheck="false" placeholder="Paste OpenAPI or Postman collection JSON..."></textarea>
-              </label>
-              <div class="button-row">
-                <button id="loadSampleContractBtn" type="button" class="sample-btn">Sample</button>
-                <button id="parseContractBtn" type="button" class="action-btn">Parse</button>
-              </div>
-            </div>
-
-            <!-- Collapsed state: summary -->
-            <div class="panel-body panel-body-summary" hidden>
-              <div class="summary-row">
-                <div class="summary-primary">
-                  <strong id="collectionSummaryTitle">—</strong>
-                  <span id="collectionSummaryFormat"></span>
-                </div>
-                <div class="summary-stats">
-                  <span class="stat-chip"><span id="collectionSummaryCount">0</span> operations</span>
-                  <span class="stat-chip" id="collectionVariableChip" hidden><span id="collectionSummaryVars">0</span> variables</span>
-                  <span class="stat-chip" id="collectionAuthChip" hidden><span id="collectionSummaryAuth"></span> auth</span>
-                  <span class="stat-chip" id="collectionWarnChip" hidden><span id="collectionSummaryWarns">0</span> warnings</span>
-                </div>
-                <div class="summary-actions">
-                  <button id="viewCatalogBtn" type="button" class="link-button">View API Catalog</button>
-                  <button id="viewRawContractBtn" type="button" class="link-button">View Raw</button>
-                  <button id="changeContractBtn" type="button" class="link-button">Change</button>
-                </div>
-              </div>
-              <!-- Method breakdown -->
-              <div id="methodBreakdown" class="method-breakdown"></div>
-            </div>
-          </section>
-
-          <!-- ═══════ SECTION 3: TEST SCENARIOS ═══════ -->
-          <section class="panel span-12 panel-scenarios" data-view-section="workspace" data-section="scenarios">
-            <div class="panel-head">
-              <div>
-                <span class="step">3</span>
-                <h2>Test Scenarios</h2>
-              </div>
-              <div class="panel-head-right">
-                <span id="scenariosStatusBadge" class="status-badge"></span>
               </div>
             </div>
             <div class="panel-body">
-              <!-- Summary bar -->
-              <div id="scenariosSummary" class="scenarios-summary" hidden>
-                <div class="scenario-metrics">
-                  <span class="scenario-metric"><strong id="scTotal">0</strong> Total</span>
-                  <span class="scenario-metric" id="scPosMetric"><strong id="scPos">0</strong> Positive</span>
-                  <span class="scenario-metric" id="scNegMetric"><strong id="scNeg">0</strong> Negative</span>
-                  <span class="scenario-metric" id="scBoundMetric"><strong id="scBound">0</strong> Boundary</span>
-                  <span class="scenario-metric" id="scEdgeMetric"><strong id="scEdge">0</strong> Edge</span>
-                  <span class="scenario-metric" id="scSecMetric"><strong id="scSec">0</strong> Security</span>
+              <!-- Loading state -->
+              <div id="reqLoading" class="req-loading-state" hidden>
+                <div class="loading-indicator">
+                  <span class="loading-icon">⟳</span>
+                  <span>Fetching Jira ticket...</span>
                 </div>
-                <div class="scenario-mapping-summary">
-                  <span class="mapping-stat" id="mapHigh"><span class="map-dot map-high"></span> <span id="mapHighCount">0</span> HIGH</span>
-                  <span class="mapping-stat" id="mapMedium"><span class="map-dot map-medium"></span> <span id="mapMediumCount">0</span> MEDIUM</span>
-                  <span class="mapping-stat" id="mapLow"><span class="map-dot map-low"></span> <span id="mapLowCount">0</span> LOW</span>
-                  <span class="mapping-stat" id="mapAmbiguous"><span class="map-dot map-ambiguous"></span> <span id="mapAmbigCount">0</span> AMBIGUOUS</span>
-                  <span class="mapping-stat" id="mapUnmapped"><span class="map-dot map-unmapped"></span> <span id="mapUnmapCount">0</span> UNMAPPED</span>
+              </div>
+
+<!-- Expanded state: input form -->
+              <div class="panel-body-expanded">
+                <!-- Source selector -->
+                <div class="source-selector">
+                  <label class="source-label">Source</label>
+                  <div class="source-options">
+                    <span class="source-chip active" data-source="jira">Jira</span>
+                    <span class="source-chip" data-source="manual">Manual</span>
+                  </div>
+                </div>
+
+<!-- Jira source inputs -->
+                <div class="source-panel source-jira">
+                  <label>
+                    Ticket Key
+                    <div class="input-row">
+                      <input id="jiraKey" type="text" placeholder="e.g. PROJ-1234">
+                      <button id="fetchJiraBtn" type="button" class="primary-action">Fetch</button>
+                    </div>
+                  </label>
+                </div>
+
+<!-- Manual source inputs -->
+                <div class="source-panel source-manual" hidden>
+                  <label>
+                    Requirement description / JSON
+                    <textarea id="ticketJson" class="code-input" spellcheck="false" placeholder="Paste ticket JSON or description text..."></textarea>
+                  </label>
+                  <div class="button-row">
+                    <button id="applyManualTicketBtn" type="button" class="primary-action">Apply</button>
+                    <button id="loadSampleTicketBtn" type="button" class="sample-btn">Sample</button>
+                  </div>
+                </div>
+
+<!-- Loaded state summary - Success message -->
+                <div id="reqLoadedSummary" class="req-loaded-summary" hidden>
+                  <div class="req-loaded-header">
+                    <span class="req-success-text">✓ Requirement loaded successfully</span>
+                    <button id="changeRequirementBtn" type="button" class="link-button">Change Requirement</button>
+                  </div>
+                </div>
+
+<!-- Requirement metadata -->
+                <div id="reqMetaSection" class="req-meta-section" hidden>
+                  <div class="req-meta-content">
+                    <strong id="reqSummaryKey"></strong>
+                    <span id="reqSummaryText"></span>
+                  </div>
+                </div>
+
+<!-- Description section (separate container below success) -->
+                <div id="reqDescriptionSection" class="req-description-section" hidden>
+                  <div class="section-label">Description</div>
+                  <div id="reqDescriptionText" class="req-description-content"></div>
+                </div>
+
+<!-- Empty state helper message (shown at bottom when no ticket loaded) -->
+                <div id="reqEmptyState" class="req-empty-state-bottom" hidden>
+                  <span class="helper-icon">ℹ</span>
+                  <span class="helper-text">No requirement loaded yet. Fetch a Jira ticket or enter requirement details manually.</span>
+                </div>
+
+                <!-- Inline error display -->
+                <div id="jiraError" class="inline-error" hidden>
+                  <span class="error-icon">⚠</span>
+                  <span class="error-text"></span>
+                </div>
+                <div id="manualError" class="inline-error" hidden>
+                  <span class="error-icon">⚠</span>
+                  <span class="error-text"></span>
+                </div>
+              </div>
+
+              <!-- Collapsed state: compact summary -->
+              <div class="panel-body-summary" hidden>
+                <div class="step-summary-compact">
+                  <span id="reqStepSummary" class="step-summary-text">—</span>
+                  <div class="step-summary-actions">
+                    <button id="editReqBtn" type="button" class="link-button">Edit</button>
+                  </div>
+                </div>
+                <div id="reqDetailsExpand" class="req-details-expand" hidden>
+                  <div class="req-details-content">
+                    <pre id="reqDetailsText" class="code-display"></pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- STEP 2: API COLLECTION -->
+          <section class="panel span-12 panel-collection" data-view-section="workspace" data-section="collection">
+            <div class="panel-head" data-toggle-section>
+              <div class="step-info">
+                <span class="step">[2]</span>
+                <h2 class="step-title">API Collection</h2>
+              </div>
+              <div class="panel-head-right">
+                <span id="collectionStepStatus" class="step-status"></span>
+                <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <!-- Loading state -->
+              <div id="apiLoading" class="req-loading-state" hidden>
+                <div class="loading-indicator">
+                  <span class="loading-icon">⟳</span>
+                  <span>Parsing API collection...</span>
                 </div>
               </div>
 
               <!-- Empty state -->
-              <div id="scenariosEmpty" class="empty-state">
-                <div class="empty-icon">🧪</div>
-                <strong>No test scenarios yet</strong>
-                <p>Complete Requirements and API Collection, then generate tests.</p>
+              <div id="apiEmptyState" class="req-empty-state" hidden>
+                <div class="empty-icon">📁</div>
+                <strong>No API collection added yet</strong>
+                <p>Upload a file or paste an OpenAPI/Postman JSON.</p>
               </div>
 
-              <div id="warnings" class="warning-list"></div>
-
-              <!-- Controls -->
-              <div id="scenariosControls" class="scenarios-controls" hidden>
-                <div class="controls-primary">
-                  <button id="generateBtn" type="button" class="primary-action">Generate Tests</button>
-                  <label class="inline-check">
-                    <input id="useAi" type="checkbox">
-                    AI enhance
-                  </label>
-                </div>
-                <div class="controls-secondary">
-                  <button id="selectAllScenariosBtn" type="button" class="action-btn" disabled>Select All</button>
-                  <button id="deselectAllScenariosBtn" type="button" class="action-btn" disabled>Deselect All</button>
-                </div>
-                <div class="controls-tertiary">
-                  <details class="inline-details">
-                    <summary>Export</summary>
-                    <div class="inline-menu">
-                      <button id="downloadScenariosBtn" type="button" class="menu-item" disabled>Download CSV</button>
-                      <button id="exportPostmanBtn" type="button" class="menu-item" disabled>Export Postman</button>
+              <!-- Expanded state: input form -->
+              <div class="panel-body-expanded">
+                <!-- Upload File Section -->
+                <div class="input-section">
+                  <div class="section-label">Upload API Collection</div>
+                  <div id="contractUploadArea" class="upload-area">
+                    <div class="upload-prompt" id="contractUploadPrompt">
+                      <span class="upload-icon">📁</span>
+                      <span class="upload-text">Drag & drop or browse</span>
+                      <span class="upload-subtext">Supported: OpenAPI · Swagger · Postman · HAR</span>
+                      <input id="contractFile" type="file" accept=".json,application/json" hidden>
                     </div>
-                  </details>
+                    <div id="contractFileSummary" class="file-summary" hidden>
+                      <div class="file-info">
+                        <span id="contractFileName" class="file-name"></span>
+                        <span id="contractFileType" class="file-type"></span>
+                        <span id="contractFileSize" class="file-size"></span>
+                      </div>
+                      <div class="file-actions">
+                        <button id="replaceContractBtn" type="button" class="link-button">Replace</button>
+                        <button id="removeContractBtn" type="button" class="link-button">Remove</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- OR divider -->
+                <div class="input-divider">
+                  <span>OR</span>
+                </div>
+
+                <!-- Paste JSON Section -->
+                <div class="input-section" id="pasteJsonSection">
+                  <div class="section-label">Paste JSON</div>
+                  <label>
+                    OpenAPI / Postman JSON
+                    <textarea id="contractJson" class="code-input" spellcheck="false" placeholder="Paste OpenAPI or Postman collection JSON..."></textarea>
+                  </label>
+                  <div class="button-row">
+                    <button id="parseContractBtn" type="button" class="primary-action">Parse Collection</button>
+                  </div>
+                </div>
+
+                <div class="button-row" style="margin-top: 12px;">
+                  <button id="loadSampleContractBtn" type="button" class="sample-btn">Sample</button>
+                </div>
+
+                <!-- Inline error -->
+                <div id="apiError" class="inline-error" hidden>
+                  <span class="error-icon">⚠</span>
+                  <span class="error-text"></span>
                 </div>
               </div>
 
-              <!-- Filter bar -->
-              <div id="scenariosFilters" class="scenarios-filters" hidden>
-                <input id="scenarioSearch" type="search" placeholder="Search scenarios..." class="filter-search">
-                <select id="scenarioTypeFilter" class="filter-select">
-                  <option value="all">All types</option>
-                </select>
-                <select id="scenarioMapFilter" class="filter-select">
-                  <option value="all">All mapping</option>
-                  <option value="high">HIGH</option>
-                  <option value="medium">MEDIUM</option>
-                  <option value="low">LOW</option>
-                  <option value="ambiguous">AMBIGUOUS</option>
-                  <option value="unmapped">UNMAPPED</option>
-                </select>
-                <span id="scenarioFilterCount" class="filter-count"></span>
+              <!-- Collapsed state: compact summary -->
+              <div class="panel-body-summary" hidden>
+                <div class="step-summary-compact">
+                  <span id="collectionStepSummary" class="step-summary-text">—</span>
+                  <div class="step-summary-actions">
+                    <button id="editCollectionBtn" type="button" class="link-button">Edit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- STEP 3: TEST SCENARIOS -->
+          <section class="panel span-12 panel-scenarios" data-view-section="workspace" data-section="scenarios">
+            <div class="panel-head" data-toggle-section>
+              <div class="step-info">
+                <span class="step">[3]</span>
+                <h2 class="step-title">Test Scenarios</h2>
+              </div>
+              <div class="panel-head-right">
+                <span id="scenariosStepStatus" class="step-status"></span>
+                <button type="button" class="expand-toggle" aria-label="Toggle section" title="Collapse/Expand">−</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <!-- Loading State -->
+              <div id="scenariosLoading" class="scenario-loading-state" hidden>
+                <div class="loading-indicator">
+                  <span class="loading-icon">⟳</span>
+                  <span class="loading-text">Generating scenarios...</span>
+                </div>
               </div>
 
-              <!-- Scenario table -->
-              <div class="table-wrap">
-                <table>
+              <!-- Empty/Prerequisites State -->
+              <div id="scenariosEmptyState" class="scenario-empty-state">
+                <div class="empty-icon">🧪</div>
+                <strong>No test scenarios generated yet</strong>
+                <div class="prereq-status">
+                  <span id="scPrereqReq" class="prereq-item">Requirement ⃝</span>
+                  <span id="scPrereqApi" class="prereq-item">API Collection ⃝</span>
+                </div>
+                <button id="generateScenariosBtn" type="button" class="primary-action generate-btn" disabled>Generate Test Scenarios</button>
+                <p id="generateHelpText" class="generate-help" hidden>Load a requirement and API collection before generating scenarios.</p>
+              </div>
+
+              <!-- Scenario Summary Bar -->
+              <div id="scenariosSummary" class="scenarios-summary" hidden>
+                <div class="scenario-metrics">
+                  <span class="scenario-metric"><strong id="scTotal">0</strong> scenarios generated</span>
+                  <span class="scenario-metric"><strong id="scSelected">0</strong> selected</span>
+                </div>
+              </div>
+
+              <!-- Inline error -->
+              <div id="scenariosError" class="inline-error" hidden>
+                <span class="error-icon">⚠</span>
+                <span class="error-text"></span>
+              </div>
+
+              <!-- Scenario Table -->
+              <div class="table-wrap" hidden>
+                <table class="scenario-compact-table">
                   <thead>
                     <tr>
                       <th class="select-col">Run</th>
                       <th>Test Scenario</th>
                       <th>Type</th>
                       <th>Target API</th>
-                      <th>Mapping</th>
-                      <th>Priority</th>
-                      <th>Status</th>
                     </tr>
                   </thead>
-                  <tbody id="scenarioRows">
-                    <tr>
-                      <td colspan="7" class="empty">No scenarios generated yet.</td>
-                    </tr>
-                  </tbody>
+                  <tbody id="scenarioRows"></tbody>
                 </table>
               </div>
             </div>
           </section>
 
-          <!-- ═══════ SECTION 4: TEST EXECUTION ═══════ -->
+          <!-- STEP 4: CONFIGURE & RUN -->
           <section class="panel span-12 panel-execution" data-view-section="workspace" data-section="execution">
-            <div class="panel-head">
-              <div>
-                <span class="step">4</span>
-                <h2>Test Execution</h2>
+            <div class="panel-head" data-toggle-section>
+              <div class="step-info">
+                <span class="step">[4]</span>
+                <h2 class="step-title">Configure & Run</h2>
               </div>
               <div class="panel-head-right">
-                <span id="executionStatusBadge" class="status-badge"></span>
+                <span id="executionStepStatus" class="step-status"></span>
               </div>
             </div>
             <div class="panel-body">
+              <!-- Loading State -->
+              <div id="execLoading" class="scenario-loading-state" hidden>
+                <div class="loading-indicator">
+                  <span class="loading-icon">⟳</span>
+                  <span class="loading-text">Running validation...</span>
+                </div>
+              </div>
+
               <!-- Empty state -->
               <div id="execEmpty" class="empty-state">
                 <div class="empty-icon">⚡</div>
-                <strong>No tests ready to execute</strong>
-                <p>Generate tests with API mappings first, then configure execution.</p>
+                <strong>Complete the previous steps to run validation</strong>
+                <p>Load requirements, add an API collection, and generate scenarios.</p>
               </div>
 
-              <div id="execContent" hidden>
-                <!-- Readiness checks -->
+              <!-- Compact summary for collapsed state -->
+              <div id="execSummaryCollapsed" class="step-summary-compact" hidden>
+                <span id="execStepSummary" class="step-summary-text">—</span>
+                <div class="step-summary-actions">
+                  <button id="editExecBtn" type="button" class="link-button">Edit</button>
+                </div>
+              </div>
+
+              <!-- Full content -->
+              <div id="execFullContent" hidden>
                 <div class="readiness-section">
                   <h3 class="readiness-title">Execution Readiness</h3>
                   <div class="readiness-grid">
@@ -351,7 +397,6 @@
                   </div>
                 </div>
 
-                <!-- Configuration -->
                 <details class="advanced-config">
                   <summary class="advanced-summary">Advanced Execution Settings</summary>
                   <div class="advanced-body">
@@ -379,7 +424,6 @@
                   </div>
                 </details>
 
-                <!-- Run controls -->
                 <div class="run-controls">
                   <div class="run-stats">
                     <span class="ready-count"><strong id="readyCount">0</strong> ready</span>
@@ -389,18 +433,24 @@
                   <div class="run-buttons">
                     <label class="inline-check dry-run-check">
                       <input id="dryRun" type="checkbox" checked>
-                      <span title="Validate request construction without executing against real API">Dry run</span>
+                      <span>Dry run</span>
                     </label>
-                    <button id="runAllBtn" type="button" class="secondary-action" title="Run all ready tests automatically">Run <span id="readyCountBtn">0</span> Ready Tests</button>
+                    <button id="runAllBtn" type="button" class="secondary-action">Run All Ready Tests</button>
                     <button id="executeBtn" type="button" class="primary-action">Run Selected Tests</button>
                     <button id="viewBlockedBtn" type="button" class="link-button" hidden>View Blocked</button>
                   </div>
+                </div>
+
+                <!-- Inline error -->
+                <div id="execError" class="inline-error" hidden>
+                  <span class="error-icon">⚠</span>
+                  <span class="error-text"></span>
                 </div>
               </div>
             </div>
           </section>
 
-          <!-- ═══════ RESULTS (inline, no separate view section) ═══════ -->
+          <!-- RESULTS -->
           <section id="results" class="panel span-12 panel-results" data-view-section="results">
             <div class="panel-head">
               <div>
@@ -431,7 +481,7 @@
             </div>
           </section>
 
-          <!-- ═══════ RUN HISTORY ═══════ -->
+          <!-- RUN HISTORY -->
           <section id="history" class="panel span-12 panel-history" data-view-section="history">
             <div class="panel-head">
               <div>
@@ -482,12 +532,11 @@
               </div>
             </div>
           </section>
-
         </main>
       </div>
     </div>
 
     <div id="toast" class="toast" hidden></div>
-    <script src="/app.js?v=5"></script>
+    <script src="/app.js?v=12"></script>
   </body>
 </html>
