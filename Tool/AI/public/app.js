@@ -18,10 +18,10 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """);
 }
 
 function pretty(value) {
@@ -49,7 +49,6 @@ function toast(message, type = "info") {
 }
 
 function showModal(title, message) {
-  // Create modal if not exists
   let modal = document.getElementById("errorModal");
   if (!modal) {
     modal = document.createElement("div");
@@ -68,8 +67,6 @@ function showModal(title, message) {
       </div>
     `;
     document.body.appendChild(modal);
-    
-    // Bind close events
     modal.addEventListener("click", (e) => {
       if (e.target === modal || e.target.classList.contains("modal-close") || e.target.classList.contains("modal-ok")) {
         modal.classList.remove("show");
@@ -77,7 +74,6 @@ function showModal(title, message) {
       }
     });
   }
-  
   modal.querySelector(".modal-title").textContent = title;
   modal.querySelector(".modal-body").textContent = message;
   modal.hidden = false;
@@ -129,7 +125,6 @@ function extractAcceptanceCriteria(text) {
     return criteria.filter(Boolean);
   }
 
-  // fallback: inline AC lists like "ACs: 1.foo, 2.bar"
   const inlineMatch = normalized.match(/\b(?:acceptance criteria|ac|acs)\b\s*[:\-]\s*(.+)$/i);
   if (inlineMatch && inlineMatch[1]) {
     return inlineMatch[1]
@@ -287,6 +282,47 @@ function renderAppMetrics() {
     .join("");
 }
 
+function renderCompactWorkflow() {
+  const ticket = state.ticket;
+  const contract = state.contract;
+  const scenarios = state.scenarios || [];
+  const run = state.run;
+
+  const reqText = ticket?.key ? `${ticket.key} ✓` : "Not configured";
+  const apiText = contract
+    ? contract.title
+      ? `${contract.title} ✓`
+      : `${contract.endpoints?.length || 0} endpoints ✓`
+    : "Not configured";
+  const scText = scenarios.length
+    ? `${scenarios.length} generated`
+    : "Not generated";
+  const execText = run
+    ? `Completed · ${(run.summary?.passed || 0)} passed`
+    : scenarios.length && contract && ticket
+      ? "Ready to Run"
+      : "Not ready";
+
+  const reqClass = ticket ? "completed" : "";
+  const apiClass = contract ? "completed" : "";
+  const scClass = scenarios.length ? "completed" : "";
+  const execClass = run
+    ? "completed"
+    : scenarios.length && contract && ticket
+      ? "active"
+      : "";
+
+  $("#compactWorkflow").innerHTML = `
+    <span class="cw-step ${reqClass}"><span class="cw-badge">${escapeHtml(reqText)}</span></span>
+    <span class="cw-sep"></span>
+    <span class="cw-step ${apiClass}"><span class="cw-badge">${escapeHtml(apiText)}</span></span>
+    <span class="cw-sep"></span>
+    <span class="cw-step ${scClass}"><span class="cw-badge">${escapeHtml(scText)}</span></span>
+    <span class="cw-sep"></span>
+    <span class="cw-step ${execClass}"><span class="cw-badge">${escapeHtml(execText)}</span></span>
+  `;
+}
+
 async function loadConfigStatus() {
   const data = await api("/api/config/status");
   $("#serverState").textContent = "Online";
@@ -302,7 +338,9 @@ async function loadSampleTicket(options = {}) {
   state.ticket = ticket;
   $("#jiraKey").value = ticket.key || "";
   $("#ticketJson").value = pretty(ticket);
+  renderTicketSummary();
   renderAppMetrics();
+  renderCompactWorkflow();
   if (!options.silent) toast("Sample ticket loaded.");
 }
 
@@ -317,6 +355,7 @@ async function fetchJiraTicket() {
   state.ticket = data.ticket;
   $("#ticketJson").value = pretty(data.ticket);
   renderAppMetrics();
+  renderCompactWorkflow();
   toast(`Fetched ${data.ticket.key}.`);
 }
 
@@ -325,18 +364,30 @@ function getTicketFromText() {
   const ticket = parseTicketInput(raw);
   state.ticket = ticket;
   renderAppMetrics();
+  renderCompactWorkflow();
   return ticket;
+}
+
+function renderTicketSummary() {
+  const ticket = state.ticket;
+  if (!ticket) {
+    $("#ticketSummary").innerHTML = '<span class="muted">No ticket loaded</span>';
+    return;
+  }
+  $("#ticketSummary").innerHTML = `
+    <span class="pill violet">${escapeHtml(ticket.issueType || "Ticket")}</span>
+    <span>${escapeHtml(ticket.key || "")}</span>
+    <span>${escapeHtml(ticket.summary || "")}</span>
+  `;
 }
 
 async function loadSampleContract(options = {}) {
   const contract = await fetch("/sample-data/openapi-refund.json").then((res) => res.json());
   $("#contractJson").value = pretty(contract);
   await parseContract({ silent: true });
-  // Auto-fill baseUrl from contract for convenience
   if (contract.baseUrl) {
     $("#baseUrl").value = contract.baseUrl;
   }
-  // Set dryRun to false by default for real API testing
   $("#dryRun").checked = false;
   if (!options.silent) toast("Sample OpenAPI contract loaded.");
 }
@@ -349,7 +400,6 @@ async function parseContract(options = {}) {
   try {
     payload = { contract: JSON.parse(raw), name: "ui-contract" };
   } catch (err) {
-    // send raw string to server; server will attempt to parse
     payload = { contract: raw, name: "ui-contract" };
   }
 
@@ -358,6 +408,9 @@ async function parseContract(options = {}) {
     body: JSON.stringify(payload),
   });
   state.contract = data.contract;
+  renderContractSummary();
+  renderAppMetrics();
+  renderCompactWorkflow();
   if (!options.silent) toast(`Parsed ${data.contract.endpoints.length} endpoint(s).`);
 }
 
@@ -371,6 +424,7 @@ async function handleTicketFileUpload(event) {
   $("#jiraKey").value = ticket.key || $("#jiraKey").value;
   renderTicketSummary();
   renderAppMetrics();
+  renderCompactWorkflow();
   toast(`Loaded ${file.name}.`);
 }
 
@@ -402,10 +456,7 @@ function renderContractSummary() {
 }
 
 async function generateScenarios() {
-  // Use the currently loaded ticket (from Jira fetch, sample load, or manual input)
   let ticket = state.ticket;
-  
-  // If no ticket is loaded but there's text in the textarea, parse it
   if (!ticket) {
     const raw = $("#ticketJson").value.trim();
     if (raw) {
@@ -414,13 +465,10 @@ async function generateScenarios() {
       renderTicketSummary();
     }
   }
-  
-  // If still no ticket content, fall back to textarea content
   if (!ticket || !ticket.summary) {
     showModal("Step 1: No Ticket Loaded", "Cannot generate scenarios without a ticket. Click the 'Sample' button in the Jira Ticket section to load a demo ticket, or paste ticket JSON/description into the text area.");
     return;
   }
-  
   if (!state.contract) {
     const raw = $("#contractJson").value.trim();
     if (!raw) {
@@ -436,11 +484,7 @@ async function generateScenarios() {
 
   const data = await api("/api/scenarios/generate", {
     method: "POST",
-    body: JSON.stringify({
-      ticket,
-      contract: state.contract,
-      useAi: $("#useAi").checked,
-    }),
+    body: JSON.stringify({ ticket, contract: state.contract, useAi: $("#useAi").checked }),
   });
 
   state.scenarios = data.scenarios || [];
@@ -448,6 +492,7 @@ async function generateScenarios() {
   renderWarnings(data.warnings || []);
   renderScenarios();
   renderAppMetrics();
+  renderCompactWorkflow();
   toast(`Generated ${state.scenarios.length} scenario(s) using ${data.mode}.`);
 }
 
@@ -473,7 +518,7 @@ function renderEndpointSummary() {
     used.set(key, (used.get(key) || 0) + 1);
   }
 
-  if (!used.size && !unlinked.length && !state.unusedEndpoints.length) {
+  if (!used.size && !unlinked.length && ![].length) {
     $("#endpointSummary").innerHTML = "";
     return;
   }
@@ -486,9 +531,9 @@ function renderEndpointSummary() {
   if (unlinked.length) {
     parts.push(`<span class="pill">Unlinked TCs: ${unlinked.length}</span>`);
   }
-  if (state.unusedEndpoints && state.unusedEndpoints.length) {
-    const entries = state.unusedEndpoints.map((ep) => `${escapeHtml(ep.method)} ${escapeHtml(ep.path)}`).join(" · ");
-    parts.push(`<span class="pill red">Unused endpoints (${state.unusedEndpoints.length})</span> ${entries}`);
+  if ([].length) {
+    const entries = [].map((ep) => `${escapeHtml(ep.method)} ${escapeHtml(ep.path)}`).join(" · ");
+    parts.push(`<span class="pill red">Unused endpoints (${[].length})</span> ${entries}`);
   }
 
   $("#endpointSummary").innerHTML = `<div class="endpoint-summary">${parts.join(" | ")}</div>`;
@@ -522,7 +567,6 @@ function renderScenarios() {
 
   $$(".scenario-check").forEach((input) => input.addEventListener("change", renderAppMetrics));
 
-  // Enable/disable the select/deselect controls depending on whether scenarios exist
   updateScenarioControls();
   renderEndpointSummary();
 }
@@ -557,7 +601,6 @@ function downloadScenarios() {
   const ticket = state.ticket;
   const contract = state.contract;
 
-  // --- Section 1: Metadata ---
   const parts = [];
   parts.push("=== TEST PLAN SUMMARY ===");
   parts.push(csvLine("Generated At", new Date().toISOString()));
@@ -574,7 +617,6 @@ function downloadScenarios() {
   parts.push(csvLine("Linked to Endpoint", linkedCount, "Unlinked", unlinkedCount));
   parts.push("");
 
-  // --- Section 2: Endpoint Coverage ---
   parts.push("=== ENDPOINT COVERAGE ===");
   parts.push(csvLine("Endpoint", "Method", "Path", "TC Count", "Status"));
   const usedMap = new Map();
@@ -598,13 +640,11 @@ function downloadScenarios() {
       parts.push(csvLine(key, method, path, count, "COVERED"));
     }
   }
-  // Also show unlinked
   if (unlinkedCount > 0) {
     parts.push(csvLine("(no endpoint)", "", "", unlinkedCount, "UNLINKED"));
   }
   parts.push("");
 
-  // --- Section 3: Full Test Case Details ---
   parts.push("=== ALL TEST CASES (Full Details) ===");
   parts.push(csvLine(
     "TC ID", "Title", "Type", "Endpoint", "Method", "Path",
@@ -635,7 +675,6 @@ function downloadScenarios() {
   parts.push("");
 
   const csv = parts.join("\n");
-
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -653,6 +692,7 @@ function setScenarioSelection(checked) {
     input.checked = checked;
   });
   renderAppMetrics();
+  renderCompactWorkflow();
   updateScenarioControls();
 }
 
@@ -729,7 +769,7 @@ function renderAuthFields() {
   if (type === "bearer") {
     target.innerHTML = '<label>Token<input id="authToken" type="password" autocomplete="off"></label>';
   } else if (type === "autoBearer") {
-target.innerHTML = `
+    target.innerHTML = `
       <div class="button-row auth-detect-row">
         <button id="detectAuthEndpointBtn" type="button" class="action-btn">Use detected token endpoint</button>
       </div>
@@ -790,52 +830,42 @@ function environmentPayload() {
 }
 
 async function runAll() {
-  // Auto-load sample ticket if none loaded
   if (!state.ticket) {
     await loadSampleTicket({ silent: true });
   }
-  
-  // Auto-parse contract if not loaded
   if (!state.contract) {
     const raw = $("#contractJson").value.trim();
-    if (!raw) {
-      await loadSampleContract({ silent: true });
-    } else {
+    if (raw) {
       await parseContract({ silent: true });
+    } else {
+      await loadSampleContract({ silent: true });
     }
   }
   if (!state.contract) {
-    showModal("Run All Failed", "Could not load API contract.");
+    showModal("Run Failed", "No API collection loaded.");
     return;
   }
 
-  // Auto-generate scenarios
   await generateScenarios();
-  
-  // Wait a tick for state to update
   await new Promise(r => setTimeout(r, 100));
 
-  if (!state.scenarios || state.scenarios.length === 0) {
-    showModal("Run All Failed", "No scenarios generated.");
+  if (!state.scenarios.length) {
+    showModal("Run Failed", "No scenarios generated.");
     return;
   }
 
-  // Auto-unselect dry run
+  setScenarioSelection(true);
   $("#dryRun").checked = false;
 
-  // Execute all scenarios
-  const scenarios = state.scenarios;
-  const env = environmentPayload();
-  
-  toast("Running all scenarios...");
-  
+  toast("Running all ready tests...");
+
   const data = await api("/api/runs/execute", {
     method: "POST",
     body: JSON.stringify({
       ticket: state.ticket,
       contract: state.contract,
-      scenarios,
-      environment: env,
+      scenarios: state.scenarios,
+      environment: environmentPayload(),
     }),
   });
 
@@ -845,117 +875,43 @@ async function runAll() {
   await loadRunHistory({ silent: true });
   setActiveView("results");
   $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
-  toast(`Run All complete: ${data.run.summary.passed} passed, ${data.run.summary.failed} failed`);
+  toast(`Run complete: ${data.run.summary.passed} passed, ${data.run.summary.failed} failed`);
 }
 
 async function executeSelected() {
-  // ---- Step 1: Ticket Validation ----
   if (!state.ticket) {
-    showModal("Step 1: No Ticket Loaded", "You need a Jira ticket to generate test scenarios. Click the 'Sample' button in the Jira Ticket section to load a demo ticket, or paste ticket JSON/plain text into the text area.");
+    showModal("No Requirements", "Load requirements first.");
     return;
   }
-  
-  // ---- Step 2: Contract Validation ----
   if (!state.contract) {
-    const raw = $("#contractJson").value.trim();
-    if (!raw) {
-      showModal("Step 2: No Contract Loaded", "You need an API contract to proceed. Click the 'Sample' button in the API Contract section to load a demo OpenAPI contract, or paste an OpenAPI/Postman JSON into the text area.");
-      return;
-    }
-    await parseContract({ silent: true });
-    if (!state.contract) {
-      showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed. Make sure it is valid OpenAPI, Postman collection v2.1, or HAR format.");
-      return;
-    }
-  }
-  if (!state.contract.endpoints || state.contract.endpoints.length === 0) {
-    showModal("Step 2: No Endpoints in Contract", "The contract was parsed successfully but contains no API endpoints. Check that your OpenAPI spec has path definitions or your Postman collection has request items.");
+    showModal("No API Collection", "Parse an API collection first.");
     return;
   }
-  
-  // ---- Step 3: Scenarios Validation ----
-  if (!state.scenarios || state.scenarios.length === 0) {
-    showModal("Step 3: No Scenarios Generated", "You need to generate test scenarios first. Click the 'Generate' button in the Generated Scenarios section to create scenarios from your ticket and contract. Ensure your ticket has acceptance criteria defined.");
-    return;
-  }
-  
   const scenarios = selectedScenarios();
   if (!scenarios.length) {
-    showModal("Step 3: No Scenarios Selected", "At least one scenario must be selected for execution. Check the checkbox(es) in the 'Run' column next to the scenarios you want to execute. Use 'Select all' to quickly select all scenarios.");
+    showModal("No Tests Selected", "Select at least one test scenario to execute.");
     return;
   }
-
-  // ---- Step 4: Execution Section Field Validation ----
   const envName = $("#envName").value.trim();
-  const baseUrl = $("#baseUrl").value.trim();
-  const authType = $("#authType").value;
-  const isDryRun = $("#dryRun").checked;
-
   if (!envName) {
-    showModal("Step 4: Environment Name Required", "The 'Environment' field in the Execution section is empty. Enter a name to identify this test run (e.g. 'local-qa', 'staging', 'production').");
+    showModal("Environment Required", "Enter an environment name.");
     $("#envName").focus();
     return;
   }
-
+  const baseUrl = $("#envName").value.trim();
   if (!baseUrl) {
-    showModal("Step 4: Base URL Required", "The 'Base URL' field in the Execution section is empty. Enter the API base URL where requests will be sent (e.g. https://api.qa.company.com). This URL is combined with endpoint paths to form complete request URLs.");
+    showModal("Base URL Required", "Enter a Base URL.");
     $("#baseUrl").focus();
     return;
   }
-
   if (!/^https?:\/\/.+/i.test(baseUrl)) {
-    showModal("Step 4: Invalid Base URL Format", "The Base URL must start with http:// or https://. Example: https://api.qa.company.com");
+    showModal("Invalid URL", "Base URL must start with http:// or https://.");
     $("#baseUrl").focus();
     return;
   }
 
-  if (authType === "bearer") {
-    const token = ($("#authToken")?.value || "").trim();
-    if (!token) {
-      showModal("Step 4: Bearer Token Missing", "Auth type is 'Bearer token' but no token value was entered. Provide a valid token in the Token field, or change the Auth type to 'None' if the API does not require authentication.");
-      $("#authToken").focus();
-      return;
-    }
-  }
+  toast(`Running ${scenarios.length} test(s)...`);
 
-  if (authType === "autoBearer") {
-    const tokenUrl = ($("#tokenUrl")?.value || "").trim();
-    if (!tokenUrl) {
-      showModal("Step 4: Token URL Missing", "Auth type is 'Auto bearer token' but no Token URL was provided. Enter the authentication endpoint path (e.g. /auth/token) or click 'Use detected token endpoint' to auto-fill from the contract.");
-      $("#tokenUrl").focus();
-      return;
-    }
-  }
-
-  if (authType === "basic") {
-    const username = ($("#authUsername")?.value || "").trim();
-    const password = ($("#authPassword")?.value || "").trim();
-    if (!username) {
-      showModal("Step 4: Basic Auth Username Missing", "Auth type is 'Basic auth' but the Username field is empty. Enter a username for basic HTTP authentication.");
-      $("#authUsername").focus();
-      return;
-    }
-    if (!password) {
-      showModal("Step 4: Basic Auth Password Missing", "Auth type is 'Basic auth' but the Password field is empty. Enter a password for basic HTTP authentication.");
-      $("#authPassword").focus();
-      return;
-    }
-  }
-
-  if (authType === "custom") {
-    const headerName = ($("#authHeaderName")?.value || "").trim();
-    const headerValue = ($("#authHeaderValue")?.value || "").trim();
-    if (!headerName) {
-      showModal("Step 4: Custom Header Name Missing", "Auth type is 'Custom header' but the Header Name field is empty. Enter the header name (e.g. X-API-Key).");
-      $("#authHeaderName").focus();
-      return;
-    }
-    if (!headerValue) {
-      showModal("Step 4: Custom Header Value Missing", "Auth type is 'Custom header' but the Header Value field is empty. Enter the value for the custom authentication header.");
-      $("#authHeaderValue").focus();
-      return;
-    }
-  }
   const data = await api("/api/runs/execute", {
     method: "POST",
     body: JSON.stringify({
@@ -971,7 +927,6 @@ async function executeSelected() {
   renderRun();
   await loadRunHistory({ silent: true });
   setActiveView("results");
-  $("#results").scrollIntoView({ behavior: "smooth", block: "start" });
   toast(`Run stored: ${data.run.id}`);
 }
 
@@ -988,9 +943,8 @@ function renderRun() {
     ["Dry Run", summary.dry_run || 0],
   ];
   if (run.authStatus) stats.push(["Auth", statusLabel(run.authStatus.status)]);
-  
-  // Calculate average response time
-  const responseTimes = (run.results || []).map(r => r.validation?.responseTimeMs).filter(Boolean);
+
+  const responseTimes = (run.results || []).map((r) => r.validation?.responseTimeMs).filter(Boolean);
   const avgTime = responseTimes.length ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
   if (avgTime > 0) stats.push(["Avg Time", `${avgTime}ms`]);
 
@@ -1003,32 +957,30 @@ function renderRun() {
     <a class="link-button" href="${state.reportUrl || `/api/reports/${encodeURIComponent(run.id)}.html`}" target="_blank" rel="noreferrer">HTML report</a>
   `;
 
-$("#resultRows").innerHTML = (run.results || [])
-    .map(
-      (result) => {
-        const statusColor = result.status === "passed" ? "#238052" : result.status === "failed" ? "#b44236" : result.status === "blocked" ? "#8b6500" : "#28699a";
-        const responseTime = result.validation?.responseTimeMs ? `${result.validation.responseTimeMs}ms` : "—";
-        return `
-      <tr>
-        <td>
-          <strong>${escapeHtml(result.title)}</strong>
-          <div class="muted">${escapeHtml(result.scenarioId)}</div>
-        </td>
-        <td><span class="status ${escapeHtml(result.status)}">${escapeHtml(statusLabel(result.status))}</span></td>
-        <td>
-          <span style="font-weight:600;color:${statusColor}">${result.response?.status || result.error || result.status}</span>
-          <div class="muted" style="margin-top:2px">⏱ ${responseTime}</div>
-        </td>
-        <td>
-          <details>
-            <summary style="color:#28699a;font-weight:600">Request/Response</summary>
-            <pre style="background:#101820;color:#eef6ff;border-radius:4px;padding:8px;margin-top:4px">${escapeHtml(pretty({ request: result.request, response: result.response }))}</pre>
-          </details>
-        </td>
-      </tr>
-    `;
-      }
-    )
+  $("#resultRows").innerHTML = (run.results || [])
+    .map((result) => {
+      const statusColor = result.status === "passed" ? "#238052" : result.status === "failed" ? "#b44236" : result.status === "blocked" ? "#8b6500" : "#28699a";
+      const responseTime = result.validation?.responseTimeMs ? `${result.validation.responseTimeMs}ms` : "—";
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(result.title)}</strong>
+            <div class="muted">${escapeHtml(result.scenarioId)}</div>
+          </td>
+          <td><span class="status ${escapeHtml(result.status)}">${escapeHtml(statusLabel(result.status))}</span></td>
+          <td>
+            <span style="font-weight:600;color:${statusColor}">${result.response?.status || result.error || result.status}</span>
+            <div class="muted" style="margin-top:2px">⏱ ${responseTime}</div>
+          </td>
+          <td>
+            <details>
+              <summary style="color:#28699a;font-weight:600">Request/Response</summary>
+              <pre style="background:#101820;color:#eef6ff;border-radius:4px;padding:8px;margin-top:4px">${escapeHtml(pretty({ request: result.request, response: result.response }))}</pre>
+            </details>
+          </td>
+        </tr>
+      `;
+    })
     .join("");
 }
 
@@ -1037,6 +989,7 @@ async function loadRunHistory(options = {}) {
   state.history = data;
   renderHistory();
   renderAppMetrics();
+  renderCompactWorkflow();
   if (!options.silent) toast("Run history refreshed.");
 }
 
@@ -1102,8 +1055,7 @@ function renderTicketGroups(runs) {
   }
 
   target.innerHTML = groups
-    .map(
-      (group) => `
+    .map((group) => `
       <div class="ticket-row">
         <div>
           <strong>${escapeHtml(group.ticketKey)}</strong>
@@ -1119,8 +1071,7 @@ function renderTicketGroups(runs) {
         </div>
 <button type="button" data-load-run="${escapeHtml(group.latestRunId)}" class="load-btn">Latest</button>
       </div>
-    `
-    )
+    `)
     .join("");
 }
 
@@ -1212,6 +1163,7 @@ function bindEvents() {
       }
     });
   });
+
   $("#loadSampleTicketBtn").addEventListener("click", () => loadSampleTicket().catch((error) => toast(error.message)));
   $("#fetchJiraBtn").addEventListener("click", () => fetchJiraTicket().catch((error) => toast(error.message)));
   $("#ticketFile").addEventListener("change", (event) => handleTicketFileUpload(event).catch((error) => toast(error.message)));
@@ -1223,7 +1175,7 @@ function bindEvents() {
   $("#deselectAllScenariosBtn").addEventListener("click", () => setScenarioSelection(false));
   $("#downloadScenariosBtn").addEventListener("click", () => downloadScenarios());
   $("#exportPostmanBtn").addEventListener("click", () => generatePostmanCollection());
-$("#runAllBtn").addEventListener("click", () => runAll().catch((error) => toast(error.message)));
+  $("#runAllBtn").addEventListener("click", () => runAll().catch((error) => toast(error.message)));
   $("#executeBtn").addEventListener("click", () => executeSelected().catch((error) => toast(error.message)));
   $("#refreshHistoryBtn").addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
   $("#authType").addEventListener("change", renderAuthFields);
@@ -1304,6 +1256,7 @@ async function boot() {
   renderAuthFields();
   setActiveView(initialViewFromHash(), { skipHash: true });
   renderAppMetrics();
+  renderCompactWorkflow();
   await loadConfigStatus();
   await loadRunHistory({ silent: true });
   await loadSampleTicket({ silent: true });

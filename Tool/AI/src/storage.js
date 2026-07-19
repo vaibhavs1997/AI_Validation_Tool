@@ -17,9 +17,19 @@ function ensureStorage() {
 }
 
 function safeName(value) {
-  return String(value || crypto.randomUUID())
+  const str = String(value || crypto.randomUUID());
+  const hasSpecial = /[^a-zA-Z0-9._-]/.test(str);
+  const sanitized = str
     .replace(/[^a-zA-Z0-9._-]/g, "-")
-    .slice(0, 120);
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 100);
+  // Append short hash when input had special characters to avoid collisions
+  if (hasSpecial && !str.startsWith(sanitized)) {
+    const hash = crypto.createHash("md5").update(str).digest("hex").slice(0, 6);
+    return `${sanitized}-${hash}`;
+  }
+  return sanitized || crypto.randomUUID().slice(0, 12);
 }
 
 function saveJson(bucket, id, data) {

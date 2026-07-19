@@ -1,4 +1,5 @@
-﻿const fs = require("fs");
+﻿const crypto = require("crypto");
+const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const config = require("./config");
@@ -23,6 +24,12 @@ const contentTypes = {
 };
 
 function send(res, status, body, headers = {}) {
+  // CORS headers for all responses
+  if (!headers["Access-Control-Allow-Origin"]) {
+    headers["Access-Control-Allow-Origin"] = "*";
+    headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS";
+    headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
+  }
   res.writeHead(status, headers);
   res.end(body);
 }
@@ -170,7 +177,18 @@ async function handleApi(req, res, url) {
 }
 
 async function handleRequest(req, res) {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  const startTime = Date.now();
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return send(res, 204, "", {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    });
+  }
 
   try {
     if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url);
@@ -187,6 +205,12 @@ async function handleRequest(req, res) {
     return sendJson(res, 500, {
       error: error.message,
     });
+  } finally {
+    const duration = Date.now() - startTime;
+    const status = res.statusCode || 0;
+    if (url.pathname.startsWith("/api/")) {
+      console.log(`[${requestId}] ${req.method} ${url.pathname} → ${status} (${duration}ms)`);
+    }
   }
 }
 
@@ -196,3 +220,23 @@ server.listen(config.port, () => {
   console.log(`AI API Validation Tool MVP running at http://localhost:${config.port}`);
 });
 
+// Graceful shutdown
+function shutdown(signal) {
+  console.log(`\n[server] Received ${signal}. Shutting down gracefully...`);
+  server.close(() => {
+    console.log("[server] Server closed. Goodbye.");
+    process.exit(0);
+  });
+  // Force exit if graceful shutdown takes too long
+  setTimeout(() => {
+    console.error("[server] Forced shutdown after timeout.");
+    process.exit(1);
+  }, 10000).unref();
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.once("uncaughtException", (err) => {
+  console.error("[server] Uncaught exception:", err);
+  shutdown("uncaughtException");
+});
