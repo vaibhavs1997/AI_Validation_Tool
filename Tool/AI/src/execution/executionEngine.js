@@ -278,10 +278,18 @@ async function executeScenario(scenario, endpoint, environment) {
   // Execute with retry support (1 retry for transient failures)
   var maxRetries = 1;
   var lastError = null;
+  var maxTimeoutMs = 60 * 1000;
+  var defaultTimeoutMs = Number(config.requestTimeoutMs);
+  if (!Number.isFinite(defaultTimeoutMs) || defaultTimeoutMs <= 0) defaultTimeoutMs = 30 * 1000;
+  defaultTimeoutMs = Math.min(defaultTimeoutMs, maxTimeoutMs);
 
   for (var attempt = 0; attempt <= maxRetries; attempt++) {
     var controller = new AbortController();
-    var timeout = setTimeout(function() { controller.abort(); }, environment.timeoutMs || config.requestTimeoutMs);
+    var requestedTimeoutMs = Number(environment.timeoutMs);
+    var timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0
+      ? Math.min(requestedTimeoutMs, maxTimeoutMs)
+      : defaultTimeoutMs;
+    var timeout = setTimeout(function() { controller.abort(); }, timeoutMs);
 
     try {
       var response = await fetch(url, {
