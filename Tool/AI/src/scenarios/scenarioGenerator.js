@@ -243,6 +243,7 @@ function createTestCasesFromTicket(ticket) {
   const titleBase = ticket?.summary || "API validation";
   const acceptance = ticket?.acceptanceCriteria || [];
   const description = ticket?.description || "";
+  const ticketKey = ticket?.key || "REQUIREMENT";
 
   const added = new Set();
 
@@ -272,6 +273,12 @@ function createTestCasesFromTicket(ticket) {
       expectedMethod: expectedMethod || null,
       precondition: null,
       expectedOutcome: null,
+      // Add traceability for matching engine grouping
+      traceability: {
+        requirementIds: [ticketKey],
+        sourceText: titleBase,
+        acceptanceCriterion: sourceAc || "",
+      },
     });
   }
 

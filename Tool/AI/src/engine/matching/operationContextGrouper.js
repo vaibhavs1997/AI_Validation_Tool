@@ -5,7 +5,7 @@
  *
  * Grouping logic:
  *   - Tests sharing requirement IDs belong together
- *   - Tests sharing the same field targets belong together
+ *   - Tests with same expectedMethod are grouped (same operation)
  *   - Tests covering positive/negative/boundary for the same field
  *
  * This ensures we resolve one context→endpoint instead of N tests→endpoint,
@@ -21,7 +21,7 @@
  */
 function groupByOperationContext(testCases, requirements = []) {
   const contexts = new Map();
-  const tcByReq = new Map(); // requirementId → test case IDs
+  const tcByReqAndMethod = new Map(); // "reqId:method" → test case IDs
   const reqMap = new Map();  // requirementId → requirement
 
   // Build requirement index
@@ -29,27 +29,35 @@ function groupByOperationContext(testCases, requirements = []) {
     if (req.requirementId) reqMap.set(req.requirementId, req);
   }
 
-  // Phase 1: Group by requirementId
+  // Phase 1: Group by requirementId AND expectedMethod
+  // This ensures tests with different methods (e.g., POST vs GET vs DELETE)
+  // are matched separately
   for (const tc of (testCases || [])) {
     const reqIds = (tc.traceability?.requirementIds || []).filter(Boolean);
-    // Also try from tc itself (scenarioGenerator creates TCs with requirementId in traceability)
+    const expMethod = tc.expectedMethod || null;
+    
     for (const reqId of reqIds) {
-      if (!tcByReq.has(reqId)) tcByReq.set(reqId, []);
-      tcByReq.get(reqId).push(tc.id);
+      // Create a compound key: reqId + expectedMethod
+      // If no expectedMethod, just use reqId
+      const key = expMethod ? `${reqId}:${expMethod}` : reqId;
+      if (!tcByReqAndMethod.has(key)) tcByReqAndMethod.set(key, []);
+      tcByReqAndMethod.get(key).push(tc.id);
     }
   }
 
   // If no requirement-based grouping, create one context per test case
-  if (tcByReq.size === 0 || testCases.length === 0) {
+  if (tcByReqAndMethod.size === 0 || testCases.length === 0) {
     return new Map();
   }
 
-  // Phase 2: Build contexts from shared requirement groups
+  // Phase 2: Build contexts from grouped test cases
   let contextCounter = 0;
-  const assigned = new Set();
-
-  for (const [reqId, tcIds] of tcByReq) {
+  for (const [key, tcIds] of tcByReqAndMethod) {
     contextCounter++;
+    const parts = key.split(":");
+    const reqId = parts[0];
+    const expMethod = parts[1] || null;
+    
     const contextId = `CTX-${String(contextCounter).padStart(3, "0")}`;
     const ctx = {
       contextId,
@@ -60,18 +68,23 @@ function groupByOperationContext(testCases, requirements = []) {
         resourceTerms: [],
         contextTerms: [],
         methodHints: [],
-        hasExplicitMethod: false,
+        hasExplicitMethod: !!expMethod,
       },
       fields: [],
       resolvedEndpointId: null,
       matchResult: null,
+      expectedMethod: expMethod,  // Store for matching hints
     };
-    tcIds.forEach((id) => assigned.add(id));
+    
+    // Pre-populate method hints if we have an explicit expectedMethod
+    if (expMethod) {
+      ctx.intent.methodHints = [expMethod];
+    }
+    
     contexts.set(contextId, ctx);
   }
 
-  // Phase 3: Merge contexts that share field targets across requirements
-  // Collect intents per context from test case data
+  // Phase 3: Collect intents per context from test case data
   for (const ctx of contexts.values()) {
     for (const tcId of ctx.testCaseIds) {
       const tc = testCases.find((t) => t.id === tcId);

@@ -17,10 +17,31 @@
  */
 
 const { buildIndex, retrieveCandidates } = require("./endpointIndex");
-const { extractIntent } = require("./targetIntentExtractor");
+const { extractIntent, extractActionTerms } = require("./targetIntentExtractor");
 const { groupByOperationContext } = require("./operationContextGrouper");
 const { computeAllSignals } = require("./matchingSignals");
 const { analyzeConfidence, computeWeightedScore } = require("./confidenceAnalyzer");
+
+// Protocol-level: HTTP methods are universal, not domain-specific
+const ACTION_VERBS = [
+  "create", "add", "post", "submit", "insert", "register",
+  "get", "fetch", "retrieve", "list", "search", "find",
+  "update", "edit", "modify", "change", "patch",
+  "delete", "remove", "cancel", "deactivate", "archive",
+  "approve", "reject", "validate", "verify", "confirm",
+  "process", "execute", "run", "trigger",
+  "login", "logout", "authenticate", "authorize",
+  "upload", "download", "export", "import",
+  "enable", "disable", "activate", "deactivate",
+];
+
+function tokenize(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+}
 
 /**
  * Match test cases against an API catalog.
@@ -204,7 +225,7 @@ function matchIntentToEndpoint(contextId, testCaseIds, intent, endpoints, epMap,
 }
 
 /**
- * Build aggregated OperationIntent from context's member test cases.
+ * Build aggregated intent from context's member test cases.
  */
 function buildAggregatedIntent(ctx, memberTcs) {
   const aggregated = {
@@ -212,8 +233,16 @@ function buildAggregatedIntent(ctx, memberTcs) {
     resourceTerms: [...new Set(ctx.intent?.resourceTerms || [])],
     contextTerms: [...new Set(ctx.intent?.contextTerms || [])],
     methodHints: [...new Set(ctx.intent?.methodHints || [])],
-    hasExplicitMethod: false,
+    hasExplicitMethod: ctx.intent?.hasExplicitMethod || false,
   };
+
+  // Also collect sourceText from all test cases for additional context
+  const sourceTexts = [];
+  for (const tc of memberTcs) {
+    if (tc.traceability?.sourceText) {
+      sourceTexts.push(tc.traceability.sourceText);
+    }
+  }
 
   for (const tc of memberTcs) {
     const intent = extractIntent(tc);
@@ -226,6 +255,14 @@ function buildAggregatedIntent(ctx, memberTcs) {
     }
   }
 
+  // Also extract action/resource terms from source texts for better matching
+  for (const sourceText of sourceTexts) {
+    const actions = extractActionTerms(sourceText);
+    aggregated.actionTerms.push(...actions);
+    const resources = tokenize(sourceText).filter(isResourceTerm);
+    aggregated.resourceTerms.push(...resources);
+  }
+
   // Deduplicate
   aggregated.actionTerms = [...new Set(aggregated.actionTerms)];
   aggregated.resourceTerms = [...new Set(aggregated.resourceTerms)];
@@ -233,6 +270,11 @@ function buildAggregatedIntent(ctx, memberTcs) {
   aggregated.methodHints = [...new Set(aggregated.methodHints)];
 
   return aggregated;
+}
+
+// Helper for resource term detection (used in buildAggregatedIntent)
+function isResourceTerm(word) {
+  return !ACTION_VERBS.includes(word) && word.length > 2;
 }
 
 module.exports = {
