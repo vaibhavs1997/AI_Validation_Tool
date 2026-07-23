@@ -197,10 +197,12 @@ function deriveConstraintType(mutation) {
  * @returns {Object} TargetIntent-compatible object
  */
 function extractIntent(tc, requirements = []) {
-  const combinedText = [tc.title, tc.sourceAc, tc.description, ...(tc.assertions || [])].filter(Boolean).join(" ");
+  // Use full traceability context if available (sourceText from summary/description)
+  const sourceText = tc.traceability?.sourceText || tc.description || "";
+  const combinedText = [tc.title, tc.sourceAc, sourceText, ...(tc.assertions || [])].filter(Boolean).join(" ");
   const { hints: methodHints, explicit: hasExplicitMethod } = extractMethodHints(combinedText);
 
-  // Add explicit method from tc.expectedMethod if available
+  // Add explicit method from tc.expectedMethod if available (strong signal for matching)
   if (tc.expectedMethod && !methodHints.includes(tc.expectedMethod)) {
     methodHints.unshift(tc.expectedMethod);
   }
@@ -209,13 +211,14 @@ function extractIntent(tc, requirements = []) {
   const allTokens = tokenize(combinedText);
   const resourceTerms = [...new Set(allTokens.filter(isResourceTerm))].slice(0, 10);
 
-  // Context terms from source AC
+  // Context terms from source AC and traceability source text
   const contextTerms = [];
   if (tc.sourceAc) {
     contextTerms.push(...tokenize(tc.sourceAc).filter(isResourceTerm));
   }
-  if (tc.description) {
-    contextTerms.push(...tokenize(tc.description).filter(isResourceTerm));
+  // Use sourceText as additional context (the requirement summary)
+  if (sourceText) {
+    contextTerms.push(...tokenize(sourceText).filter(isResourceTerm));
   }
 
   const targetFields = [
