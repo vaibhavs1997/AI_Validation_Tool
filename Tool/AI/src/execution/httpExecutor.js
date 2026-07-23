@@ -2,7 +2,7 @@
  * Shared HTTP Executor
  *
  * Production-hardened single-request execution logic extracted for reuse.
- * Used by both executionEngine.js and dependencyAwareExecutor.js.
+ * Used by dependencyAwareExecutor.js and related execution flows.
  */
 
 const config = require("../config");
