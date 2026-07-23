@@ -45,6 +45,22 @@ function intEnv(name, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function strEnv(name, fallback) {
+  return process.env[name] || fallback;
+}
+
+// Detect provider name from base URL for diagnostics
+function detectProviderFromUrl(url) {
+  if (!url) return "unknown";
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes("groq.com")) return "groq";
+  if (lowerUrl.includes("openai.com")) return "openai";
+  if (lowerUrl.includes("together.xyz")) return "together";
+  if (lowerUrl.includes("anthropic.com")) return "anthropic";
+  if (lowerUrl.includes("deepseek.com")) return "deepseek";
+  return "openai-compatible";
+}
+
 const config = {
   rootDir,
   publicDir: path.join(rootDir, "public"),
@@ -59,9 +75,14 @@ const config = {
   },
   ai: {
     enabledByDefault: boolEnv("AI_ENABLED_BY_DEFAULT", false),
-    apiKey: process.env.OPENAI_API_KEY || "",
-    model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-    baseUrl: (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, ""),
+    // Provider-agnostic configuration (preferred)
+    // Falls back to OPENAI_* for backward compatibility
+    // For Ollama: apiKey is not required, use baseUrl=http://localhost:11434/v1
+    provider: strEnv("AI_PROVIDER") || process.env.OPENAI_PROVIDER || detectProviderFromUrl(strEnv("AI_BASE_URL") || process.env.OPENAI_BASE_URL || ""),
+    apiKey: strEnv("AI_API_KEY") || process.env.OPENAI_API_KEY || "",
+    model: strEnv("AI_MODEL") || process.env.OPENAI_MODEL || "gpt-4.1-mini",
+    baseUrl: (strEnv("AI_BASE_URL") || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, ""),
+    timeoutMs: intEnv("AI_TIMEOUT_MS", 30000),
   },
 };
 

@@ -58,26 +58,32 @@ function analyzeConfidence(contextId, testCaseIds, candidates, intent) {
 
   // Check if best candidate has hard conflicts
   const hasHardConflict = topCand.hasHardConflict;
-  
+
   // Check for explicit method match as a strong signal
-  // If method signal is 1.0 and no hard conflicts, consider this a valid match
   const methodSignal = topCand.signals?.find(s => s.name === "method");
   const hasExplicitMethodMatch = methodSignal && methodSignal.score === 1.0;
-  
-  // If we have an explicit method match with no hard conflicts, resolve even with low confidence
-  // This enables domain-agnostic matching where method is the strongest signal
-  const canResolveWithMethodMatch = hasExplicitMethodMatch && !hasHardConflict;
-  
-  const needsHumanReview = hasHardConflict || ambiguous || (!canResolveWithMethodMatch && (confidenceLevel === "LOW" || confidenceLevel === "NONE"));
+
+  // Check if this is an auth test - auth tests should NOT use method match fallback
+  // because they should only match endpoints with explicit auth indicators
+  const isAuthTest = intent?.authIntent?.isAuthTest;
+
+  // Auth tests should only resolve if there's a strong match (no hard conflicts)
+  // Non-auth tests can use method match fallback
+  const canResolveWithMethodMatch = hasExplicitMethodMatch && !hasHardConflict && !isAuthTest;
+
+  const needsHumanReview = hasHardConflict || ambiguous || (!canResolveWithMethodMatch && (confidenceLevel === "LOW" || confidenceLevel === "NONE" || (confidenceLevel === "NONE" && !isAuthTest)));
 
   const reviewReasons = [];
   if (hasHardConflict) reviewReasons.push(`Top candidate has hard conflicts: ${topCand.conflictReasons.join("; ")}`);
   if (ambiguous && candidates.length > 1) {
     reviewReasons.push(`Ambiguous: top two candidates are close (${candidates[0].endpointId}: ${(topScore * 100).toFixed(0)}% vs ${candidates[1].endpointId}: ${(secondScore * 100).toFixed(0)}%)`);
   }
-  // Only add low confidence reason if we can't resolve via method match
   if (!canResolveWithMethodMatch && (confidenceLevel === "LOW" || confidenceLevel === "NONE")) {
-    reviewReasons.push(`Low confidence (${(topScore * 100).toFixed(0)}%)`);
+    if (isAuthTest) {
+      reviewReasons.push(`Auth test requires endpoint with auth indicators (no match found)`);
+    } else {
+      reviewReasons.push(`Low confidence (${(topScore * 100).toFixed(0)}%)`);
+    }
   }
 
   // Resolve endpoint

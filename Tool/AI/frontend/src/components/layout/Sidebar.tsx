@@ -1,6 +1,6 @@
 interface SidebarProps {
-  currentView: "workspace" | "results" | "history";
-  onViewChange: (view: "workspace" | "results" | "history") => void;
+  currentView: "setup" | "workspace" | "results" | "history";
+  onViewChange: (view: "setup" | "workspace" | "results" | "history") => void;
 }
 
 export function Sidebar({ currentView, onViewChange }: SidebarProps) {
@@ -41,6 +41,23 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="side-nav" aria-label="Primary navigation">
+        <a
+          href="#setup"
+          className={currentView === "setup" ? "active" : ""}
+          style={{
+            display: "block",
+            padding: "10px 12px",
+            borderRadius: "6px",
+            color: "#dce6ee",
+            textDecoration: "none"
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            onViewChange("setup");
+          }}
+        >
+          Setup
+        </a>
         <a
           href="#workspace"
           className={currentView === "workspace" ? "active" : ""}

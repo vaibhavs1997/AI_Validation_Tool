@@ -45,19 +45,6 @@ function tokenize(text) {
 
 /**
  * Match test cases against an API catalog.
- *
- * Strategy:
- *   - Groups test cases by OperationContext for efficiency
- *   - Resolves one context → one endpoint
- *   - Allows per-test-case override when evidence differs
- *
- * @param {Array} testCases — array of test case objects (from scenarioGenerator)
- * @param {Array} endpoints — normalized API catalog endpoints
- * @param {Object} [options]
- * @param {Array} [options.requirements] — requirement objects for enrichment
- * @param {Map<string, string>} [options.folderMap] — endpointId → folder path
- * @param {number} [options.maxCandidates=20]
- * @returns {Object} { results: MatchingResult[], scenarioAssignments: Map<string, Object> }
  */
 function matchTestCases(testCases, endpoints, options = {}) {
   const { requirements = [], folderMap = new Map(), maxCandidates = 20 } = options;
@@ -85,7 +72,7 @@ function matchTestCases(testCases, endpoints, options = {}) {
   }
 
   // Track which endpoint was assigned to each context for inheritance
-  const contextAssignments = new Map(); // contextId → resolved endpoint info
+  const contextAssignments = new Map();
 
   // Process grouped contexts
   for (const ctx of contexts.values()) {
@@ -139,7 +126,7 @@ function matchTestCases(testCases, endpoints, options = {}) {
     const result = matchIntentToEndpoint(
       ctxId,
       [tc.id],
-      intent.operationIntent,
+      intent,
       endpoints,
       epMap,
       fieldIndex,
@@ -168,10 +155,17 @@ function matchTestCases(testCases, endpoints, options = {}) {
 
 /**
  * Match a single intent to the best endpoint.
+ * Note: aggregatedIntent has { methodHints, actionTerms, resourceTerms, contextTerms, hasExplicitMethod } at top level
  */
-function matchIntentToEndpoint(contextId, testCaseIds, intent, endpoints, epMap, fieldIndex, folderMap, maxCandidates, targetFields) {
+function matchIntentToEndpoint(contextId, testCaseIds, intent, endpoints, epMap, fieldIndex, folderMap, maxCandidates) {
   // Step 3-4: Retrieve candidates via inverted index
-  let candidateIds = retrieveCandidates(intent || {}, fieldIndex, { maxCandidates });
+  // The aggregated intent has these at the top level (not nested in operationIntent)
+  const methodHints = intent?.methodHints || [];
+  const actionTerms = intent?.actionTerms || [];
+  const resourceTerms = intent?.resourceTerms || [];
+  const contextTerms = intent?.contextTerms || [];
+  
+  let candidateIds = retrieveCandidates({ methodHints, actionTerms, resourceTerms, contextTerms }, fieldIndex, { maxCandidates });
 
   // If no candidates from index, use all endpoints
   if (candidateIds.length === 0) {
@@ -185,13 +179,20 @@ function matchIntentToEndpoint(contextId, testCaseIds, intent, endpoints, epMap,
     if (!ep) continue;
 
     // Build a minimal intent object for signal functions
+    // Signals expect operationIntent to be nested
     const signalIntent = {
       testCaseId: testCaseIds[0] || "unknown",
-      operationIntent: intent || { actionTerms: [], resourceTerms: [], contextTerms: [], methodHints: [], hasExplicitMethod: false },
-      targetFields: targetFields || [],
-      parameterHints: { query: [], path: [], header: [] },
-      authIntent: { isAuthTest: false, authTestType: null, authKeywords: [] },
-      sourceEvidence: [],
+      operationIntent: {
+        actionTerms: actionTerms,
+        resourceTerms: resourceTerms,
+        contextTerms: contextTerms,
+        methodHints: methodHints,
+        hasExplicitMethod: intent?.hasExplicitMethod || false,
+      },
+      targetFields: intent?.targetFields || [],
+      parameterHints: intent?.parameterHints || { query: [], path: [], header: [] },
+      authIntent: intent?.authIntent || { isAuthTest: false },
+      sourceEvidence: intent?.sourceEvidence || [],
     };
 
     const signals = computeAllSignals(signalIntent, ep, fieldIndex, folderMap);
@@ -226,6 +227,8 @@ function matchIntentToEndpoint(contextId, testCaseIds, intent, endpoints, epMap,
 
 /**
  * Build aggregated intent from context's member test cases.
+ * Returns intent with actionTerms, resourceTerms, contextTerms, methodHints at top level
+ * (to match what retrieveCandidates expects).
  */
 function buildAggregatedIntent(ctx, memberTcs) {
   const aggregated = {

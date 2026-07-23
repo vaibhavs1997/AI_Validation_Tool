@@ -43,81 +43,6 @@ function keywords(text) {
 
 // ─── Endpoint scoring ─────────────────────────────────────────────────────
 
-function scoreEndpointForTestCase(tc, endpoint) {
-  const tcText = [tc.title, tc.sourceAc, tc.description, ...(tc.assertions || [])].join(" ").toLowerCase();
-  const tcWords = keywords(tcText);
-  const epPath = (endpoint.path || "").toLowerCase();
-  const epMethod = (endpoint.method || "").toUpperCase();
-  const epWords = keywords([endpoint.path, endpoint.summary, endpoint.description, endpoint.operationId, ...(endpoint.tags || [])].join(" "));
-  const reasons = [];
-  let score = 0;
-
-  // 1. HTTP method match from the ticket context
-  const tcMethod = detectMethod(tc);
-  if (tcMethod && tcMethod === epMethod) {
-    score += 10;
-    reasons.push(`method:${epMethod}`);
-  } else if (tcMethod && tcMethod !== epMethod) {
-    score -= 5;
-  }
-
-  // 2. Path segment matching
-  const pathSegments = epPath.split("/").filter(Boolean);
-  for (const segment of pathSegments) {
-    const cleanSeg = segment.replace(/[{}]/g, "");
-    if (tcWords.has(cleanSeg)) {
-      score += 8;
-      reasons.push(`path:${cleanSeg}`);
-    }
-    for (const tw of tcWords) {
-      if (cleanSeg.includes(tw) || tw.includes(cleanSeg)) {
-        score += 4;
-        reasons.push(`partial:${cleanSeg}`);
-        break;
-      }
-    }
-  }
-
-  // 3. OperationId / summary matching
-  const opWords = keywords([endpoint.operationId, endpoint.summary].filter(Boolean).join(" "));
-  for (const ow of opWords) {
-    if (tcWords.has(ow)) {
-      score += 5;
-      reasons.push(`op:${ow}`);
-    }
-  }
-
-  // 4. Tag matching
-  for (const tag of (endpoint.tags || [])) {
-    const tagWords = keywords(tag);
-    for (const tw of tagWords) {
-      if (tcWords.has(tw)) {
-        score += 3;
-        reasons.push(`tag:${tw}`);
-      }
-    }
-  }
-
-  // 5. Description/notes matching
-  const descWords = keywords(endpoint.description || "");
-  for (const dw of descWords) {
-    if (tcWords.has(dw)) {
-      score += 2;
-    }
-  }
-
-  return { score, reasons };
-}
-
-function detectMethod(tc) {
-  const title = tc.title.toLowerCase();
-  for (const [action, method] of Object.entries(ACTION_TO_METHOD)) {
-    if (title.includes(action)) return method;
-  }
-  if (tc.type === "auth") return "POST";
-  return null;
-}
-
 function positiveStatus(endpoint) {
   const statuses = Object.keys(endpoint.responses || {});
   return statuses.find((s) => ["200", "201", "202", "204"].includes(s)) || statuses.find((s) => /^2/.test(s)) || 200;
@@ -162,6 +87,8 @@ function buildScenario(endpoint, index, overrides) {
     assertions: [],
     risk: "medium",
     sourceAc: "API contract",
+    acIndex: -1,
+    generationSource: "orchestrator",
     ...overrides,
   };
 }
@@ -208,10 +135,8 @@ function detectAcConstraintType(ac) {
   result.isRequired = /required|mandatory|missing/i.test(lower);
   result.isUnique = /unique|already exists|duplicate/i.test(lower);
   result.isBoundary = /greater than|less than|minimum|maximum|exceed|greater than zero/i.test(lower);
-  result.isRange = /range|between|up to|no more|no less/i.test(lower);
   result.isFormat = /format|pattern|valid|invalid/i.test(lower);
   result.isLength = /length|character|char/i.test(lower);
-  result.isEmail = /email/i.test(lower);
   result.isAuth = /auth|token|login|password|credential|authentication/i.test(lower);
 
   return result;
@@ -235,8 +160,12 @@ function cleanAcceptanceItem(item) {
   return s.trim();
 }
 
-// ─── Domain-agnostic test case generation ────────────────────────────────
+// ─── Legacy: Marked as DEPRECATED - NOT USED in production generation ────────────
 
+/**
+ * @deprecated This function is deprecated and should not be used in production.
+ * The orchestrator pipeline is the authoritative scenario generation path.
+ */
 function createTestCasesFromTicket(ticket) {
   const cases = [];
   let counter = 1;
@@ -253,17 +182,14 @@ function createTestCasesFromTicket(ticket) {
     return `${type}|${mutSig}|${asrtSig}|${sourceAc || ""}`;
   }
 
-  function tryAdd(title, type, sourceAc, assertions, mutations, risk, expectedMethod, fieldName) {
+  function tryAdd(title, type, sourceAc, assertions, mutations, risk, expectedMethod) {
     const key = dedupKey(type, mutations, assertions, sourceAc);
     if (added.has(key)) return;
     added.add(key);
 
-    const mutationDesc = (mutations || []).map(m => `${m.operation}`).join(", ");
-    const finalTitle = title.length > 200 ? title.slice(0, 197) + "..." : title;
-
     cases.push({
       id: `TC-${String(counter++).padStart(3, "0")}`,
-      title: finalTitle,
+      title: title.slice(0, 200),
       type,
       sourceAc: sourceAc || "",
       description,
@@ -271,183 +197,40 @@ function createTestCasesFromTicket(ticket) {
       mutations: mutations || [],
       risk: risk || "medium",
       expectedMethod: expectedMethod || null,
-      precondition: null,
-      expectedOutcome: null,
-      // Add traceability for matching engine grouping
       traceability: {
         requirementIds: [ticketKey],
         sourceText: titleBase,
-        acceptanceCriterion: sourceAc || "",
       },
     });
   }
 
-  // Determine overall method from ticket summary
   const summaryLower = titleBase.toLowerCase();
   let defaultMethod = detectMethodFromAc(summaryLower);
 
-  // 1. POSITIVE: One happy path using valid data (no mutations)
+  // 1. POSITIVE: One happy path
   tryAdd(
-    `Verify happy path: Send a valid request with correct data and confirm the API returns a successful response`,
+    `Verify happy path: Send a valid request with correct data`,
     "positive",
     ticket?.summary || "Happy path",
-    ["Returns success status (2xx)", "Response contains expected resource data"],
+    ["Returns success status (2xx)"],
     [],
     "low",
     defaultMethod
   );
 
-  // 2. For each acceptance criterion, generate domain-agnostic test scenarios
+  // 2. For each acceptance criterion
   for (const rawAc of acceptance.slice(0, 10)) {
     const ac = cleanAcceptanceItem(rawAc);
     if (!ac) continue;
-
     const constraint = detectAcConstraintType(ac);
     const method = detectMethodFromAc(ac) || defaultMethod;
 
-    // POSITIVE scenario: only if this AC is NOT a constraint
     if (!constraint.isConstraint) {
-      tryAdd(
-        `Verify: ${ac.length > 120 ? ac.slice(0, 120) + "..." : ac} — should succeed`,
-        "positive",
-        rawAc,
-        [`Verify: ${ac}`],
-        [],
-        "low",
-        method
-      );
+      tryAdd(`Verify: ${ac} — should succeed`, "positive", rawAc, ["Verify"], [], "low", method);
     }
-
-    // NEGATIVE scenarios based on detected constraint type
     if (constraint.isRequired) {
-      tryAdd(
-        `Negative — Missing required field as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error (400/422) indicating the missing field"],
-        [{ field: "field", operation: "remove" }],
-        "medium",
-        method
-      );
-      tryAdd(
-        `Negative — Empty required field as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for empty field"],
-        [{ field: "field", operation: "replace", value: "" }],
-        "medium",
-        method
-      );
+      tryAdd(`Negative — Missing required`, "negative", rawAc, ["400 error"], [{ field: "field", operation: "remove" }], "medium", method);
     }
-
-    if (constraint.isUnique) {
-      tryAdd(
-        `Negative — Duplicate request rejected as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns 409 conflict", "Error indicates duplicate resource"],
-        [{ field: "field", operation: "duplicate" }],
-        "high",
-        method
-      );
-    }
-
-    if (constraint.isBoundary) {
-      tryAdd(
-        `Negative — Value below minimum as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for out-of-range value"],
-        [{ field: "field", operation: "boundaryMin", value: -1 }],
-        "medium",
-        method
-      );
-      tryAdd(
-        `Negative — Value exceeding maximum as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for exceeded limit"],
-        [{ field: "field", operation: "boundaryMax", value: 999999999 }],
-        "medium",
-        method
-      );
-    }
-
-    if (constraint.isFormat && constraint.isEmail) {
-      // Email format is protocol-level standard (RFC 5321/5322)
-      // We still generate from the text pattern, not from domain knowledge
-      tryAdd(
-        `Negative — Invalid format as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for invalid format"],
-        [{ field: "field", operation: "invalidType" }],
-        "medium",
-        method
-      );
-    } else if (constraint.isFormat) {
-      tryAdd(
-        `Negative — Invalid format as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for invalid format"],
-        [{ field: "field", operation: "invalidType" }],
-        "medium",
-        method
-      );
-    }
-
-    if (constraint.isLength) {
-      tryAdd(
-        `Negative — Exceed maximum length as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        ["API returns validation error for exceeding length"],
-        [{ field: "field", operation: "maxLengthExceeded", length: 999 }],
-        "medium",
-        method
-      );
-    }
-
-    // General rejection: "not allowed", "cannot", "reject"
-    if (constraint.isConstraint && !constraint.isRequired && !constraint.isUnique && !constraint.isBoundary) {
-      tryAdd(
-        `Negative — Invalid input as per: "${ac.slice(0, 80)}"`,
-        "negative",
-        rawAc,
-        [`API rejects invalid request`],
-        [{ field: "field", operation: "invalidType" }],
-        "medium",
-        method
-      );
-    }
-  }
-
-  // 3. Generic negative/edge cases — domain agnostic
-  const hasBodyContent = /data|field|input|payload|json|body/i.test(description + " " + acceptance.join(" "));
-  const hasAuthContent = /auth|token|login|password|credential|authentication|session/i.test(description + " " + acceptance.join(" "));
-
-  if (hasBodyContent) {
-    tryAdd(`Edge case: Empty JSON body rejected`, "negative",
-      "Edge case - empty payload", ["API returns validation error"],
-      [{ field: "body", operation: "replace", value: {} }], "medium", null);
-  }
-
-  if (hasBodyContent) {
-    tryAdd(`Edge case: Unknown/extra fields in payload`, "negative",
-      "Edge case - unknown fields", ["API ignores or rejects unknown fields"],
-      [{ field: "extraField", operation: "replace", value: "unexpected" }], "low", null);
-  }
-
-  // 4. Auth/Security — only when auth is mentioned in ticket
-  if (hasAuthContent) {
-    tryAdd(`Security: Missing authentication rejected`, "auth",
-      "Security - missing auth", ["API returns 401 unauthorized"],
-      [{ field: "auth", operation: "remove" }], "high", "GET");
-
-    tryAdd(`Security: Invalid authentication rejected`, "auth",
-      "Security - invalid token", ["API returns 401 or 403"],
-      [{ field: "auth", operation: "replace", value: "invalid-token" }], "high", "GET");
   }
 
   return cases;
@@ -455,21 +238,20 @@ function createTestCasesFromTicket(ticket) {
 
 // ─── Endpoint assignment (Matching Engine) ───────────────────────────────
 
-function assignEndpointsToTestCases(testCases, contract) {
+function assignEndpointsToTestCases(testCases, contract, requirements = []) {
   const endpoints = contract?.endpoints || [];
   const unlinkedCounter = { val: 1 };
   let scenarioCounter = 1;
 
   if (!endpoints.length) {
-    // No endpoints — create unlinked scenarios for all
     return {
       scenarios: testCases.map((tc) => createUnlinkedScenario(tc, unlinkedCounter)),
       unusedEndpoints: [],
     };
   }
 
-  // Run the intelligent matching engine
-  const { scenarioAssignments, results } = matchTestCases(testCases, endpoints, {
+  const { scenarioAssignments } = matchTestCases(testCases, endpoints, {
+    requirements,
     maxCandidates: 20,
   });
 
@@ -479,57 +261,36 @@ function assignEndpointsToTestCases(testCases, contract) {
     const assignment = scenarioAssignments.get(tc.id);
 
     if (assignment && assignment.endpointId && !assignment.needsHumanReview) {
-      // Good match — use the matched endpoint
       const ep = assignment.endpoint;
-      if (ep) {
-        const override = {
-          title: tc.title,
-          type: tc.type || "scenario",
-          expectedStatus: tc.type === "positive" ? positiveStatus(ep) : tc.type === "auth" ? authStatus(ep) : negativeStatus(ep),
-          assertions: tc.assertions || [],
-          mutations: tc.mutations && tc.mutations.length ? tc.mutations : tc.sourceAc ? deriveMutationFromRule(tc.sourceAc, ep) : [],
-          sourceAc: tc.sourceAc || "",
-          risk: tc.risk || "medium",
-          matchScore: Math.round(assignment.confidence * 100),
-          matchReasons: assignment.reviewReasons || [],
-          matchConfidence: assignment.confidenceLevel,
-          matchAmbiguous: assignment.ambiguous,
-          matchNeedsReview: assignment.needsHumanReview,
-        };
-        scenarios.push(buildScenario(ep, scenarioCounter++, override));
-      } else {
-        scenarios.push(createUnlinkedScenario(tc, unlinkedCounter));
-      }
+      scenarios.push(buildScenario(ep, scenarioCounter++, {
+        title: tc.title,
+        type: tc.type || "scenario",
+        expectedStatus: tc.type === "positive" ? positiveStatus(ep) : tc.type === "auth" ? authStatus(ep) : negativeStatus(ep),
+        assertions: tc.assertions || [],
+        sourceAc: tc.sourceAc || "",
+        acIndex: tc.acIndex ?? -1,
+        risk: tc.risk || "medium",
+        generationSource: tc.generationSource || "orchestrator",
+      }));
     } else if (assignment && assignment.needsHumanReview && assignment.endpointId) {
-      // Low confidence but still has a suggested endpoint — attach with review flag
       const ep = assignment.endpoint;
-      if (ep) {
-        const override = {
-          title: tc.title,
-          type: tc.type || "scenario",
-          expectedStatus: tc.type === "positive" ? positiveStatus(ep) : tc.type === "auth" ? authStatus(ep) : negativeStatus(ep),
-          assertions: tc.assertions || [],
-          mutations: tc.mutations && tc.mutations.length ? tc.mutations : tc.sourceAc ? deriveMutationFromRule(tc.sourceAc, ep) : [],
-          sourceAc: tc.sourceAc || "",
-          risk: tc.risk || "medium",
-          matchScore: Math.round(assignment.confidence * 100),
-          matchReasons: assignment.reviewReasons || [],
-          matchConfidence: assignment.confidenceLevel,
-          matchAmbiguous: assignment.ambiguous,
-          matchNeedsReview: true,
-          needsHumanReview: true,
-        };
-        scenarios.push(buildScenario(ep, scenarioCounter++, override));
-      } else {
-        scenarios.push(createUnlinkedScenario(tc, unlinkedCounter));
-      }
+      scenarios.push(buildScenario(ep, scenarioCounter++, {
+        title: tc.title,
+        type: tc.type || "scenario",
+        expectedStatus: tc.type === "positive" ? positiveStatus(ep) : tc.type === "auth" ? authStatus(ep) : negativeStatus(ep),
+        assertions: tc.assertions || [],
+        sourceAc: tc.sourceAc || "",
+        acIndex: tc.acIndex ?? -1,
+        risk: tc.risk || "medium",
+        generationSource: tc.generationSource || "orchestrator",
+        matchNeedsReview: true,
+        needsHumanReview: true,
+      }));
     } else {
-      // No match — unlinked
       scenarios.push(createUnlinkedScenario(tc, unlinkedCounter));
     }
   }
 
-  // Compute unused endpoints
   const matchedEpIds = new Set(scenarios.filter((s) => s.endpointId).map((s) => s.endpointId));
   const unusedEndpoints = endpoints.filter((ep) => !matchedEpIds.has(ep.id));
 
@@ -544,22 +305,72 @@ function createUnlinkedScenario(tc, counter) {
     title: tc.title,
     endpointId: null,
     method,
-    path: "/",
+    path: tc.pathHint || "/",
     basePayload: {},
     mutations: tc.mutations || [],
     assertions: tc.assertions || [],
     risk: tc.risk || "medium",
     sourceAc: tc.sourceAc || "",
+    acIndex: tc.acIndex ?? -1,
     type: tc.type,
+    generationSource: tc.generationSource || "orchestrator",
     expectedStatus: tc.type === "positive" ? 200 : tc.type === "auth" ? 401 : 400,
     unlinked: true,
   };
 }
 
-async function localGenerate(ticket, contract) {
-  const testCases = createTestCasesFromTicket(ticket || {});
-  const { scenarios, unusedEndpoints } = assignEndpointsToTestCases(testCases, contract || {});
-  return { scenarios, unusedEndpoints };
+// ─── Orchestrator-based generation (Authoritative Path) ───────────────────────────
+
+const { runPipeline } = require("../engine/orchestrator");
+const { GenerationModes } = require("../engine/types");
+
+function orchestratorGenerate(ticket, contract) {
+  const pipelineResult = runPipeline(ticket || {}, GenerationModes.STANDARD);
+
+  const testCases = (pipelineResult.testCases || []).map(tc => ({
+    ...tc,
+    generationSource: "orchestrator",
+  }));
+
+  const adaptedTestCases = testCases.map(tc => ({
+    id: tc.testCaseId,
+    title: tc.title || "Untitled",
+    type: mapCategoryToType(tc.classification?.category),
+    sourceAc: tc.traceability?.originalAc || tc.description || "",
+    description: tc.description || "",
+    assertions: tc.expected?.bodyAssertions || [],
+    mutations: tc.request?.mutation ? [tc.request.mutation] : [],
+    risk: mapConfidenceToRisk(tc.classification?.confidence, tc.classification?.origin),
+    expectedMethod: tc.request?.method || tc.methodHint || null,
+    pathHint: tc.request?.endpoint || tc.pathHint || null,
+    acIndex: tc.traceability?.acIndex ?? -1,
+    generationSource: tc.generationSource,
+    traceability: {
+      requirementIds: tc.traceability?.requirementIds || [],
+      acIndex: tc.traceability?.acIndex ?? -1,
+    },
+  }));
+
+  const { scenarios, unusedEndpoints } = assignEndpointsToTestCases(adaptedTestCases, contract || {}, pipelineResult.requirements || []);
+
+  return { scenarios, unusedEndpoints, requirementGaps: pipelineResult.requirementGaps, summary: pipelineResult.summary };
+}
+
+function mapCategoryToType(category) {
+  const map = {
+    "POSITIVE": "positive",
+    "NEGATIVE": "negative",
+    "BOUNDARY": "negative",
+    "EDGE": "negative",
+    "SECURITY": "auth",
+  };
+  return map[category] || "positive";
+}
+
+function mapConfidenceToRisk(confidence, origin) {
+  if (origin === "EXPLICIT") return "high";
+  if (origin === "DERIVED") return "medium";
+  return "low";
 }
 
 function prioritizeScenarios(scenarios) {
@@ -568,14 +379,26 @@ function prioritizeScenarios(scenarios) {
     const aRisk = riskScores[a.risk] || 2;
     const bRisk = riskScores[b.risk] || 2;
     if (bRisk !== aRisk) return bRisk - aRisk;
-    if ((b.matchScore || 0) !== (a.matchScore || 0)) return (b.matchScore || 0) - (a.matchScore || 0);
     return (a.title || "").localeCompare(b.title || "");
   });
 }
 
-async function generateScenarios({ ticket, contract, useAi = false }) {
-  const warnings = [];
+// ─── AI-first hybrid generation ───────────────────────────────────────────
 
+const { generateWithAi, isAiAvailable } = require("../engine/aiTestDesigner");
+const { validateAiGeneratedTestCases } = require("../engine/deterministicValidator");
+const { adaptAiTestCasesToScenarios } = require("../engine/scenarioAdapter");
+
+async function generateScenarios({ ticket, contract, useAi = null }) {
+  const warnings = [];
+  const generationMeta = {
+    mode: "deterministic_fallback",
+    model: null,
+    attempts: null,
+    fallbackReason: null,
+  };
+
+  // Normalize contract
   let normalizedContract = contract || {};
   try {
     const looksLikeRaw = typeof normalizedContract === 'string' ||
@@ -589,24 +412,63 @@ async function generateScenarios({ ticket, contract, useAi = false }) {
     normalizedContract = { endpoints: [] };
   }
 
-  const { scenarios: localScenarios, unusedEndpoints } = await localGenerate(ticket, normalizedContract);
-  const prioritized = prioritizeScenarios(localScenarios);
+  // STEP 9L.2C-2: AI-first with deterministic fallback
+  // AI is primary when configured and available
+  const shouldAttemptAi = isAiAvailable();
 
-  if (!useAi) {
-    return {
-      mode: "local",
-      warnings,
-      scenarios: prioritized,
-      unusedEndpoints,
-    };
+  if (shouldAttemptAi) {
+    const startTime = Date.now();
+    const aiResult = await generateWithAi(ticket, normalizedContract);
+
+    if (aiResult.success && aiResult.testCases && aiResult.testCases.length > 0) {
+      // Validate AI output against contract
+      const validated = validateAiGeneratedTestCases(aiResult.testCases, normalizedContract);
+
+      // Get valid scenarios (VALID or VALID_WITH_WARNINGS)
+      const validTests = validated.filter(
+        (tc) => tc.validation.status === "VALID" || tc.validation.status === "VALID_WITH_WARNINGS"
+      );
+
+      if (validTests.length > 0) {
+        // AI succeeded with usable output
+        const scenarios = adaptAiTestCasesToScenarios(validTests, normalizedContract);
+        const prioritized = prioritizeScenarios(scenarios);
+
+        generationMeta.mode = "ai_primary";
+        generationMeta.model = aiResult.model;
+        generationMeta.attempts = aiResult.attempts;
+
+        return {
+          mode: generationMeta.mode,
+          warnings,
+          scenarios: prioritized,
+          unusedEndpoints: [],
+          generationMeta,
+        };
+      }
+
+      // AI returned output but all tests rejected - fallback with warning
+      generationMeta.fallbackReason = "All AI scenarios rejected by contract validation";
+      warnings.push(`AI generated ${validated.length} scenarios but all were rejected`);
+    } else {
+      generationMeta.fallbackReason = aiResult.reason || "Unknown AI error";
+      warnings.push(`AI generation unavailable: ${aiResult.reason}`);
+    }
+  } else {
+    generationMeta.fallbackReason = "AI provider not configured";
   }
 
-  // AI enhancement path — kept for backwards compatibility
+  // Deterministic fallback
+  const { scenarios: orchestratorScenarios, unusedEndpoints, requirementGaps, summary } =
+    orchestratorGenerate(ticket, normalizedContract);
+  const prioritized = prioritizeScenarios(orchestratorScenarios);
+
   return {
-    mode: "local",
-    warnings: [...warnings, "AI enhancement requires llmClient integration."],
+    mode: generationMeta.mode,
+    warnings,
     scenarios: prioritized,
     unusedEndpoints,
+    generationMeta,
   };
 }
 
@@ -615,4 +477,5 @@ const { createSampleValue } = require("../contracts/contractParser");
 
 module.exports = {
   generateScenarios,
+  createTestCasesFromTicket,
 };

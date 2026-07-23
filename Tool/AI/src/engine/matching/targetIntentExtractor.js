@@ -82,6 +82,17 @@ function isResourceTerm(word) {
 }
 
 /**
+ * Normalize path for comparison.
+ */
+function canonicalizePath(path) {
+  if (!path) return null;
+  return path
+    .replace(/\/+$/, "") // Remove trailing slash
+    .replace(/\{[^}]*\}/g, "{param}") // Normalize all {param} variants
+    .replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, "{param}"); // Normalize :param to {param}
+}
+
+/**
  * Detect field names from a mutation or assertion text.
  * Returns discovered field names with locations.
  */
@@ -192,7 +203,7 @@ function deriveConstraintType(mutation) {
 /**
  * Main entry: extract TargetIntent from a test case.
  *
- * @param {Object} tc — a test case from scenarioGenerator (has id, title, type, sourceAc, description, assertions, mutations, expectedMethod)
+ * @param {Object} tc — a test case from scenarioGenerator (has id, title, type, sourceAc, description, assertions, mutations, expectedMethod, pathHint)
  * @param {Array} [requirements] — optional requirement objects for enrichment
  * @returns {Object} TargetIntent-compatible object
  */
@@ -233,6 +244,10 @@ function extractIntent(tc, requirements = []) {
   if (/\bpath\s+param/i.test(lower)) paramHints.path.push("detected");
   if (/\bheader\s+(param|name)/i.test(lower)) paramHints.header.push("detected");
 
+  // Include explicit path hint if available (STEP 9L.2C)
+  const pathHint = tc.pathHint || null;
+  const canonicalPathHint = pathHint ? canonicalizePath(pathHint) : null;
+
   return {
     testCaseId: tc.id,
     category: tc.type === "positive" ? "POSITIVE" : tc.type === "auth" ? "SECURITY" : tc.type === "negative" ? "NEGATIVE" : "EDGE",
@@ -242,6 +257,9 @@ function extractIntent(tc, requirements = []) {
       contextTerms: [...new Set(contextTerms)],
       methodHints: [...new Set(methodHints)],
       hasExplicitMethod,
+      // STEP 9L.2C: Include path hints for exact matching
+      pathHint,
+      canonicalPathHint,
     },
     targetFields,
     parameterHints: paramHints,

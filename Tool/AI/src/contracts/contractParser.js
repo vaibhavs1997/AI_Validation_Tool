@@ -287,25 +287,169 @@ function parseContract(input) {
   throw new Error("Unsupported contract. Provide OpenAPI/Swagger JSON, Postman collection JSON, or HAR file.");
 }
 
+/**
+ * Format-aware deterministic value generators.
+ * Returns valid values matching the specified format.
+ */
+function generateFormattedValue(format, schema, fieldName) {
+  switch (format) {
+    case "email":
+      return "test.user@example.com";
+    case "uuid":
+    case "guid":
+      return "00000000-0000-0000-0000-000000000000";
+    case "date":
+      return "2024-01-15";
+    case "date-time":
+    case "datetime":
+    case "dateTime":
+      return "2024-01-15T10:30:00.000Z";
+    case "uri":
+    case "url":
+      return "https://example.com/test";
+    case "hostname":
+      return "example.com";
+    case "ipv4":
+      return "192.168.1.1";
+    case "ipv6":
+      return "2001:db8::1";
+    default:
+      return null; // No special format handling
+  }
+}
+
+/**
+ * Generate a string value respecting schema constraints.
+ */
+function generateStringValue(schema, fieldName) {
+  // Try format-aware generation first for known formats
+  const format = schema.format || schema["x-format"];
+  if (format) {
+    const formatted = generateFormattedValue(format, schema, fieldName);
+    if (formatted) return formatted;
+  }
+
+  // Handle minLength/maxLength constraints
+  const minLen = schema.minLength;
+  const maxLen = schema.maxLength;
+  
+  if (minLen !== undefined || maxLen !== undefined) {
+    const targetLen = Math.max(minLen || 1, 5); // At least minLength or 5
+    const cappedLen = maxLen !== undefined ? Math.min(targetLen, maxLen) : targetLen;
+    return "x".repeat(cappedLen);
+  }
+
+  // Default string fallback
+  return `sample-${fieldName}`;
+}
+
+/**
+ * Generate a number/integer value respecting schema constraints.
+ */
+function generateNumberValue(schema) {
+  const min = schema.minimum;
+  const max = schema.maximum;
+  const exclusiveMin = schema.exclusiveMinimum;
+  const exclusiveMax = schema.exclusiveMaximum;
+  
+  // Calculate valid range bounds
+  let lowerBound = exclusiveMin !== undefined ? exclusiveMin + 1 : min;
+  let upperBound = exclusiveMax !== undefined ? exclusiveMax - 1 : max;
+  
+  // If no bounds or only upper bound, use 1 or lower bound
+  if (lowerBound === undefined && upperBound === undefined) {
+    return schema.type === "integer" ? 1 : 1.5;
+  }
+  
+  if (lowerBound === undefined) {
+    return schema.type === "integer" ? Math.max(0, upperBound - 1) : upperBound - 0.5;
+  }
+  
+  if (upperBound === undefined) {
+    return schema.type === "integer" ? lowerBound : lowerBound + 0.5;
+  }
+  
+  // Both bounds exist - return a value in the middle
+  const range = upperBound - lowerBound;
+  const mid = lowerBound + Math.floor(range / 2);
+  return schema.type === "integer" ? mid : mid + 0.5;
+}
+
+/**
+ * Generate an array value respecting schema constraints.
+ */
+function generateArrayValue(schema, fieldName) {
+  const itemsSchema = schema.items || {};
+  const minItems = schema.minItems || 1;
+  const maxItems = schema.maxItems;
+  const itemCount = maxItems !== undefined ? Math.min(minItems, maxItems) : minItems;
+  
+  const result = [];
+  for (let i = 0; i < itemCount; i++) {
+    result.push(createSampleValue(itemsSchema, `${fieldName}Item`));
+  }
+  return result;
+}
+
 function createSampleValue(schema, fieldName = "value") {
   if (!schema || typeof schema !== "object") return null;
+  
+  // Priority 1: explicit example
   if (schema.example !== undefined) return schema.example;
+  
+  // Priority 2: default
   if (schema.default !== undefined) return schema.default;
+  
+  // Priority 3: enum first valid value
   if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+  
+  // Priority 4: const if supported
+  if (schema.const !== undefined) return schema.const;
 
   const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  
+  // Priority 5-7: complex types
   if (type === "object" || schema.properties) {
     const result = {};
-    for (const [key, childSchema] of Object.entries(schema.properties || {})) {
+    // Required fields first if specified
+    const required = new Set(schema.required || []);
+    const props = schema.properties || {};
+    
+    // Process required fields first, then optional
+    const sortedProps = Object.entries(props).sort(([a], [b]) => {
+      const aRequired = required.has(a);
+      const bRequired = required.has(b);
+      if (aRequired && !bRequired) return -1;
+      if (!aRequired && bRequired) return 1;
+      return 0;
+    });
+    
+    for (const [key, childSchema] of sortedProps) {
       result[key] = createSampleValue(childSchema, key);
     }
     return result;
   }
-  if (type === "array") return [createSampleValue(schema.items || {}, fieldName)];
-  if (type === "integer") return schema.minimum ?? 1;
-  if (type === "number") return schema.minimum ?? 10.5;
+  
+  if (type === "array") {
+    return generateArrayValue(schema, fieldName);
+  }
+  
+  if (type === "integer") {
+    return generateNumberValue({ ...schema, type: "integer" });
+  }
+  
+  if (type === "number") {
+    return generateNumberValue({ ...schema, type: "number" });
+  }
+  
   if (type === "boolean") return true;
+  
+  // Priority 5: format-aware string generation
+  if (type === "string") {
+    return generateStringValue(schema, fieldName);
+  }
 
+  // Safe type-based fallback
   return `sample-${fieldName}`;
 }
 

@@ -1,19 +1,32 @@
 import type { ActiveRequirement } from "../../features/requirements/RequirementTypes";
 
-interface WorkflowStatusProps {
-  activeRequirement: ActiveRequirement | null;
+/** Lightweight run summary for WorkflowStatus display */
+interface RunSummary {
+  total: number;
+  passed: number;
+  failed: number;
+  blocked: number;
 }
 
-export function WorkflowStatus({ activeRequirement }: WorkflowStatusProps) {
+interface WorkflowStatusProps {
+  activeRequirement: ActiveRequirement | null;
+  testCaseCount?: number;
+  includedCount?: number;
+  matchedCount?: number;
+  runSummary?: RunSummary;
+  reportUrl?: string;
+}
+
+export function WorkflowStatus({ activeRequirement, testCaseCount = 0, includedCount = 0, matchedCount = 0, runSummary }: WorkflowStatusProps) {
   const getRequirementStatus = (): { status: string; label: string } => {
     if (!activeRequirement || !activeRequirement.requirement) {
       return { status: "empty", label: "Not configured" };
     }
-    
+
     if (activeRequirement.source === "jira") {
-      return { status: "loaded", label: activeRequirement.requirement.key };
+      return { status: "loaded", label: activeRequirement.requirement.key || "Manual" };
     }
-    
+
     // Manual source
     return { status: "loaded", label: "Manual" };
   };
@@ -21,11 +34,33 @@ export function WorkflowStatus({ activeRequirement }: WorkflowStatusProps) {
   const reqStatus = getRequirementStatus();
 
   const steps = [
-    { number: 1, label: "Requirements", status: reqStatus.status, value: reqStatus.label },
-    { number: 2, label: "API Collection", status: "empty" },
-    { number: 3, label: "Test Scenarios", status: "empty" },
-    { number: 4, label: "Run", status: "empty" }
+    { number: 1, label: "Requirement", status: reqStatus.status },
+    { number: 2, label: "Test Cases", status: testCaseCount > 0 ? "loaded" : "empty" },
+    { number: 3, label: "API Matching", status: matchedCount > 0 ? "loaded" : "empty" },
+    { number: 4, label: "Results", status: runSummary ? "loaded" : "empty" }
   ];
+
+  const formatStepValue = (stepNum: number): string => {
+    // Step 2 shows "X test cases · Y selected"
+    if (stepNum === 2) {
+      if (testCaseCount > 0) {
+        return `${testCaseCount} test case${testCaseCount !== 1 ? "s" : ""} · ${includedCount} selected`;
+      }
+      return "Not configured";
+    }
+    // Step 3/4 shows run summary if available
+    if (stepNum === 3 && runSummary) {
+      return `${runSummary.passed} passed · ${runSummary.failed} failed`;
+    }
+    if (stepNum === 4 && runSummary) {
+      return `Total: ${runSummary.total}`;
+    }
+    // Step 1 shows requirement status
+    if (stepNum === 1 && activeRequirement && activeRequirement.requirement) {
+      return reqStatus.label;
+    }
+    return "Not configured";
+  };
 
   return (
     <div className="compact-workflow" style={{
@@ -55,7 +90,7 @@ export function WorkflowStatus({ activeRequirement }: WorkflowStatusProps) {
           <span className="cw-step-value" style={{
             color: step.status === "active" ? "var(--blue)" : step.status === "loaded" ? "var(--green)" : "var(--muted)"
           }}>
-            {step.number === 1 && activeRequirement && activeRequirement.requirement ? reqStatus.label : "Not configured"}
+            {formatStepValue(step.number)}
           </span>
         </div>
       ))}

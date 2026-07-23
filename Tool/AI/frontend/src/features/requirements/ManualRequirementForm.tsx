@@ -32,6 +32,48 @@ interface ManualRequirementFormProps {
   onRequirementConfirmed?: (requirement: ManualRequirement) => void;
 }
 
+/**
+ * Extracts acceptance criteria from raw text if present.
+ * Looks for numbered items, bullet points, or explicit "Acceptance Criteria" sections.
+ * Returns an array of AC strings, or empty array if none found.
+ */
+function extractAcceptanceCriteria(text: string): string[] {
+  if (!text) return [];
+  
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+  const acLines: string[] = [];
+  
+  // Detect lines that look like acceptance criteria
+  // - Numbered items: "1.", "2.", "AC 1:", "AC1:", "Acceptance Criterion 1:"
+  // - Bullet points under "Acceptance Criteria" section
+  let inAcSection = false;
+  
+  for (const line of lines) {
+    // Check for section headers
+    if (/^acceptance\s*criteria/i.test(line)) {
+      inAcSection = true;
+      continue;
+    }
+    
+    // Check if line looks like an AC item
+    // Numbered: "1.", "1)", "AC 1:", "AC1:"
+    // Bullet: "- Given...", "- When..."
+    const acMatch = line.match(/^(\d+[\.\)]|AC\s*\d+[:\.]?|\-|\*)[\s]+(.+)$/i);
+    if (acMatch) {
+      acLines.push(acMatch[2] || line);
+    } else if (inAcSection || /^(given|when|then|and|should|must)\b/i.test(line)) {
+      // Continuation of AC content
+      if (acLines.length > 0) {
+        acLines[acLines.length - 1] += " " + line;
+      } else {
+        acLines.push(line);
+      }
+    }
+  }
+  
+  return acLines;
+}
+
 export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirementFormProps) {
   // Draft state - editable textarea content
   const [manualDraft, setManualDraft] = useState<string>("");
@@ -52,13 +94,18 @@ export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirem
       return;
     }
     
+    // Extract acceptance criteria from the text (optional - may be empty)
+    const extractedAc = extractAcceptanceCriteria(trimmedDraft);
+    
     // Create confirmed ManualRequirement
     const confirmed: ManualRequirement = {
       source: "manual",
       key: `manual-${Date.now()}`,
       summary: trimmedDraft.split("\n")[0]?.slice(0, 50) || "Manual Requirement",
       description: trimmedDraft,
-      acceptanceCriteria: [],
+      // Preserve extracted ACs if found, otherwise empty array
+      // The requirement extractor will use description as fallback
+      acceptanceCriteria: extractedAc,
       fetchedAt: new Date().toISOString()
     };
     
@@ -81,10 +128,10 @@ export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirem
       <div className="source-panel source-manual" style={{ marginTop: "12px" }}>
         <label style={{ display: "grid", gap: "6px", marginBottom: "12px" }}>
           <span style={{ fontSize: "12px", fontWeight: 800, color: "var(--muted)", textTransform: "uppercase" }}>
-            REQUIREMENT DESCRIPTION
+            MANUAL REQUIREMENT
           </span>
           <textarea
-            placeholder="Paste or enter the requirement description, user story, acceptance criteria, and any relevant business rules..."
+            placeholder="Paste your requirement, user story, Jira description, acceptance criteria, business rules, or API behavior here..."
             value={manualDraft}
             onChange={(e) => setManualDraft(e.target.value)}
             style={{
@@ -104,6 +151,15 @@ export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirem
             }}
           />
         </label>
+
+        <p style={{ 
+          fontSize: "12px", 
+          color: "var(--muted)", 
+          margin: "0 0 8px 0",
+          lineHeight: 1.4
+        }}>
+          You can paste plain text, Jira-style requirements, Given/When/Then criteria, numbered lists, or bullet points.
+        </p>
 
         {/* Inline validation error */}
         {validationError && (
@@ -161,7 +217,7 @@ export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirem
         </p>
         <div>
           <strong style={{ fontSize: "12px", textTransform: "uppercase", color: "var(--muted)" }}>
-            DESCRIPTION
+            REQUIREMENT
           </strong>
           <div
             style={{
