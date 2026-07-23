@@ -4,11 +4,11 @@
  * 14 independent signal functions used to score candidate endpoint matches.
  * Each signal operates on (TargetIntent, Endpoint) and returns a MatchingSignal.
  *
- * Signals 1-14 as specified:
+ * Signals:
  *   1. HTTP METHOD MATCH
  *   2. REQUEST NAME MATCH
  *   3. FOLDER CONTEXT MATCH
- *   4. NORMALIZED PATH MATCH
+ *   4. CANONICAL PATH HINT MATCH (NEW - STEP 9L.2C)
  *   5. RESOURCE / ENTITY SEMANTIC MATCH
  *   6. ACTION MATCH
  *   7. REQUEST FIELD OVERLAP
@@ -49,6 +49,16 @@ function overlapScore(intentTerms, endpointTerms) {
   if (intentTerms.length === 0 || endpointTerms.length === 0) return 0;
   const matched = intentTerms.filter((t) => endpointTerms.includes(t));
   return matched.length / Math.max(intentTerms.length, endpointTerms.length);
+}
+
+// ─── Helper: Canonicalize path for comparison ───────────────────────────
+
+function canonicalPath(path) {
+  if (!path) return null;
+  return path
+    .replace(/\/+$/, "") // Remove trailing slash
+    .replace(/\{[^}]*\}/g, "{param}") // Normalize all {param} variants
+    .replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, "{param}"); // Normalize :param to {param}
 }
 
 // ─── Signal 1: HTTP METHOD MATCH ─────────────────────────────────────────
@@ -112,28 +122,40 @@ function signalFolderContext(intent, ep, folderMap = new Map()) {
   };
 }
 
-// ─── Signal 4: NORMALIZED PATH MATCH ─────────────────────────────────────
+// ─── Signal 4 (STEP 9L.2C): CANONICAL PATH HINT MATCH ────────────────────
 
-function signalPath(intent, ep) {
-  const epPath = (ep.path || "").toLowerCase();
-  const epTokens = epPath.split("/").filter(Boolean).map((s) => s.replace(/[{}]/g, ""));
-  const resourceTerms = intent.operationIntent?.resourceTerms || [];
-  const contextTerms = intent.operationIntent?.contextTerms || [];
-  const allTerms = [...resourceTerms, ...contextTerms];
-
-  if (!epPath || allTerms.length === 0) return { name: "path", score: 0, weight: SIGNAL_WEIGHTS.PATH_MATCH.weight, strength: "WEAK" };
-
-  const matchCount = allTerms.filter((t) => epTokens.includes(t)).length;
-  const partialMatches = allTerms.filter((t) => epTokens.some((tok) => tok.includes(t) || t.includes(tok))).length;
-  const totalPossible = Math.max(allTerms.length, 1);
-  const score = Math.min((matchCount * 1.5 + partialMatches * 0.5) / totalPossible, 1);
-
+function signalExplicitPath(intent, ep) {
+  const pathHint = intent.operationIntent?.pathHint;
+  const canonicalHint = intent.operationIntent?.canonicalPathHint;
+  
+  if (!canonicalHint) {
+    return { name: "explicit_path", score: 0, weight: 0.25, strength: "WEAK" };
+  }
+  
+  const canonicalEpPath = canonicalPath(ep.path);
+  if (!canonicalEpPath) {
+    return { name: "explicit_path", score: 0, weight: 0.25, strength: "WEAK" };
+  }
+  
+  // Exact match on canonical paths
+  if (canonicalHint === canonicalEpPath) {
+    return {
+      name: "explicit_path",
+      score: 1.0,
+      weight: 0.25,
+      strength: "HARD_CONSTRAINT",
+      explanation: `Explicit path hint "${pathHint}" matches endpoint path`,
+    };
+  }
+  
+  // No match - but this is not a hard conflict, just lower score
   return {
-    name: "path",
-    score,
-    weight: SIGNAL_WEIGHTS.PATH_MATCH.weight,
-    strength: "STRONG",
-    explanation: score > 0 ? `Path "${epPath}" matches ${matchCount} exact + ${partialMatches - matchCount} partial` : undefined,
+    name: "explicit_path",
+    score: 0,
+    weight: 0.25,
+    strength: "HARD_CONSTRAINT",
+    isConflict: true,
+    explanation: `Explicit path hint "${pathHint}" does not match endpoint path "${ep.path}"`,
   };
 }
 
@@ -177,7 +199,6 @@ function signalFieldOverlap(intent, ep, fieldIndex) {
   const targetFields = intent.targetFields || [];
   if (targetFields.length === 0) return { name: "field_overlap", score: 0.5, weight: SIGNAL_WEIGHTS.FIELD_OVERLAP.weight, strength: "WEAK" };
 
-  // Check how many target fields exist in this endpoint's schema
   const epFields = fieldIndex?.byFieldName || new Map();
   let matchCount = 0;
   const matchedFields = [];
@@ -245,17 +266,19 @@ function signalHeader(intent, ep) {
 
 function signalAuth(intent, ep) {
   const authIntent = intent.authIntent || {};
-  if (!authIntent.isAuthTest) return { name: "auth", score: 0.5, weight: SIGNAL_WEIGHTS.AUTH_MATCH.weight, strength: "WEAK" };
+  if (!authIntent.isAuthTest) return { name: "auth", score: 0.3, weight: SIGNAL_WEIGHTS.AUTH_MATCH.weight, strength: "WEAK" };
 
-  // Check if endpoint has security definitions (OpenAPI)
-  const hasSecurity = ep.security?.length > 0 || ep.parameters?.some((p) => (p.in || "").toLowerCase() === "header" && /auth|token|bearer|apikey|apikey/i.test(p.name));
+  // Check if endpoint has security definitions (OpenAPI) or auth-related headers
+  const hasSecurity = ep.security?.length > 0 || ep.parameters?.some((p) => (p.in || "").toLowerCase() === "header" && /auth|token|bearer|apikey/i.test(p.name));
   const epText = [ep.path, ep.summary, ep.description, ep.operationId].filter(Boolean).join(" ").toLowerCase();
   const hasAuthTerms = /auth|token|login|bearer|oauth/i.test(epText);
 
   if (hasSecurity || hasAuthTerms) {
     return { name: "auth", score: 1.0, weight: SIGNAL_WEIGHTS.AUTH_MATCH.weight, strength: "STRONG", explanation: "Test is auth-related and endpoint has auth indicators" };
   }
-  return { name: "auth", score: 0.3, weight: SIGNAL_WEIGHTS.AUTH_MATCH.weight, strength: "MEDIUM", explanation: "Test is auth-related but endpoint has no explicit auth metadata" };
+  // When test is auth-related but endpoint has no explicit auth metadata,
+  // this endpoint should NOT be selected - return hard conflict
+  return { name: "auth", score: 0, weight: SIGNAL_WEIGHTS.AUTH_MATCH.weight, strength: "HARD_CONSTRAINT", isConflict: true, explanation: "Test is auth-related but endpoint has no auth indicators" };
 }
 
 // ─── Signal 12: CONTENT TYPE MATCH ───────────────────────────────────────
@@ -299,9 +322,6 @@ function signalSchemaShape(intent, ep, fieldIndex) {
   const targetFields = intent.targetFields || [];
   if (targetFields.length < 2) return { name: "schema_shape", score: 0.3, weight: SIGNAL_WEIGHTS.SCHEMA_SHAPE_MATCH.weight, strength: "WEAK" };
 
-  // Count how many endpoint field names overlap with target fields
-  const epFieldNames = fieldIndex?.byFieldName ? new Map() : new Map();
-  // We'll use the index more efficiently — check which fields exist
   const idx = fieldIndex?.byFieldName;
   let exactMatches = 0;
   let nestedMatches = 0;
@@ -311,7 +331,6 @@ function signalSchemaShape(intent, ep, fieldIndex) {
     const eps = idx.get(tf.name);
     if (eps && eps.includes(ep.id)) {
       exactMatches++;
-      // Check if it might be a nested field (has dot in name or jsonPath)
       if (tf.jsonPath && tf.jsonPath.includes(".")) nestedMatches++;
     }
   }
@@ -331,21 +350,12 @@ function signalSchemaShape(intent, ep, fieldIndex) {
 
 // ─── Compute all signals ─────────────────────────────────────────────────
 
-/**
- * Compute all 14 signals for a candidate endpoint.
- *
- * @param {Object} intent — TargetIntent
- * @param {Object} ep — normalized endpoint
- * @param {Object} fieldIndex — FieldIndex
- * @param {Map} [folderMap] — endpointId → folder path
- * @returns {MatchingSignal[]}
- */
 function computeAllSignals(intent, ep, fieldIndex, folderMap = new Map()) {
   return [
     signalMethod(intent, ep),
     signalRequestName(intent, ep),
     signalFolderContext(intent, ep, folderMap),
-    signalPath(intent, ep),
+    signalExplicitPath(intent, ep), // STEP 9L.2C
     signalResourceSemantic(intent, ep),
     signalAction(intent, ep),
     signalFieldOverlap(intent, ep, fieldIndex),
@@ -364,7 +374,7 @@ module.exports = {
   signalMethod,
   signalRequestName,
   signalFolderContext,
-  signalPath,
+  signalExplicitPath,
   signalResourceSemantic,
   signalAction,
   signalFieldOverlap,

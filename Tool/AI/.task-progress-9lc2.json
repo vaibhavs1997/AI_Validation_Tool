@@ -1,0 +1,11 @@
+[
+  { "id": 1, "content": "Create src/engine/aiContractContext.js - build contract context for AI", "status": "pending" },
+  { "id": 2, "content": "Create src/engine/deterministicValidator.js - validate AI output against contract", "status": "pending" },
+  { "id": 3, "content": "Create src/engine/scenarioAdapter.js - adapt AI output to existing Scenario model", "status": "pending" },
+  { "id": 4, "content": "Create src/engine/aiTestDesigner.js - production AI test designer from aiTester.js", "status": "pending" },
+  { "id": 5, "content": "Modify scenarioGenerator.js - implement AI-first with deterministic fallback", "status": "pending" },
+  { "id": 6, "content": "Update ScenariosPanel.tsx - remove useAi=false hardcoded (optional toggle)", "status": "pending" },
+  { "id": 7, "content": "Create test-ai-regression.js - verify 5 control tests still work", "status": "pending" },
+  { "id": 8, "content": "Create test-fallback.js - verify deterministic fallback works", "status": "pending" },
+  { "id": 9, "content": "Run all regression tests and verify execution compatibility", "status": "pending" }
+]

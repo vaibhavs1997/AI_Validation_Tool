@@ -16,8 +16,12 @@ A Node.js-based MVP that automates API validation by generating test scenarios f
 Loads environment variables with `.env` support:
 - `PORT` - Server port (default: 4173)
 - `JIRA_*` - Jira API credentials
-- `OPENAI_*` - AI provider configuration
-- `REQUEST_TIMEOUT_MS` - Request timeout (default: 20000ms)
+- `AI_*` - Provider-agnostic AI configuration (preferred)
+  - `AI_PROVIDER` - Provider name for diagnostics (openai, groq, together, etc.)
+  - `AI_API_KEY` - API key for the AI provider
+  - `AI_MODEL` - Model name (e.g., gpt-4.1-mini, llama-3.3-70b-versatile)
+  - `AI_BASE_URL` - Base URL for OpenAI-compatible API
+- `OPENAI_*` - Legacy environment variables (backward compatible)
 
 #### 2. Storage (`src/storage.js`)
 Local JSON file storage with these buckets:
@@ -191,9 +195,15 @@ JIRA_BASE_URL=https://company.atlassian.net
 JIRA_EMAIL=user@company.com
 JIRA_API_TOKEN=api-token
 
-OPENAI_API_KEY=your-key
-OPENAI_MODEL=llama-3.3-70b-versatile
-OPENAI_BASE_URL=https://api.groq.com/openai/v1
+# AI Provider Configuration (provider-agnostic)
+# Works with any OpenAI-compatible API (OpenAI, Groq, Together, etc.)
+AI_PROVIDER=groq
+AI_API_KEY=your-ai-api-key
+AI_MODEL=llama-3.3-70b-versatile
+AI_BASE_URL=https://api.groq.com/openai/v1
+
+# Legacy configuration (backward compatible)
+# OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL still work
 
 REQUEST_TIMEOUT_MS=30000
 ```

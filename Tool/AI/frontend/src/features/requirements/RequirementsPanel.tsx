@@ -51,7 +51,7 @@ export function RequirementsPanel({ activeRequirement, onActiveRequirementChange
             [1]
           </span>
           <h2 style={{ margin: 0, fontSize: "17px", color: "var(--violet)" }}>
-            Requirements
+            Requirement
           </h2>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
