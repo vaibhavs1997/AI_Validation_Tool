@@ -20,6 +20,23 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
+  // Synchronize view with URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith("#results")) {
+        setCurrentView("results");
+      } else if (hash.startsWith("#history")) {
+        setCurrentView("history");
+      } else if (hash.startsWith("#workspace") || hash.startsWith("#setup")) {
+        setCurrentView(hash.startsWith("#workspace") ? "workspace" : "setup");
+      }
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
   // Default to "default" project if none selected
   useEffect(() => {
     if (!activeProjectId) {

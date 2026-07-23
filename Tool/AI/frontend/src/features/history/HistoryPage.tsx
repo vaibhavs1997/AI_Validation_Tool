@@ -39,11 +39,8 @@ function renderRunRow(run: RunSummary) {
     : "";
 
   const handleClick = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("runId", run.id);
-    window.location.href = `#results?runId=${encodeURIComponent(run.id)}`;
-    // Trigger a navigation by changing the hash
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    // Navigate to Results view with runId in hash
+    window.location.hash = `#results?runId=${encodeURIComponent(run.id)}`;
   };
 
   return (
@@ -185,7 +182,20 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
 
   return (
     <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2 style={{ marginBottom: "20px" }}>Run History</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+        <h2 style={{ margin: 0 }}>Run History</h2>
+        <button
+          type="button"
+          onClick={() => { window.location.hash = "#workspace"; }}
+          style={{
+            padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+            border: "1px solid var(--line)", borderRadius: "6px",
+            background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+          }}
+        >
+          Back to Workspace
+        </button>
+      </div>
       <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
         {runs.length} run{runs.length !== 1 ? "s" : ""} for project "{activeProjectId}"
       </div>

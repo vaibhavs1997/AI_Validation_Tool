@@ -54,20 +54,20 @@ interface ExecutionResult extends ExecuteDependentResponse {
 function deriveDependencyExplanation(step: ExecutionPlanStep): string {
   const explanations: string[] = [];
   for (const binding of step.bindings || []) {
-    const fromLocation = binding.source?.split(".").slice(-1)[0] || "value";
-    const toLocation = binding.target?.split(".").slice(-1)[0] || "value";
+    const fromLocation = binding.source?.split(".").slice(-1)[0] || "input";
+    const toLocation = binding.target?.split(".").slice(-1)[0] || "input";
     if (binding.type === "auth" || binding.type === "token") {
-      explanations.push(`uses token/credentials from prerequisite`);
+      explanations.push(`uses authentication from previous step`);
     } else if (binding.transform) {
-      explanations.push(`transforms "${fromLocation}" → "${toLocation}"`);
+      explanations.push(`uses "${fromLocation}" as "${toLocation}"`);
     } else {
-      explanations.push(`uses "${fromLocation}" from prerequisite as "${toLocation}"`);
+      explanations.push(`uses "${fromLocation}" from previous step`);
     }
   }
   if (explanations.length === 0 && step.prerequisites.length > 0) {
-    return `must run after prerequisite${step.prerequisites.length > 1 ? "s" : ""}`;
+    return `runs after previous step${step.prerequisites.length > 1 ? "s" : ""}`;
   }
-  return explanations.join("; ") || "depends on prerequisite";
+  return explanations.join("; ") || "depends on previous step";
 }
 
 function renderPlanPreview(plan: ExecutionPlan) {
@@ -404,6 +404,58 @@ function getRecoveryGuidance(error: string): string | null {
   return null;
 }
 
+type OverrideErrors = {
+  bodyJson?: string;
+  status?: string;
+  assertion?: string;
+  paramKey?: string;
+};
+
+function parseJsonSafely(text: string): { value?: unknown; error?: string } {
+  if (!text || !text.trim()) return { value: {} };
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return { value: undefined, error: "Invalid JSON" };
+  }
+}
+
+function validateOverride(override: {
+  testData: { pathParams: Record<string, string>; queryParams: Record<string, string>; headers: Record<string, string>; body: unknown };
+  expectedBehavior: { status: number; responseAssertions: string[] };
+}): OverrideErrors {
+  const errors: OverrideErrors = {};
+  const bodyText = typeof override.testData.body === "string" ? override.testData.body : JSON.stringify(override.testData.body, null, 2);
+  const parsed = parseJsonSafely(bodyText);
+  if (parsed.error) errors.bodyJson = parsed.error;
+
+  const status = override.expectedBehavior.status;
+  if (typeof status !== "number" || !Number.isInteger(status) || status < 100 || status >= 600) {
+    errors.status = "Enter a valid HTTP status (100-599)";
+  }
+
+  for (const assertion of override.expectedBehavior.responseAssertions) {
+    if (!assertion || !assertion.trim()) {
+      errors.assertion = "Assertion cannot be empty";
+      break;
+    }
+  }
+
+  const checkParams = (params: Record<string, string>) => {
+    for (const k of Object.keys(params)) {
+      if (!k.trim()) {
+        errors.paramKey = "Parameter name cannot be empty";
+        break;
+      }
+    }
+  };
+  checkParams(override.testData.pathParams);
+  checkParams(override.testData.queryParams);
+  checkParams(override.testData.headers);
+
+  return errors;
+}
+
 export function ExecutionPanel({
   activeProjectId,
   prepareResponse,
@@ -412,6 +464,11 @@ export function ExecutionPanel({
   const [execState, setExecState] = useState<ExecutionStatus>("IDLE");
   const [execResult, setExecResult] = useState<ExecutionResult | null>(null);
   const [execError, setExecError] = useState<string>("");
+  const [override, setOverride] = useState<{
+    testData: { pathParams: Record<string, string>; queryParams: Record<string, string>; headers: Record<string, string>; body: string };
+    expectedBehavior: { status: number; responseAssertions: string[] };
+  } | null>(null);
+  const [overrideErrors, setOverrideErrors] = useState<OverrideErrors>({});
 
   // Reset state when prepareResponse changes (new preparation)
   useEffect(() => {
@@ -419,7 +476,31 @@ export function ExecutionPanel({
     setExecState("IDLE");
     setExecResult(null);
     setExecError("");
+    setOverride(null);
+    setOverrideErrors({});
   }, [prepareResponse]);
+
+  const initOverride = (specId: string) => {
+    const spec = prepareResponse.testSpecifications.find(s => s.id === specId);
+    if (!spec) return;
+    setOverride({
+      testData: {
+        pathParams: { ...(spec.testData?.pathParams || {}) } as Record<string, string>,
+        queryParams: { ...(spec.testData?.queryParams || {}) } as Record<string, string>,
+        headers: { ...(spec.testData?.headers || {}) } as Record<string, string>,
+        body: spec.testData?.body ? JSON.stringify(spec.testData.body, null, 2) : "{}",
+      },
+      expectedBehavior: {
+        status: spec.expectedBehavior?.status ?? 200,
+        responseAssertions: [...(spec.expectedBehavior?.responseAssertions || [])],
+      },
+    });
+    setOverrideErrors({});
+  };
+
+  useEffect(() => {
+    if (selectedSpecId) initOverride(selectedSpecId);
+  }, [selectedSpecId]);
 
   const selectedSpec = prepareResponse.testSpecifications.find(s => s.id === selectedSpecId);
   const selectedPlan = selectedSpecId ? prepareResponse.plans[selectedSpecId] : undefined;
@@ -434,6 +515,14 @@ export function ExecutionPanel({
   const handleRun = useCallback(async () => {
     if (!selectedSpec || !selectedPlan || !activeProjectId) return;
     if (execState === "RUNNING") return;
+    if (!override) return;
+
+    const errors = validateOverride(override);
+    setOverrideErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setExecError("Fix the highlighted issues before running.");
+      return;
+    }
 
     setExecState("RUNNING");
     setExecResult(null);
@@ -493,10 +582,10 @@ export function ExecutionPanel({
             background: "var(--amber)",
             color: "#fff",
           }}>
-            [5]
+            4
           </span>
           <h2 style={{ margin: 0, fontSize: "17px", color: "var(--amber-deep)" }}>
-            Execute Tests
+            Run Tests
           </h2>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -523,7 +612,7 @@ export function ExecutionPanel({
             letterSpacing: "0.04em",
             color: "var(--muted)",
           }}>
-            PREREQUISITES
+            BEFORE YOU RUN
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
             <div style={{
@@ -696,13 +785,92 @@ export function ExecutionPanel({
           </div>
         )}
 
+        {/* Test Data & Expected Result editor */}
+        {selectedSpec && override && (
+          <div style={{ marginBottom: "18px" }}>
+            <details open>
+              <summary style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--ink)",
+                cursor: "pointer",
+                padding: "8px 0",
+              }}>
+                Test Data & Expected Result
+              </summary>
+              <div style={{ marginTop: "10px", padding: "12px", border: "1px solid var(--line)", borderRadius: "6px", background: "var(--surface)" }}>
+                <div style={{ display: "grid", gap: "14px" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Path Parameters</div>
+                    {Object.entries(override.testData.pathParams).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, pathParams: { ...prev.testData.pathParams, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                    {overrideErrors.paramKey && <div style={{ fontSize: "12px", color: "var(--red-deep)" }}>{overrideErrors.paramKey}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Query Parameters</div>
+                    {Object.entries(override.testData.queryParams).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, queryParams: { ...prev.testData.queryParams, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Headers</div>
+                    {Object.entries(override.testData.headers).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, headers: { ...prev.testData.headers, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Request Body</div>
+                    <textarea
+                      value={typeof override.testData.body === "string" ? override.testData.body : JSON.stringify(override.testData.body, null, 2)}
+                      onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, body: e.target.value } } : prev)}
+                      style={{ width: "100%", minHeight: "120px", padding: "8px", border: "1px solid var(--line)", borderRadius: "4px", fontFamily: "monospace", fontSize: "12px" }}
+                    />
+                    {overrideErrors.bodyJson && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.bodyJson}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Expected Status</div>
+                    <input
+                      type="number"
+                      value={override.expectedBehavior.status}
+                      onChange={(e) => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, status: parseInt(e.target.value || "200", 10) } } : prev)}
+                      style={{ width: "120px", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                    />
+                    {overrideErrors.status && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.status}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Assertions</div>
+                    {override.expectedBehavior.responseAssertions.map((assertion, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
+                        <input value={assertion} onChange={(e) => setOverride(prev => { if (!prev) return null; const next = [...prev.expectedBehavior.responseAssertions]; next[idx] = e.target.value; return { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: next } }; })} style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                        <button type="button" onClick={() => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: prev.expectedBehavior.responseAssertions.filter((_, i) => i !== idx) } } : null)} style={{ padding: "4px 8px", border: "1px solid var(--red)", borderRadius: "4px", background: "var(--surface)", color: "var(--red-deep)", cursor: "pointer" }}>Remove</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: [...prev.expectedBehavior.responseAssertions, ""] } } : null)} style={{ padding: "6px 12px", border: "1px dashed var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: "pointer" }}>+ Add Assertion</button>
+                    {overrideErrors.assertion && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.assertion}</div>}
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+
         {/* Execute button */}
         {selectedSpec && (
           <div style={{ marginBottom: "18px" }}>
             <button
               type="button"
               onClick={handleRun}
-              disabled={!canRun}
+              disabled={!canRun || !override}
               style={{
                 padding: "10px 24px",
                 fontSize: "14px",
@@ -773,7 +941,7 @@ export function ExecutionPanel({
                   type="button"
                   onClick={() => {
                     const runId = execResult.runId as string;
-                    window.location.href = `#results?runId=${encodeURIComponent(runId)}`;
+                    window.location.hash = `#results?runId=${encodeURIComponent(runId)}`;
                   }}
                   style={{
                     padding: "8px 20px",

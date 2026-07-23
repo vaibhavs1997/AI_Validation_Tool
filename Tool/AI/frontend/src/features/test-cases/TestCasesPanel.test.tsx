@@ -132,13 +132,13 @@ function renderPanel(overrides: {
   );
 }
 
-async function generateTests() {
-  const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
-  fireEvent.click(generateBtn);
-  await waitFor(() => {
-    expect(screen.getByText(/Generated: 3/)).toBeDefined();
-  });
-}
+  async function generateTests() {
+    const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+    fireEvent.click(generateBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
+    });
+  }
 
 function getCheckbox(index: number): HTMLInputElement {
   const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
@@ -170,8 +170,7 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
       expect(cb.checked).toBe(true);
     });
 
-    expect(screen.getByText(/Included: 3/)).toBeDefined();
-    expect(screen.getByText(/Excluded: 0/)).toBeDefined();
+    expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
   });
 
   // 2. Individual exclude
@@ -183,8 +182,7 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     fireEvent.click(getCheckbox(1)); // uncheck tc-2
 
     await waitFor(() => {
-      expect(screen.getByText(/Included: 2/)).toBeDefined();
-      expect(screen.getByText(/Excluded: 1/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 2 selected to continue/)).toBeDefined();
     });
 
     expect(getCheckbox(1).checked).toBe(false);
@@ -199,14 +197,13 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     // Exclude tc-2
     fireEvent.click(getCheckbox(1));
     await waitFor(() => {
-      expect(screen.getByText(/Excluded: 1/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 2 selected to continue/)).toBeDefined();
     });
 
     // Re-include tc-2
     fireEvent.click(getCheckbox(1));
     await waitFor(() => {
-      expect(screen.getByText(/Included: 3/)).toBeDefined();
-      expect(screen.getByText(/Excluded: 0/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
     });
   });
 
@@ -220,15 +217,14 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     const excludeAllBtn = screen.getByRole("button", { name: /exclude all/i });
     fireEvent.click(excludeAllBtn);
     await waitFor(() => {
-      expect(screen.getByText(/Included: 0/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 0 selected to continue/)).toBeDefined();
     });
 
     // Select All
     const selectAllBtn = screen.getByRole("button", { name: /select all/i });
     fireEvent.click(selectAllBtn);
     await waitFor(() => {
-      expect(screen.getByText(/Included: 3/)).toBeDefined();
-      expect(screen.getByText(/Excluded: 0/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
     });
 
     getAllCheckboxes().forEach((cb) => {
@@ -246,8 +242,7 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     fireEvent.click(excludeAllBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Included: 0/)).toBeDefined();
-      expect(screen.getByText(/Excluded: 3/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 0 selected to continue/)).toBeDefined();
     });
 
     getAllCheckboxes().forEach((cb) => {
@@ -264,22 +259,7 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     fireEvent.click(getCheckbox(0));
 
     await waitFor(() => {
-      const summary = screen.getByText(/Generated: 3 · Included: 2 · Excluded: 1/);
-      expect(summary).toBeDefined();
-    });
-  });
-
-  // 7. Excluded count
-  it("shows correct excluded count after excluding two", async () => {
-    setupMockResponse();
-    renderPanel();
-    await generateTests();
-
-    fireEvent.click(getCheckbox(0));
-    fireEvent.click(getCheckbox(1));
-
-    await waitFor(() => {
-      const summary = screen.getByText(/Generated: 3 · Included: 1 · Excluded: 2/);
+      const summary = screen.getByText(/3 test cases · 2 selected to continue/);
       expect(summary).toBeDefined();
     });
   });
@@ -327,7 +307,7 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     fireEvent.click(getCheckbox(1));
 
     await waitFor(() => {
-      expect(screen.getByText(/Excluded: 1/)).toBeDefined();
+      expect(screen.getByText(/3 test cases · 2 selected to continue/)).toBeDefined();
     });
 
     // The original mockTestCases array should not have been mutated

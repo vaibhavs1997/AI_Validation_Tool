@@ -50,6 +50,11 @@ const { saveRun, getRun, listRuns } = require("./domain/RunRepository");
 storage.ensureStorage();
 seedDefaultProject();
 
+// Ensure projects are loadable even when default/project state changes later
+function reSeedDefaults() {
+  try { seedDefaultProject(); } catch {}
+}
+
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",

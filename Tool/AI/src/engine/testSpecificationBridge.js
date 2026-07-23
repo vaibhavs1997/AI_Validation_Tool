@@ -118,15 +118,22 @@ function prepareTestSpecifications({ projectId, testCases = [], mappings = [] })
       relationships: confirmedRelationships,
     });
 
-    if (validatePlan(plan)) {
+    // Executable only if plan exists, is valid, and has at least one step.
+    const hasValidPlan = plan && validatePlan(plan) && Array.isArray(plan.steps) && plan.steps.length > 0;
+    if (hasValidPlan) {
       plans[spec.id] = plan;
       if (plan.steps.length > 1) {
         diagnostics.plansBuilt++;
       }
-    } else if (plan.errors && plan.errors.length > 0) {
+    } else {
+      const reason = !plan
+        ? 'No execution plan returned'
+        : !validatePlan(plan)
+          ? `Invalid execution plan: ${plan.errors?.length ? plan.errors[0] : 'validation failed'}`
+          : 'Execution plan has no executable steps';
       unresolvedTestCases.push({
         testCaseId: tc.id,
-        reason: `Execution plan failed: ${plan.errors[0]}`,
+        reason,
       });
       diagnostics.prepared--;
       diagnostics.unresolved++;

@@ -38,7 +38,6 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
 
   const generatedCount = response?.testCases.length || 0;
   const includedCount = includedTestCaseIds.size;
-  const excludedCount = generatedCount - includedCount;
 
   // Report generated count and included set up to parent (e.g. WorkflowStatus)
   useEffect(() => {
@@ -316,7 +315,7 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
           fontSize: "13px",
           color: "var(--muted)"
         }}>
-          No test cases could be generated from the current requirement. Try refining the acceptance criteria.
+          No test cases could be generated from the current requirement. Try refining the requirement description.
         </div>
       );
     }
@@ -542,7 +541,7 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
               color: "var(--ink)"
             }}>
               <span>
-                Generated: {generatedCount} · Included: {includedCount} · Excluded: {excludedCount}
+                {generatedCount} test case{generatedCount !== 1 ? "s" : ""} · {includedCount} selected to continue
               </span>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button

@@ -149,14 +149,17 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Check URL for runId parameter
+  // Check URL hash for runId parameter
   useEffect(() => {
     if (!activeProjectId) {
       setRun(null);
       return;
     }
 
-    const params = new URLSearchParams(window.location.search);
+    // Parse runId from hash (e.g., "#results?runId=abc-123")
+    const hash = window.location.hash;
+    const searchStr = hash.includes("?") ? hash.substring(hash.indexOf("?")) : "";
+    const params = new URLSearchParams(searchStr);
     const runId = params.get("runId");
     if (!runId) return;
 
@@ -223,7 +226,33 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
 
   return (
     <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2 style={{ marginBottom: "20px" }}>Results</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+        <h2 style={{ margin: 0 }}>Results</h2>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = "#workspace"; }}
+            style={{
+              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+              border: "1px solid var(--line)", borderRadius: "6px",
+              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+            }}
+          >
+            Back to Workspace
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = "#history"; }}
+            style={{
+              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+              border: "1px solid var(--line)", borderRadius: "6px",
+              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+            }}
+          >
+            Run History
+          </button>
+        </div>
+      </div>
 
       {/* Overall result */}
       <div style={{
