@@ -553,81 +553,86 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
               borderRadius: "8px", fontWeight: 800,
               background: "var(--green)", color: "#fff", marginRight: "10px"
             }}>
-              [3]
+              3
             </span>
             <h3 style={{ margin: 0, display: "inline", fontSize: "17px", color: "var(--green-deep)" }}>
-              Relationships ({knowledge.relationships.length})
+              API Dependencies
             </h3>
           </div>
           <div style={{ padding: "18px" }}>
-            {/* Filters for status tabs */}
-            {(["proposed", "confirmed", "rejected"] as const).map((status) => {
-              const filtered = knowledge.relationships.filter((r) => r.status === status);
-              if (filtered.length === 0) return null;
-              const colors = getStatusColor(status);
-              return (
-                <div key={status} style={{ marginBottom: "16px" }}>
-                  <span style={{
-                    display: "inline-block", padding: "2px 8px", borderRadius: "4px",
-                    fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                    background: colors.bg, color: colors.text, marginBottom: "8px"
-                  }}>
-                    {status} ({filtered.length})
-                  </span>
-                  <div style={{ display: "grid", gap: "6px" }}>
-                    {filtered.map((rel, idx) => (
-                      <div key={idx} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "8px 12px", border: "1px solid var(--line)",
-                        borderRadius: "6px", background: "var(--surface-alt)",
-                        fontSize: "13px"
-                      }}>
-                        <div>
-                          <span style={{ fontWeight: 500 }}>{formatRelationship(rel)}</span>
-                          <span style={{
-                            display: "inline-block", marginLeft: "8px",
-                            padding: "1px 6px", borderRadius: "3px",
-                            fontSize: "11px", fontWeight: 600,
-                            background: colors.bg, color: colors.text
-                          }}>
-                            {rel.type}
-                          </span>
-                          <span style={{ marginLeft: "8px", color: "var(--muted)", fontSize: "12px" }}>
-                            {(rel.confidence * 100).toFixed(0)}% confidence
-                          </span>
-                        </div>
-                        {rel.status === "proposed" && (
-                          <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmRelationship(rel)}
-                              style={{
-                                padding: "4px 10px", fontSize: "12px", fontWeight: 600,
-                                color: "#fff", background: "var(--green)",
-                                border: "none", borderRadius: "4px", cursor: "pointer"
-                              }}
-                            >
-                              Confirm
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectRelationship(rel)}
-                              style={{
-                                padding: "4px 10px", fontSize: "12px", fontWeight: 600,
-                                color: "#fff", background: "var(--red)",
-                                border: "none", borderRadius: "4px", cursor: "pointer"
-                              }}
-                            >
-                              Reject
-                            </button>
+            <div style={{ fontSize: "13px", color: "var(--ink)", marginBottom: "12px" }}>
+              {knowledge.relationships.filter((r) => r.status === "confirmed").length} dependency configured
+              {knowledge.relationships.filter((r) => r.status === "proposed").length > 0 && (
+                <span style={{ color: "var(--muted)" }}> · {knowledge.relationships.filter((r) => r.status === "proposed").length} pending review</span>
+              )}
+            </div>
+            <details style={{ fontSize: "12px", color: "var(--muted)" }}>
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Advanced Relationships</summary>
+              {(["proposed", "confirmed", "rejected"] as const).map((status) => {
+                const filtered = knowledge.relationships.filter((r) => r.status === status);
+                if (filtered.length === 0) return null;
+                const colors = getStatusColor(status);
+                return (
+                  <div key={status} style={{ marginBottom: "12px" }}>
+                    <span style={{
+                      display: "inline-block", padding: "2px 8px", borderRadius: "4px",
+                      fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+                      background: colors.bg, color: colors.text, marginBottom: "8px"
+                    }}>
+                      {status} ({filtered.length})
+                    </span>
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      {filtered.map((rel, idx) => (
+                        <div key={idx} style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "8px 12px", border: "1px solid var(--line)",
+                          borderRadius: "6px", background: "var(--surface-alt)",
+                          fontSize: "13px"
+                        }}>
+                          <div>
+                            <span style={{ fontWeight: 500 }}>{formatRelationship(rel)}</span>
+                            <span style={{
+                              display: "inline-block", marginLeft: "8px",
+                              padding: "1px 6px", borderRadius: "3px",
+                              fontSize: "11px", fontWeight: 600,
+                              background: colors.bg, color: colors.text
+                            }}>
+                              {rel.type}
+                            </span>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                          {rel.status === "proposed" && (
+                            <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleConfirmRelationship(rel)}
+                                style={{
+                                  padding: "4px 10px", fontSize: "12px", fontWeight: 600,
+                                  color: "#fff", background: "var(--green)",
+                                  border: "none", borderRadius: "4px", cursor: "pointer"
+                                }}
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectRelationship(rel)}
+                                style={{
+                                  padding: "4px 10px", fontSize: "12px", fontWeight: 600,
+                                  color: "#fff", background: "var(--red)",
+                                  border: "none", borderRadius: "4px", cursor: "pointer"
+                                }}
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </details>
           </div>
         </section>
       )}

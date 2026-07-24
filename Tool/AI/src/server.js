@@ -46,9 +46,42 @@ const { DEFAULT_PROJECT } = require("./domain/ProjectIdentity");
 const { executeTestSpecification } = require("./execution/dependencyAwareExecutor");
 const { validatePlan } = require("./domain/ExecutionPlan");
 const { saveRun, getRun, listRuns } = require("./domain/RunRepository");
+const { migrate } = require("./db/migrate");
+const { checkConnection } = require("./db/pool");
 
 storage.ensureStorage();
-seedDefaultProject();
+
+// Seed default project — handles both sync (file) and async (PostgreSQL) backends
+const seedResult = seedDefaultProject();
+if (seedResult && typeof seedResult.then === 'function') {
+  seedResult.catch(err => console.error('[startup] Default project seed failed:', err.message));
+}
+
+// Run PostgreSQL migration if enabled (non-blocking — file repos still work)
+if (config.pg.enabled) {
+  migrate().then((result) => {
+    if (result.applied) {
+      console.log('[startup] PostgreSQL schema ready');
+    } else if (result.error) {
+      console.error('[startup] PostgreSQL migration error:', result.error);
+    } else {
+      console.log('[startup] PostgreSQL disabled, skipping migration');
+    }
+    // Verify connectivity
+    checkConnection().then((status) => {
+      if (status.connected) {
+        console.log('[startup] PostgreSQL connected');
+      } else {
+        console.log('[startup] PostgreSQL status:', status.reason);
+      }
+    });
+  });
+}
+
+// Ensure projects are loadable even when default/project state changes later
+function reSeedDefaults() {
+  try { seedDefaultProject(); } catch {}
+}
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",

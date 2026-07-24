@@ -39,11 +39,8 @@ function renderRunRow(run: RunSummary) {
     : "";
 
   const handleClick = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("runId", run.id);
-    window.location.href = `#results?runId=${encodeURIComponent(run.id)}`;
-    // Trigger a navigation by changing the hash
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    // Navigate to Results view with runId in hash
+    window.location.hash = `#results?runId=${encodeURIComponent(run.id)}`;
   };
 
   return (
@@ -121,6 +118,7 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retryProjectId, setRetryProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeProjectId) {
@@ -130,12 +128,27 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
 
     setLoading(true);
     setError("");
+    setRetryProjectId(activeProjectId);
 
     listRuns(activeProjectId)
       .then(setRuns)
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load history"))
       .finally(() => setLoading(false));
   }, [activeProjectId]);
+
+  const handleRetry = async () => {
+    if (!retryProjectId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const r = await listRuns(retryProjectId);
+      setRuns(r);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load history");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!activeProjectId) {
     return (
@@ -165,8 +178,44 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
           borderRadius: "6px",
           fontSize: "13px",
           color: "var(--red-deep)",
+          marginBottom: "12px",
         }}>
-          {error}
+          <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load run history.</div>
+          <div>{error}</div>
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={handleRetry}
+            style={{
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--red-deep)",
+              background: "var(--surface)",
+              border: "1px solid var(--red)",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Try Again
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = "#workspace"; }}
+            style={{
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--ink)",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Back to Workspace
+          </button>
         </div>
       </div>
     );
@@ -185,7 +234,20 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
 
   return (
     <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <h2 style={{ marginBottom: "20px" }}>Run History</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+        <h2 style={{ margin: 0 }}>Run History</h2>
+        <button
+          type="button"
+          onClick={() => { window.location.hash = "#workspace"; }}
+          style={{
+            padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+            border: "1px solid var(--line)", borderRadius: "6px",
+            background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+          }}
+        >
+          Back to Workspace
+        </button>
+      </div>
       <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
         {runs.length} run{runs.length !== 1 ? "s" : ""} for project "{activeProjectId}"
       </div>

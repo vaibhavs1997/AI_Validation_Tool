@@ -20,9 +20,8 @@ export function RequirementsPanel({ activeRequirement, onActiveRequirementChange
     onActiveRequirementChange({ source: "manual", requirement });
   };
 
-  // Status follows activeRequirement, NOT the selected tab
-  const statusText = activeRequirement && activeRequirement.requirement ? "Configured" : "Not configured";
-  const statusColor = activeRequirement && activeRequirement.requirement ? "var(--green)" : "var(--muted)";
+  const isConfigured = Boolean(activeRequirement && activeRequirement.requirement);
+  const summaryText = activeRequirement?.requirement?.summary || activeRequirement?.requirement?.key || "Requirement ready";
 
   return (
     <section className="panel span-12 panel-requirements" data-view-section="workspace">
@@ -48,21 +47,24 @@ export function RequirementsPanel({ activeRequirement, onActiveRequirementChange
             background: "var(--violet)",
             color: "#fff"
           }}>
-            [1]
+            1
           </span>
-          <h2 style={{ margin: 0, fontSize: "17px", color: "var(--violet)" }}>
-            Requirement
-          </h2>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--violet)" }}>Requirement</h2>
+            {isConfigured && (
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>{summaryText}</div>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="step-status" style={{
+          <span style={{
             fontSize: "12px",
             fontWeight: 700,
             textTransform: "uppercase",
             letterSpacing: "0.04em",
-            color: statusColor
+            color: isConfigured ? "var(--green)" : "var(--muted)"
           }}>
-            {statusText}
+            {isConfigured ? "Ready" : "Not configured"}
           </span>
           <button
             type="button"
@@ -90,7 +92,6 @@ export function RequirementsPanel({ activeRequirement, onActiveRequirementChange
       </div>
       <div className="panel-body" style={{ padding: "18px" }}>
         <RequirementSourceTabs source={source} onSourceChange={setSource} />
-        {/* Both forms mounted to preserve independent state per tab */}
         <div style={{ display: source === "jira" ? "block" : "none" }}>
           <JiraRequirementForm onRequirementConfirmed={handleJiraRequirementConfirmed} />
         </div>

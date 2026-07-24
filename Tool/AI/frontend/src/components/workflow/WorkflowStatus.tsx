@@ -34,10 +34,12 @@ export function WorkflowStatus({ activeRequirement, testCaseCount = 0, includedC
   const reqStatus = getRequirementStatus();
 
   const steps = [
-    { number: 1, label: "Requirement", status: reqStatus.status },
-    { number: 2, label: "Test Cases", status: testCaseCount > 0 ? "loaded" : "empty" },
-    { number: 3, label: "API Matching", status: matchedCount > 0 ? "loaded" : "empty" },
-    { number: 4, label: "Results", status: runSummary ? "loaded" : "empty" }
+    { number: 1, label: "Setup", status: "loaded" },
+    { number: 2, label: "Requirement", status: reqStatus.status },
+    { number: 3, label: "Test Cases", status: testCaseCount > 0 ? "loaded" : "empty" },
+    { number: 4, label: "Connect APIs", status: matchedCount > 0 ? "loaded" : "empty" },
+    { number: 5, label: "Run Tests", status: runSummary ? "loaded" : "empty" },
+    { number: 6, label: "Results", status: runSummary ? "loaded" : "empty" }
   ];
 
   const formatStepValue = (stepNum: number): string => {
