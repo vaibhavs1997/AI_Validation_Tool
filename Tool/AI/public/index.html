@@ -21,40 +21,62 @@
           <div class="brand-mark">AV</div>
           <div>
             <strong>API Validator</strong>
-            <span>QA Automation Platform</span>
+            <span>Validation workspace</span>
           </div>
         </div>
 
         <nav class="side-nav" aria-label="Primary navigation">
-          <a class="active" href="#workspace" data-view-trigger="workspace">Workspace</a>
-          <a href="#results" data-view-trigger="results">Recent Run</a>
-          <a href="#history" data-view-trigger="history">Run History</a>
-        </nav>
+          <div class="nav-group">
+            <a class="active" href="#workspace" data-view-trigger="workspace" data-nav-key="overview" data-scroll-section="top">Overview</a>
+          </div>
 
-        <div class="server-card">
-          <span>Server</span>
-          <strong id="serverState">Checking</strong>
-          <p id="configStatus">Loading configuration...</p>
-        </div>
+          <div class="nav-group">
+            <span class="nav-label">Testing</span>
+            <a href="#workspace" data-view-trigger="workspace" data-nav-key="testing-workspace" data-scroll-section="requirements">Test Workspace</a>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-label">APIs</span>
+            <a href="#workspace" data-view-trigger="workspace" data-nav-key="apis-services" data-scroll-section="collection">API Services</a>
+            <a href="#workspace" data-view-trigger="workspace" data-nav-key="apis-dependencies" data-scroll-section="execution">Dependencies</a>
+          </div>
+
+          <div class="nav-group">
+            <span class="nav-label">Results</span>
+            <a href="#results" data-view-trigger="results" data-nav-key="results">Results</a>
+            <a href="#history" data-view-trigger="history" data-nav-key="history">History</a>
+          </div>
+
+          <div class="nav-group">
+            <a href="#workspace" data-view-trigger="workspace" data-nav-key="settings" data-scroll-section="execution">Settings</a>
+          </div>
+        </nav>
       </aside>
 
       <div class="main-shell">
         <header class="topbar">
-          <div>
-            <span class="eyebrow">QA automation platform</span>
-            <h1>Ticket-to-API Validation</h1>
+          <div class="topbar-title">
+            <span class="eyebrow">QA automation</span>
+            <h1 id="pageTitle">Test Workspace</h1>
+          </div>
+          <div class="topbar-meta">
+            <div class="meta-item">
+              <span class="meta-label">Project</span>
+              <strong id="headerProjectName">Default Project</strong>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Environment</span>
+              <span id="headerEnvironment" class="status neutral">Not set</span>
+            </div>
           </div>
           <div class="topbar-actions">
-            <button id="themeToggle" type="button" class="link-button ghost" title="Toggle dark mode">🌙</button>
-            <details class="dev-dropdown">
-              <summary class="dev-trigger link-button ghost" title="Developer tools">Dev</summary>
-              <div class="dev-menu">
-                <a href="/api/health" target="_blank" rel="noreferrer" class="dev-item">Health</a>
-                <a href="/api/runs" target="_blank" rel="noreferrer" class="dev-item">Runs API</a>
-              </div>
-            </details>
+            <button id="themeToggle" type="button" class="link-button" title="Toggle dark mode">🌙</button>
           </div>
         </header>
+
+        <section class="overview-strip" data-view-section="workspace">
+          <div id="appMetrics" class="app-metrics"></div>
+        </section>
 
         <div id="compactWorkflow" class="compact-workflow" aria-label="Workflow status"></div>
 
@@ -159,6 +181,7 @@
                 <div class="step-summary-compact">
                   <span id="reqStepSummary" class="step-summary-text">—</span>
                   <div class="step-summary-actions">
+                    <button id="generateFromRequirementBtn" type="button" class="primary-action">Generate Tests</button>
                     <button id="editReqBtn" type="button" class="link-button">Edit</button>
                   </div>
                 </div>
@@ -175,8 +198,8 @@
           <section class="panel span-12 panel-collection" data-view-section="workspace" data-section="collection">
             <div class="panel-head" data-toggle-section>
               <div class="step-info">
-                <span class="step">[2]</span>
-                <h2 class="step-title">API Collection</h2>
+                <span class="step">[3]</span>
+                <h2 class="step-title">Connect APIs</h2>
               </div>
               <div class="panel-head-right">
                 <span id="collectionStepStatus" class="step-status"></span>
@@ -246,6 +269,19 @@
                   <button id="loadSampleContractBtn" type="button" class="sample-btn">Sample</button>
                 </div>
 
+                <div class="input-section">
+                  <div class="section-label">Suggested Connections</div>
+                  <div id="connectionEmptyState" class="empty-state">
+                    <div class="empty-icon">🔗</div>
+                    <strong>Generate and select tests to see API recommendations</strong>
+                  </div>
+                  <div id="apiConnectionList" class="connection-list" hidden></div>
+                </div>
+
+                <div class="button-row">
+                  <button id="useConnectionsBtn" type="button" class="primary-action" disabled>Use These Connections</button>
+                </div>
+
                 <!-- Inline error -->
                 <div id="apiError" class="inline-error" hidden>
                   <span class="error-icon">⚠</span>
@@ -258,6 +294,7 @@
                 <div class="step-summary-compact">
                   <span id="collectionStepSummary" class="step-summary-text">—</span>
                   <div class="step-summary-actions">
+                    <button id="viewConnectionsBtn" type="button" class="link-button">View</button>
                     <button id="editCollectionBtn" type="button" class="link-button">Edit</button>
                   </div>
                 </div>
@@ -269,8 +306,8 @@
           <section class="panel span-12 panel-scenarios" data-view-section="workspace" data-section="scenarios">
             <div class="panel-head" data-toggle-section>
               <div class="step-info">
-                <span class="step">[3]</span>
-                <h2 class="step-title">Test Scenarios</h2>
+                <span class="step">[2]</span>
+                <h2 class="step-title">Review Tests</h2>
               </div>
               <div class="panel-head-right">
                 <span id="scenariosStepStatus" class="step-status"></span>
@@ -289,13 +326,12 @@
               <!-- Empty/Prerequisites State -->
               <div id="scenariosEmptyState" class="scenario-empty-state">
                 <div class="empty-icon">🧪</div>
-                <strong>No test scenarios generated yet</strong>
+                <strong>No tests generated yet</strong>
                 <div class="prereq-status">
                   <span id="scPrereqReq" class="prereq-item">Requirement ⃝</span>
                   <span id="scPrereqApi" class="prereq-item">API Collection ⃝</span>
                 </div>
-                <button id="generateScenariosBtn" type="button" class="primary-action generate-btn" disabled>Generate Test Scenarios</button>
-                <p id="generateHelpText" class="generate-help" hidden>Load a requirement and API collection before generating scenarios.</p>
+                <p id="generateHelpText" class="generate-help">Generate tests from the requirement to continue.</p>
               </div>
 
               <!-- Scenario Summary Bar -->
@@ -313,18 +349,16 @@
               </div>
 
               <!-- Scenario Table -->
+              <div id="scenarioControls" class="scenarios-controls" hidden>
+                <div class="button-row">
+                  <button id="selectAllScenariosBtn" type="button" class="link-button">Select All</button>
+                  <button id="deselectAllScenariosBtn" type="button" class="link-button">Clear Selection</button>
+                </div>
+                <button id="continueWithTestsBtn" type="button" class="primary-action">Continue with 0 Tests</button>
+              </div>
+
               <div class="table-wrap" hidden>
-                <table class="scenario-compact-table">
-                  <thead>
-                    <tr>
-                      <th class="select-col">Run</th>
-                      <th>Test Scenario</th>
-                      <th>Type</th>
-                      <th>Target API</th>
-                    </tr>
-                  </thead>
-                  <tbody id="scenarioRows"></tbody>
-                </table>
+                <div id="scenarioRows" class="test-review-list"></div>
               </div>
             </div>
           </section>
@@ -334,7 +368,7 @@
             <div class="panel-head" data-toggle-section>
               <div class="step-info">
                 <span class="step">[4]</span>
-                <h2 class="step-title">Configure & Run</h2>
+                <h2 class="step-title">Run Tests</h2>
               </div>
               <div class="panel-head-right">
                 <span id="executionStepStatus" class="step-status"></span>
@@ -366,39 +400,14 @@
 
               <!-- Full content -->
               <div id="execFullContent" hidden>
-                <div class="readiness-section">
-                  <h3 class="readiness-title">Execution Readiness</h3>
-                  <div class="readiness-grid">
-                    <div class="readiness-item" id="readinessEnv">
-                      <span class="readiness-label">Environment</span>
-                      <span class="readiness-value" id="readinessEnvVal">—</span>
-                      <span class="readiness-check" id="readinessEnvIcon">◯</span>
-                    </div>
-                    <div class="readiness-item" id="readinessUrl">
-                      <span class="readiness-label">Base URL</span>
-                      <span class="readiness-value" id="readinessUrlVal">—</span>
-                      <span class="readiness-check" id="readinessUrlIcon">◯</span>
-                    </div>
-                    <div class="readiness-item" id="readinessAuth">
-                      <span class="readiness-label">Authentication</span>
-                      <span class="readiness-value" id="readinessAuthVal">—</span>
-                      <span class="readiness-check" id="readinessAuthIcon">◯</span>
-                    </div>
-                    <div class="readiness-item" id="readinessMappings">
-                      <span class="readiness-label">API Mappings</span>
-                      <span class="readiness-value" id="readinessMappingVal">—</span>
-                      <span class="readiness-check" id="readinessMappingIcon">◯</span>
-                    </div>
-                    <div class="readiness-item" id="readinessBlocked">
-                      <span class="readiness-label">Blocked Tests</span>
-                      <span class="readiness-value" id="readinessBlockedVal">—</span>
-                      <span class="readiness-check" id="readinessBlockedIcon">◯</span>
-                    </div>
-                  </div>
+                <div class="readiness-section run-ready-simple">
+                  <h3 class="readiness-title">Run readiness</h3>
+                  <p id="runSimpleSummary" class="run-simple-summary">0 tests ready</p>
+                  <div id="runOrderPreview" class="run-order-preview"></div>
                 </div>
 
                 <details class="advanced-config">
-                  <summary class="advanced-summary">Advanced Execution Settings</summary>
+                  <summary class="advanced-summary">Test settings</summary>
                   <div class="advanced-body">
                     <div class="field-grid cols-3">
                       <label>
@@ -439,6 +448,11 @@
                     <button id="executeBtn" type="button" class="primary-action">Run Selected Tests</button>
                     <button id="viewBlockedBtn" type="button" class="link-button" hidden>View Blocked</button>
                   </div>
+                </div>
+
+                <div id="runResultCompact" class="run-result-compact" hidden>
+                  <div id="runResultCompactText"></div>
+                  <button id="viewResultsBtn" type="button" class="primary-action">View Results</button>
                 </div>
 
                 <!-- Inline error -->

@@ -74,7 +74,7 @@ function generateLocalFallbackTestCases(ticket) {
 async function generateTestCases({ projectId, ticket }) {
   let projectInstructions = "";
   try {
-    const knowledge = getProjectKnowledge(projectId);
+    const knowledge = await getProjectKnowledge(projectId);
     projectInstructions = knowledge?.instructions || "";
   } catch {
     // ignore

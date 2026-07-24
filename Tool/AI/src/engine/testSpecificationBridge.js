@@ -61,7 +61,11 @@ function findOperationInApis(serviceId, operationId, apiModels) {
   return null;
 }
 
-function prepareTestSpecifications({ projectId, testCases = [], mappings = [] }) {
+function isPromise(value) {
+  return Boolean(value && typeof value.then === "function");
+}
+
+function buildPreparedSpecs({ projectId, testCases = [], mappings = [], services, apiModels, confirmedRelationships }) {
   const warnings = [];
   const diagnostics = {
     included: testCases.length,
@@ -74,11 +78,6 @@ function prepareTestSpecifications({ projectId, testCases = [], mappings = [] })
   for (const m of mappings) {
     mappingById.set(m.testCaseId, m);
   }
-
-  const services = listServices(projectId);
-  const apiModels = services.map((s) => getApiModel(projectId, s.id)).filter(Boolean);
-  const projectKnowledge = getProjectKnowledge(projectId);
-  const confirmedRelationships = (projectKnowledge?.relationships || []).filter((rel) => rel.status === "confirmed");
 
   const testSpecifications = [];
   const plans = {};
@@ -141,6 +140,50 @@ function prepareTestSpecifications({ projectId, testCases = [], mappings = [] })
     diagnostics,
     warnings,
   };
+}
+
+function prepareTestSpecifications({ projectId, testCases = [], mappings = [] }) {
+  const servicesMaybe = listServices(projectId);
+  if (isPromise(servicesMaybe)) {
+    return servicesMaybe.then((services) =>
+      Promise.all([
+        Promise.all(services.map((s) => getApiModel(projectId, s.id))),
+        Promise.resolve(getProjectKnowledge(projectId)),
+      ]).then(([apiModels, projectKnowledge]) =>
+        buildPreparedSpecs({
+          projectId,
+          testCases,
+          mappings,
+          services,
+          apiModels: apiModels.filter(Boolean),
+          confirmedRelationships: (projectKnowledge?.relationships || []).filter((rel) => rel.status === "confirmed"),
+        }))
+    );
+  }
+
+  const services = servicesMaybe;
+  const apiModels = services.map((s) => getApiModel(projectId, s.id)).filter(Boolean);
+  const projectKnowledge = getProjectKnowledge(projectId);
+  if (isPromise(projectKnowledge)) {
+    return projectKnowledge.then((knowledge) =>
+      buildPreparedSpecs({
+        projectId,
+        testCases,
+        mappings,
+        services,
+        apiModels,
+        confirmedRelationships: (knowledge?.relationships || []).filter((rel) => rel.status === "confirmed"),
+      })
+    );
+  }
+  return buildPreparedSpecs({
+    projectId,
+    testCases,
+    mappings,
+    services,
+    apiModels,
+    confirmedRelationships: (projectKnowledge?.relationships || []).filter((rel) => rel.status === "confirmed"),
+  });
 }
 
 module.exports = {

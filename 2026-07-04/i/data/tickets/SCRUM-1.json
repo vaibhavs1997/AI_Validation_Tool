@@ -1,0 +1,14 @@
+{
+  "key": "SCRUM-1",
+  "id": "10000",
+  "url": "https://aivalidation.atlassian.net/browse/SCRUM-1",
+  "summary": "Start here: Add your team's work",
+  "issueType": "Task",
+  "status": "To Do",
+  "priority": "",
+  "labels": [],
+  "description": "- Have existing work? Import from a CSV or another tool (like Asana or Notion).\n- Have an idea to plan out? Use Rovo, your AI assistant, to turn it into structured tasks instantly.\n- Want to accelerate work? Use AI agents to refine tasks and drive projects forward.",
+  "acceptanceCriteria": [],
+  "comments": [],
+  "fetchedAt": "2026-07-15T07:13:21.621Z"
+}

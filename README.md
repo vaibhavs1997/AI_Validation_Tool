@@ -38,6 +38,21 @@ It includes the server, UI, contract parsing logic, scenario generation, executi
    http://localhost:4173
    ```
 
+## Environment branch promotion
+
+This repository now includes a manual GitHub Actions workflow to move code from `main` to `dev` or `test`.
+
+1. Open **Actions** in GitHub.
+2. Run **Promote branch to environment**.
+3. Choose:
+   - `source_branch`: usually `main`
+   - `target_environment`: `dev`, `test`, or `both`
+   - `delivery_mode`:
+     - `pull_request` for a reviewable promotion PR
+     - `direct_sync` to update the target branch immediately
+
+Use `pull_request` when you want approval before promotion, and `direct_sync` when you want to move the branch without a separate PR.
+
 ## Configuration
 
 The app can use Jira credentials and optional AI enhancement settings through environment variables. Typical settings include:

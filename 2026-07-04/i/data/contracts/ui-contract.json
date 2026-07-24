@@ -1,0 +1,152 @@
+{
+  "type": "openapi",
+  "title": "Payments API",
+  "version": "1.0.0",
+  "baseUrl": "https://api.qa.example.com",
+  "endpoints": [
+    {
+      "id": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "operationId": "createRefund",
+      "summary": "Create a payment refund",
+      "description": "",
+      "tags": [
+        "payments",
+        "refunds"
+      ],
+      "parameters": [
+        {
+          "name": "paymentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestSchema": {
+        "type": "object",
+        "required": [
+          "amount",
+          "reason",
+          "idempotencyKey"
+        ],
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0.01,
+            "example": 50
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "example": "Customer request"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "refund-PAY-1234-001"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "requestedBy": {
+                "type": "string",
+                "example": "qa.user@example.com"
+              }
+            }
+          }
+        }
+      },
+      "responses": {
+        "201": "Refund created",
+        "400": "Invalid request",
+        "401": "Unauthorized",
+        "409": "Payment cannot be refunded"
+      },
+      "responseSchemas": {
+        "201": {
+          "type": "object",
+          "required": [
+            "refundId",
+            "paymentId",
+            "status",
+            "amount"
+          ],
+          "properties": {
+            "refundId": {
+              "type": "string"
+            },
+            "paymentId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "CREATED",
+                "FAILED"
+              ]
+            },
+            "amount": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "operationId": "getPayment",
+      "summary": "Get payment details",
+      "description": "",
+      "tags": [
+        "payments"
+      ],
+      "parameters": [
+        {
+          "name": "paymentId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestSchema": null,
+      "responses": {
+        "200": "Payment details",
+        "401": "Unauthorized",
+        "404": "Payment not found"
+      },
+      "responseSchemas": {
+        "200": {
+          "type": "object",
+          "required": [
+            "paymentId",
+            "status",
+            "capturedAmount"
+          ],
+          "properties": {
+            "paymentId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "CREATED",
+                "SETTLED",
+                "FAILED"
+              ]
+            },
+            "capturedAmount": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "importedAt": "2026-07-15T09:46:08.401Z"
+}

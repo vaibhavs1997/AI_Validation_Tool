@@ -14,6 +14,10 @@ const { createKnowledgeRelationship } = require('./KnowledgeRelationship');
 
 const STATUSES = Object.freeze(['proposed', 'confirmed', 'rejected']);
 
+function isPromise(value) {
+  return Boolean(value && typeof value.then === 'function');
+}
+
 function relationshipKey(rel) {
   return `${rel.source.serviceId}::${rel.source.operationId}::${rel.source.location}::${rel.target.serviceId}::${rel.target.operationId}::${rel.target.location}`;
 }
@@ -27,7 +31,7 @@ async function analyzeAndStoreProposals({ projectId, instructions, services, api
     analyzedRelationships = relationships;
   }
 
-  const existing = getProjectKnowledge(projectId) || { relationships: [] };
+  const existing = (await getProjectKnowledge(projectId)) || { relationships: [] };
   const preserved = existing.relationships || [];
   const preservedByKey = new Map();
   for (const rel of preserved) {
@@ -49,12 +53,19 @@ async function analyzeAndStoreProposals({ projectId, instructions, services, api
 }
 
 function listRelationshipsByStatus(projectId, status) {
-  const knowledge = getProjectKnowledge(projectId);
-  if (!knowledge) return [];
-  const targetStatus = status;
-  return (knowledge.relationships || [])
-    .filter((rel) => rel.status === targetStatus)
-    .map((rel) => createKnowledgeRelationship(rel));
+  const resolve = (knowledge) => {
+    if (!knowledge) return [];
+    const targetStatus = status;
+    return (knowledge.relationships || [])
+      .filter((rel) => rel.status === targetStatus)
+      .map((rel) => createKnowledgeRelationship(rel));
+  };
+
+  const knowledgeOrPromise = getProjectKnowledge(projectId);
+  if (isPromise(knowledgeOrPromise)) {
+    return knowledgeOrPromise.then(resolve);
+  }
+  return resolve(knowledgeOrPromise);
 }
 
 function confirmRelationship(projectId, sourceKey) {
@@ -66,17 +77,23 @@ function rejectRelationship(projectId, sourceKey) {
 }
 
 function updateRelationshipStatus(projectId, sourceKey, newStatus) {
-  const knowledge = getProjectKnowledge(projectId);
-  if (!knowledge) return null;
-  const relationships = (knowledge.relationships || []).map((rel) => {
-    const key = relationshipKey(rel);
-    if (key === sourceKey && rel.status === 'proposed') {
-      return createKnowledgeRelationship({ ...rel, status: newStatus });
-    }
-    return rel;
-  });
+  const applyUpdate = (knowledge) => {
+    if (!knowledge) return null;
+    const relationships = (knowledge.relationships || []).map((rel) => {
+      const key = relationshipKey(rel);
+      if (key === sourceKey && rel.status === 'proposed') {
+        return createKnowledgeRelationship({ ...rel, status: newStatus });
+      }
+      return rel;
+    });
+    return saveProjectKnowledge(projectId, knowledge.instructions, relationships);
+  };
 
-  return saveProjectKnowledge(projectId, knowledge.instructions, relationships);
+  const knowledgeOrPromise = getProjectKnowledge(projectId);
+  if (isPromise(knowledgeOrPromise)) {
+    return knowledgeOrPromise.then(applyUpdate);
+  }
+  return applyUpdate(knowledgeOrPromise);
 }
 
 module.exports = {

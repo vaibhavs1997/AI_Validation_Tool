@@ -18,21 +18,19 @@ const { compareContracts } = require("./contracts/openapiDiff");
 const { generateTestCases } = require("./engine/testCaseGenerator");
 const { matchTestCasesToApis } = require("./engine/matching/testCaseMatcher");
 const { prepareTestSpecifications } = require("./engine/testSpecificationBridge");
-const { createProjectContext } = require("./domain/ProjectContext");
 const {
   createProject,
   getProject,
   listProjects,
-  projectExists,
   seedDefaultProject,
+  ensureReady: ensureProjectRepositoryReady,
 } = require("./domain/ProjectRepository");
 const {
-  createService,
   getService,
   listServices,
-  saveApiModel,
   getApiModel,
-  serviceExists,
+  registerServiceWithApiModel,
+  ensureReady: ensureServiceRepositoryReady,
 } = require("./domain/ServiceRepository");
 const { adaptContractToApiModel } = require("./domain/contractAdapter");
 const {
@@ -42,13 +40,21 @@ const {
   rejectRelationship,
   STATUSES,
 } = require("./domain/ProjectKnowledgeService");
+const {
+  getProjectKnowledge,
+  ensureReady: ensureProjectKnowledgeRepositoryReady,
+} = require("./domain/ProjectKnowledgeRepository");
 const { DEFAULT_PROJECT } = require("./domain/ProjectIdentity");
 const { executeTestSpecification } = require("./execution/dependencyAwareExecutor");
 const { validatePlan } = require("./domain/ExecutionPlan");
-const { saveRun, getRun, listRuns } = require("./domain/RunRepository");
+const {
+  saveRun,
+  getRun,
+  listRuns,
+  ensureReady: ensureRunRepositoryReady,
+} = require("./domain/RunRepository");
 
 storage.ensureStorage();
-seedDefaultProject();
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -159,21 +165,21 @@ async function handleApi(req, res, url) {
 
   // List projects
   if (req.method === "GET" && url.pathname === "/api/projects") {
-    return sendJson(res, 200, { projects: listProjects() });
+    return sendJson(res, 200, { projects: await listProjects() });
   }
 
   // Get project
   if (req.method === "GET" && url.pathname.match(/^\/api\/projects\/([^/]+)$/)) {
     const match = url.pathname.match(/^\/api\/projects\/([^/]+)$/);
     const projectId = match[1];
-    const project = getProject(projectId);
+    const project = await getProject(projectId);
     return project ? sendJson(res, 200, { project }) : notFound(res);
   }
 
   // List services for a project
   if (req.method === "GET" && url.pathname === "/api/services") {
     const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
-    return sendJson(res, 200, { services: listServices(projectId) });
+    return sendJson(res, 200, { services: await listServices(projectId) });
   }
 
   // Get a specific service
@@ -181,16 +187,16 @@ async function handleApi(req, res, url) {
     const match = url.pathname.match(/^\/api\/services\/([^/]+)\/([^/]+)$/);
     const projectId = match[1];
     const serviceId = match[2];
-    const service = getService(projectId, serviceId);
+    const service = await getService(projectId, serviceId);
     if (!service) return notFound(res);
-    const apiModel = getApiModel(projectId, serviceId);
+    const apiModel = await getApiModel(projectId, serviceId);
     return sendJson(res, 200, { service, apiModel });
   }
 
   // Get project knowledge (instructions + relationships)
   if (req.method === "GET" && url.pathname === "/api/knowledge") {
     const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
-    const knowledge = require("./domain/ProjectKnowledgeRepository").getProjectKnowledge(projectId);
+    const knowledge = await getProjectKnowledge(projectId);
     return sendJson(res, 200, { knowledge: knowledge || { relationships: [] } });
   }
 
@@ -204,7 +210,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: "Invalid status. Use: proposed, confirmed, rejected" });
     }
 
-    const relationships = listRelationshipsByStatus(projectId, status);
+    const relationships = await listRelationshipsByStatus(projectId, status);
     return sendJson(res, 200, { relationships });
   }
 
@@ -213,7 +219,7 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && activeRunListMatch) {
     const projectId = url.searchParams.get("projectId");
     if (!projectId) return sendJson(res, 400, { error: "projectId query parameter required" });
-    const runs = listRuns(projectId);
+    const runs = await listRuns(projectId);
     return sendJson(res, 200, { runs });
   }
 
@@ -222,7 +228,7 @@ async function handleApi(req, res, url) {
     const runId = activeRunDetailMatch[1];
     const projectId = url.searchParams.get("projectId");
     if (!projectId) return sendJson(res, 400, { error: "projectId query parameter required" });
-    const run = getRun(projectId, runId);
+    const run = await getRun(projectId, runId);
     if (!run) return notFound(res);
     return sendJson(res, 200, { run });
   }
@@ -260,7 +266,7 @@ async function handleApi(req, res, url) {
     const projectId = body.projectId || DEFAULT_PROJECT.id;
     const ticket = body.ticket || {};
 
-    const project = getProject(projectId);
+    const project = await getProject(projectId);
     if (!project) {
       return sendJson(res, 400, { error: `Project not found: ${projectId}` });
     }
@@ -281,7 +287,7 @@ async function handleApi(req, res, url) {
     const testCases = body.testCases || [];
 
     // Validate project exists
-    const project = getProject(projectId);
+    const project = await getProject(projectId);
     if (!project) {
       return sendJson(res, 400, { error: `Project not found: ${projectId}` });
     }
@@ -292,7 +298,7 @@ async function handleApi(req, res, url) {
     }
 
     // Match test cases against registered project APIs (deterministic, no AI)
-    const result = matchTestCasesToApis({ projectId, testCases });
+    const result = await matchTestCasesToApis({ projectId, testCases });
 
     return sendJson(res, 200, result);
   }
@@ -304,7 +310,7 @@ async function handleApi(req, res, url) {
     const mappings = body.mappings || [];
 
     // Validate project exists
-    const project = getProject(projectId);
+    const project = await getProject(projectId);
     if (!project) {
       return sendJson(res, 400, { error: `Project not found: ${projectId}` });
     }
@@ -318,7 +324,7 @@ async function handleApi(req, res, url) {
     }
 
     // Prepare TestSpecifications from confirmed mappings (no AI, no execution)
-    const result = prepareTestSpecifications({ projectId, testCases, mappings });
+    const result = await prepareTestSpecifications({ projectId, testCases, mappings });
 
     return sendJson(res, 200, result);
   }
@@ -331,7 +337,7 @@ async function handleApi(req, res, url) {
     const environment = body.environment || {};
 
     // Validate project exists
-    const project = getProject(projectId);
+    const project = await getProject(projectId);
     if (!project) {
       return sendJson(res, 400, { error: `Project not found: ${projectId}` });
     }
@@ -350,8 +356,8 @@ async function handleApi(req, res, url) {
     }
 
     // Load apiModels for request building
-    const services = listServices(projectId);
-    const apiModels = services.map((s) => getApiModel(projectId, s.id));
+    const services = await listServices(projectId);
+    const apiModels = await Promise.all(services.map((s) => getApiModel(projectId, s.id)));
 
     // Execute using shared dependency-aware executor
     const startedAt = new Date().toISOString();
@@ -409,7 +415,7 @@ async function handleApi(req, res, url) {
     };
 
     // Persist the run
-    const persisted = saveRun(projectId, runData);
+    const persisted = await saveRun(projectId, runData);
 
     return sendJson(res, 200, {
       specId: result.specId,
@@ -429,7 +435,7 @@ async function handleApi(req, res, url) {
   // Create project
   if (url.pathname === "/api/projects" && req.method === "POST") {
     try {
-      const project = createProject({
+      const project = await createProject({
         id: body.id,
         name: body.name,
         createdAt: body.createdAt,
@@ -451,23 +457,27 @@ async function handleApi(req, res, url) {
     }
 
     try {
-      const service = createService(projectId, {
-        id: contract.title || body.serviceId || "api-service",
-        name: contract.title || "API Service",
-        protocol: "rest",
-        description: contract.description || "",
-      });
-
       const apiModel = adaptContractToApiModel(contract);
+      const registration = await registerServiceWithApiModel(
+        projectId,
+        {
+          id: contract.title || body.serviceId || "api-service",
+          name: contract.title || "API Service",
+          protocol: "rest",
+          description: contract.description || "",
+        },
+        {
+          service: apiModel.service,
+          title: apiModel.title,
+          baseUrl: apiModel.baseUrl,
+          operations: apiModel.operations,
+        }
+      );
 
-      saveApiModel(projectId, service.id, {
-        service: apiModel.service,
-        title: apiModel.title,
-        baseUrl: apiModel.baseUrl,
-        operations: apiModel.operations,
+      return sendJson(res, 200, {
+        service: registration.service,
+        apiModel,
       });
-
-      return sendJson(res, 200, { service, apiModel });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
     }
@@ -479,8 +489,8 @@ async function handleApi(req, res, url) {
     const instructions = body.instructions || "";
 
     try {
-      const services = listServices(projectId);
-      const apiModels = services.map((s) => getApiModel(projectId, s.id));
+      const services = await listServices(projectId);
+      const apiModels = await Promise.all(services.map((s) => getApiModel(projectId, s.id)));
 
       const result = await analyzeAndStoreProposals({
         projectId,
@@ -504,7 +514,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: "sourceKey required" });
     }
 
-    const result = confirmRelationship(projectId, sourceKey);
+    const result = await confirmRelationship(projectId, sourceKey);
     return result ? sendJson(res, 200, { knowledge: result }) : notFound(res);
   }
 
@@ -517,7 +527,7 @@ async function handleApi(req, res, url) {
       return sendJson(res, 400, { error: "sourceKey required" });
     }
 
-    const result = rejectRelationship(projectId, sourceKey);
+    const result = await rejectRelationship(projectId, sourceKey);
     return result ? sendJson(res, 200, { knowledge: result }) : notFound(res);
   }
 
@@ -538,8 +548,6 @@ async function handleRequest(req, res) {
   const requestId = crypto.randomUUID().slice(0, 8);
   const startTime = Date.now();
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const projectContext = createProjectContext({ projectId: getProjectIdFromRequest(req) });
-
   if (req.method === "OPTIONS") {
     return send(res, 204, "", {
       "Access-Control-Allow-Origin": "*",
@@ -572,8 +580,20 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 
-server.listen(config.port, () => {
-  console.log(`AI API Validation Tool MVP running at http://localhost:${config.port}`);
+async function startServer() {
+  await ensureProjectRepositoryReady();
+  await seedDefaultProject();
+  await ensureServiceRepositoryReady();
+  await ensureProjectKnowledgeRepositoryReady();
+  await ensureRunRepositoryReady();
+  server.listen(config.port, () => {
+    console.log(`AI API Validation Tool MVP running at http://localhost:${config.port}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error(`[server] Startup failed: ${error.message}`);
+  process.exit(1);
 });
 
 function shutdown(signal) {
