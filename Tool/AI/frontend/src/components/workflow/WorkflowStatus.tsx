@@ -20,81 +20,43 @@ interface WorkflowStatusProps {
 export function WorkflowStatus({ activeRequirement, testCaseCount = 0, includedCount = 0, matchedCount = 0, runSummary }: WorkflowStatusProps) {
   const getRequirementStatus = (): { status: string; label: string } => {
     if (!activeRequirement || !activeRequirement.requirement) {
-      return { status: "empty", label: "Not configured" };
+      return { status: "upcoming", label: "Not configured" };
     }
 
     if (activeRequirement.source === "jira") {
-      return { status: "loaded", label: activeRequirement.requirement.key || "Manual" };
+      return { status: "completed", label: activeRequirement.requirement.key || "Manual" };
     }
 
-    // Manual source
-    return { status: "loaded", label: "Manual" };
+    return { status: "completed", label: "Manual" };
   };
 
   const reqStatus = getRequirementStatus();
 
+  const hasRequirement = reqStatus.status === "completed";
+  const hasTests = testCaseCount > 0;
+  const hasConnections = matchedCount > 0;
+  const hasRun = Boolean(runSummary);
+
+  const runSummaryValue = hasRun && runSummary ? `${runSummary.passed} passed` : hasConnections && hasTests ? "Ready" : "Not ready";
+
   const steps = [
-    { number: 1, label: "Setup", status: "loaded" },
-    { number: 2, label: "Requirement", status: reqStatus.status },
-    { number: 3, label: "Test Cases", status: testCaseCount > 0 ? "loaded" : "empty" },
-    { number: 4, label: "Connect APIs", status: matchedCount > 0 ? "loaded" : "empty" },
-    { number: 5, label: "Run Tests", status: runSummary ? "loaded" : "empty" },
-    { number: 6, label: "Results", status: runSummary ? "loaded" : "empty" }
+    { number: 1, label: "Requirement", status: hasRequirement ? "completed" : "current", value: reqStatus.label },
+    { number: 2, label: "Review Tests", status: hasTests ? "completed" : hasRequirement ? "current" : "upcoming", value: hasTests ? `${testCaseCount} generated · ${includedCount} selected` : "Generate from requirement" },
+    { number: 3, label: "Connect APIs", status: hasConnections ? "completed" : hasTests ? "current" : "upcoming", value: hasConnections ? `${matchedCount} matched` : "Not configured" },
+    { number: 4, label: "Run Tests", status: hasRun ? "completed" : hasConnections ? "current" : "upcoming", value: runSummaryValue },
+    { number: 5, label: "Results", status: hasRun ? "completed" : "upcoming", value: hasRun ? "Available" : "Not available" }
   ];
 
-  const formatStepValue = (stepNum: number): string => {
-    // Step 2 shows "X test cases · Y selected"
-    if (stepNum === 2) {
-      if (testCaseCount > 0) {
-        return `${testCaseCount} test case${testCaseCount !== 1 ? "s" : ""} · ${includedCount} selected`;
-      }
-      return "Not configured";
-    }
-    // Step 3/4 shows run summary if available
-    if (stepNum === 3 && runSummary) {
-      return `${runSummary.passed} passed · ${runSummary.failed} failed`;
-    }
-    if (stepNum === 4 && runSummary) {
-      return `Total: ${runSummary.total}`;
-    }
-    // Step 1 shows requirement status
-    if (stepNum === 1 && activeRequirement && activeRequirement.requirement) {
-      return reqStatus.label;
-    }
-    return "Not configured";
-  };
-
   return (
-    <div className="compact-workflow" style={{
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      padding: "10px 22px",
-      maxWidth: "1520px",
-      margin: "0 auto",
-      background: "var(--surface)",
-      borderBottom: "1px solid var(--line)"
-    }}>
-      {steps.map(step => (
-        <div key={step.number} className={`cw-step ${step.status}`} style={{
-          display: "inline-flex",
-          flexDirection: "column",
-          gap: "2px",
-          fontSize: "11px",
-          fontWeight: 700,
-          textAlign: "center" as const
-        }}>
-          <span className="cw-step-label" style={{
-            color: step.status === "active" ? "var(--blue)" : step.status === "loaded" ? "var(--green)" : "var(--muted)"
-          }}>
-            {step.label}
-          </span>
-          <span className="cw-step-value" style={{
-            color: step.status === "active" ? "var(--blue)" : step.status === "loaded" ? "var(--green)" : "var(--muted)"
-          }}>
-            {formatStepValue(step.number)}
-          </span>
-        </div>
+    <div className="compact-workflow">
+      {steps.map((step, index) => (
+        <>
+          {index > 0 && <span key={`sep-${index}`} className="cw-sep">→</span>}
+          <div key={step.number} className={`cw-step ${step.status}`}>
+            <span className="cw-step-label">{step.label}</span>
+            <span className="cw-step-value">{step.value}</span>
+          </div>
+        </>
       ))}
     </div>
   );

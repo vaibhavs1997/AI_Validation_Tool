@@ -13,6 +13,13 @@ interface WorkspacePageProps {
   activeProjectId: string | null;
 }
 
+type RunOutcome = {
+  passed: number;
+  failed: number;
+  blocked: number;
+  runId?: string;
+};
+
 export function WorkspacePage({ activeProjectId }: WorkspacePageProps) {
   const [activeRequirement, setActiveRequirement] = useState<ActiveRequirement | null>(null);
   const [projectName, setProjectName] = useState<string>("");
@@ -22,6 +29,7 @@ export function WorkspacePage({ activeProjectId }: WorkspacePageProps) {
   const [confirmedMappings, setConfirmedMappings] = useState<any[]>([]);
   const [prepareResponse, setPrepareResponse] = useState<PrepareResponse | null>(null);
   const [executionKey, setExecutionKey] = useState<number>(0);
+  const [lastRun, setLastRun] = useState<RunOutcome | null>(null);
 
   useEffect(() => {
     if (!activeProjectId) {
@@ -67,8 +75,6 @@ export function WorkspacePage({ activeProjectId }: WorkspacePageProps) {
         testCaseCount={generatedCount}
         includedCount={includedTestCases.length}
         matchedCount={matchedCount}
-        runSummary={undefined}
-        reportUrl={undefined}
       />
       <main id="workspace" className="workspace" style={{
         display: "grid",
@@ -116,7 +122,37 @@ export function WorkspacePage({ activeProjectId }: WorkspacePageProps) {
             key={executionKey}
             activeProjectId={activeProjectId}
             prepareResponse={prepareResponse}
+            onRunComplete={(outcome) => setLastRun(outcome)}
           />
+        )}
+
+        {lastRun && (
+          <section className="panel span-12 panel-results-handoff" style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-lg)", background: "var(--surface)", overflow: "hidden" }}>
+            <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--line)", background: "var(--blue-soft)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span className="step-indicator results">R</span>
+                <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+              </div>
+            </div>
+            <div className="panel-body" style={{ padding: "18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+              <div style={{ fontSize: "13px", color: "var(--ink)" }}>
+                <strong>{lastRun.passed}</strong> passed · <strong>{lastRun.failed}</strong> failed · <strong>{lastRun.blocked}</strong> blocked
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  if (lastRun.runId) {
+                    window.location.hash = `#results?runId=${encodeURIComponent(lastRun.runId)}`;
+                  } else {
+                    window.location.hash = "#results";
+                  }
+                }}
+              >
+                View Results
+              </button>
+            </div>
+          </section>
         )}
       </main>
     </div>

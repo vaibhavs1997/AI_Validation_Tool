@@ -63,7 +63,7 @@ function detectProviderFromUrl(url) {
 
 const config = {
   rootDir,
-  publicDir: path.join(rootDir, "public"),
+  publicDir: path.join(rootDir, "frontend", "dist"),
   sampleDir: path.join(rootDir, "sample-data"),
   dataDir: path.join(rootDir, "data"),
   port: intEnv("PORT", 4173),
