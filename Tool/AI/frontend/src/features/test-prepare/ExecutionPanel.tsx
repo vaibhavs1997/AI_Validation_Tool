@@ -461,6 +461,7 @@ export function ExecutionPanel({
   prepareResponse,
 }: ExecutionPanelProps) {
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
+  const [selectedSpecIds, setSelectedSpecIds] = useState<Set<string>>(new Set());
   const [execState, setExecState] = useState<ExecutionStatus>("IDLE");
   const [execResult, setExecResult] = useState<ExecutionResult | null>(null);
   const [execError, setExecError] = useState<string>("");
@@ -470,14 +471,23 @@ export function ExecutionPanel({
   } | null>(null);
   const [overrideErrors, setOverrideErrors] = useState<OverrideErrors>({});
 
+  // Batch execution state
+  const [batchResults, setBatchResults] = useState<ExecutionResult[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchCompleted, setBatchCompleted] = useState(false);
+
   // Reset state when prepareResponse changes (new preparation)
   useEffect(() => {
     setSelectedSpecId(null);
+    setSelectedSpecIds(new Set());
     setExecState("IDLE");
     setExecResult(null);
     setExecError("");
     setOverride(null);
     setOverrideErrors({});
+    setBatchResults([]);
+    setBatchRunning(false);
+    setBatchCompleted(false);
   }, [prepareResponse]);
 
   const initOverride = (specId: string) => {
@@ -512,6 +522,45 @@ export function ExecutionPanel({
     activeProjectId
   );
 
+  // Build list of executable specs (have a valid plan)
+  const executableSpecs = prepareResponse.testSpecifications.filter(
+    (s): s is typeof s => {
+      const plan = prepareResponse.plans[s.id];
+      return plan !== undefined && plan.isValid !== false;
+    }
+  );
+
+  const buildExecutionSpec = (spec: PrepareResponse["testSpecifications"][0], plan: ExecutionPlan) => {
+    if (!spec || !plan || !override) return null;
+    const errors = validateOverride(override);
+    if (Object.keys(errors).length > 0) return null;
+
+    const parseBody = (text: string): unknown => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return spec.testData?.body || {};
+      }
+    };
+
+    return {
+      ...spec,
+      testData: {
+        ...(spec.testData || {}),
+        pathParams: { ...(spec.testData?.pathParams || {}), ...(override.testData.pathParams || {}) },
+        queryParams: { ...(spec.testData?.queryParams || {}), ...(override.testData.queryParams || {}) },
+        headers: { ...(spec.testData?.headers || {}), ...(override.testData.headers || {}) },
+        body: parseBody(override.testData.body as string),
+      },
+      expectedBehavior: {
+        ...(spec.expectedBehavior || {}),
+        status: override.expectedBehavior.status,
+        responseAssertions: override.expectedBehavior.responseAssertions.filter(a => a.trim()),
+      },
+      assertions: override.expectedBehavior.responseAssertions.filter(a => a.trim()),
+    };
+  };
+
   const handleRun = useCallback(async () => {
     if (!selectedSpec || !selectedPlan || !activeProjectId) return;
     if (execState === "RUNNING") return;
@@ -524,6 +573,9 @@ export function ExecutionPanel({
       return;
     }
 
+    const executionSpec = buildExecutionSpec(selectedSpec, selectedPlan);
+    if (!executionSpec) return;
+
     setExecState("RUNNING");
     setExecResult(null);
     setExecError("");
@@ -531,7 +583,7 @@ export function ExecutionPanel({
     try {
       const response = await executePreparedTest({
         projectId: activeProjectId,
-        testSpecification: selectedSpec,
+        testSpecification: executionSpec,
         executionPlan: selectedPlan,
         environment: {},
       });
@@ -549,15 +601,103 @@ export function ExecutionPanel({
       setExecError(msg);
       setExecState("ERROR");
     }
-  }, [selectedSpec, selectedPlan, activeProjectId, execState]);
+  }, [selectedSpec, selectedPlan, activeProjectId, execState, override]);
 
-  // Build list of executable specs (have a valid plan)
-  const executableSpecs = prepareResponse.testSpecifications.filter(
-    (s): s is typeof s => {
-      const plan = prepareResponse.plans[s.id];
-      return plan !== undefined && plan.isValid !== false;
+  const runBatch = useCallback(async () => {
+    if (!activeProjectId || batchRunning) return;
+    setBatchRunning(true);
+    setBatchCompleted(false);
+    setBatchResults([]);
+
+    const uniqueIds = Array.from(selectedSpecIds);
+    const results: ExecutionResult[] = [];
+
+    for (const specId of uniqueIds) {
+      const spec = executableSpecs.find(s => s.id === specId);
+      const plan = prepareResponse.plans[specId];
+      if (!spec || !plan) continue;
+
+      const executionSpec = buildExecutionSpec(spec, plan);
+      if (!executionSpec) continue;
+
+      try {
+        const response = await executePreparedTest({
+          projectId: activeProjectId,
+          testSpecification: executionSpec,
+          executionPlan: plan,
+          environment: {},
+        });
+        results.push({
+          ...response,
+          specId: spec.id,
+          specTitle: spec.title,
+          specDescription: spec.description,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Execution failed";
+        results.push({
+          specId: spec.id,
+          spec: { title: spec.title, description: spec.description },
+          status: "failed",
+          results: [],
+          errors: [msg],
+          success: false,
+          specTitle: spec.title,
+          specDescription: spec.description,
+        });
+      }
+      setBatchResults([...results]);
     }
-  );
+
+    setBatchRunning(false);
+    setBatchCompleted(true);
+  }, [activeProjectId, batchRunning, selectedSpecIds, executableSpecs, prepareResponse.plans, override]);
+
+  const toggleSelectedSpecId = useCallback((specId: string) => {
+    if (batchRunning) return;
+    setSelectedSpecIds(prev => {
+      const next = new Set(prev);
+      if (next.has(specId)) next.delete(specId);
+      else next.add(specId);
+      return next;
+    });
+  }, [batchRunning]);
+
+  const selectAllReady = useCallback(() => {
+    if (batchRunning) return;
+    const ids = new Set(executableSpecs.map(s => s.id));
+    setSelectedSpecIds(ids);
+  }, [batchRunning, executableSpecs]);
+
+  const clearSelection = useCallback(() => {
+    if (batchRunning) return;
+    setSelectedSpecIds(new Set());
+  }, [batchRunning]);
+
+  const rerunFailed = useCallback(() => {
+    if (batchRunning) return;
+    const failedIds = new Set(
+      batchResults
+        .filter(r => r.status === "failed")
+        .map(r => r.specId)
+    );
+    setSelectedSpecIds(failedIds);
+  }, [batchRunning, batchResults]);
+
+  const runAgain = useCallback(() => {
+    if (batchRunning || selectedSpecIds.size === 0) return;
+    runBatch();
+  }, [batchRunning, selectedSpecIds, runBatch]);
+
+  // Derive batch progress for live UI
+  const selectedIdsArray = Array.from(selectedSpecIds);
+  const batchCompletedCount = batchResults.length;
+  const batchTotalCount = selectedIdsArray.length;
+
+  // Compute summary stats from completed batch results
+  const batchPassedCount = batchResults.filter(r => r.status === "passed").length;
+  const batchFailedCount = batchResults.filter(r => r.status === "failed").length;
+  const batchBlockedCount = batchResults.filter(r => r.results.some(step => step.status === "blocked")).length;
 
   return (
     <section className="panel span-12 panel-execution" data-view-section="workspace">
@@ -676,20 +816,44 @@ export function ExecutionPanel({
         {/* Spec selection */}
         {executableSpecs.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <h3 style={{
-              margin: "0 0 8px 0",
-              fontSize: "13px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              color: "var(--muted)",
-            }}>
-              Select Test to Execute
-            </h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--muted)",
+              }}>
+                Select Tests to Execute
+              </h3>
+              {executableSpecs.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)" }}>
+                  <span>{selectedSpecIds.size} of {executableSpecs.length} selected</span>
+                  <button
+                    type="button"
+                    onClick={selectAllReady}
+                    disabled={batchRunning}
+                    style={{ padding: "4px 10px", fontSize: "11px", fontWeight: 600, border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: batchRunning ? "not-allowed" : "pointer" }}
+                  >
+                    Select All Ready
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={batchRunning || selectedSpecIds.size === 0}
+                    style={{ padding: "4px 10px", fontSize: "11px", fontWeight: 600, border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: (batchRunning || selectedSpecIds.size === 0) ? "not-allowed" : "pointer", opacity: (batchRunning || selectedSpecIds.size === 0) ? 0.5 : 1 }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={{ display: "grid", gap: "6px" }}>
               {executableSpecs.map(spec => {
                 const plan = prepareResponse.plans[spec.id];
                 const isSelected = spec.id === selectedSpecId;
+                const isBatchSelected = selectedSpecIds.has(spec.id);
                 const opRef = spec.operationRefs?.[0];
                 const isIndependent = !plan || plan.steps.length <= 1;
 
@@ -711,6 +875,16 @@ export function ExecutionPanel({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        type="checkbox"
+                        checked={isBatchSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleSelectedSpecId(spec.id);
+                        }}
+                        disabled={batchRunning}
+                        style={{ cursor: batchRunning ? "not-allowed" : "pointer" }}
+                      />
                       <input
                         type="radio"
                         checked={isSelected}
@@ -782,6 +956,171 @@ export function ExecutionPanel({
                 {item.reason}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Batch actions + progress + completion — single consolidated section */}
+        {executableSpecs.length > 1 && (
+          <div style={{ marginBottom: "18px" }}>
+            {/* Run / progress header */}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" }}>
+              <button
+                type="button"
+                onClick={runBatch}
+                disabled={!activeProjectId || batchRunning || selectedSpecIds.size === 0}
+                style={{
+                  padding: "10px 18px",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? "var(--blue)" : "var(--line)",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? "pointer" : "not-allowed",
+                  opacity: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? 1 : 0.6,
+                }}
+              >
+                {batchRunning ? "Running Tests..." : `Run Selected Tests (${selectedSpecIds.size})`}
+              </button>
+              {batchRunning && (
+                <span style={{ fontSize: "13px", color: "var(--muted)" }}>Running tests...</span>
+              )}
+            </div>
+
+            {/* Live progress while running */}
+            {batchRunning && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", marginBottom: "8px" }}>
+                  Running Tests
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+                  {batchCompletedCount} of {batchTotalCount} completed
+                </div>
+                <div style={{ display: "grid", gap: "4px" }}>
+                  {selectedIdsArray.map((specId, idx) => {
+                    const spec = executableSpecs.find(s => s.id === specId);
+                    const title = spec?.title || specId;
+                    if (idx < batchCompletedCount) {
+                      const r = batchResults[idx];
+                      const isPassed = r?.status === "passed";
+                      const isFailed = r?.status === "failed";
+                      return (
+                        <div key={specId} style={{
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          background: "var(--surface)",
+                          fontSize: "12px",
+                          color: isPassed ? "var(--green-deep)" : isFailed ? "var(--red-deep)" : "var(--muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}>
+                          <span>{isPassed ? "✓" : isFailed ? "✕" : "⊘"}</span>
+                          <span>{title}</span>
+                        </div>
+                      );
+                    }
+                    if (idx === batchCompletedCount) {
+                      return (
+                        <div key={specId} style={{
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          background: "var(--surface)",
+                          fontSize: "12px",
+                          color: "var(--ink)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}>
+                          <span>●</span>
+                          <span>{title} — Running</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={specId} style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        background: "var(--surface)",
+                        fontSize: "12px",
+                        color: "var(--muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        opacity: 0.6,
+                      }}>
+                        <span>○</span>
+                        <span>{title} — Waiting</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Completion summary */}
+            {batchCompleted && batchResults.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", marginBottom: "8px" }}>
+                  Batch Complete
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+                  {batchResults.length} test{batchResults.length !== 1 ? "s" : ""} completed · {batchPassedCount} passed · {batchFailedCount} failed · {batchBlockedCount} blocked
+                </div>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  {batchFailedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={rerunFailed}
+                      disabled={batchRunning}
+                      style={{
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "var(--red-deep)",
+                        background: "var(--red-soft)",
+                        border: "1px solid var(--red)",
+                        borderRadius: "6px",
+                        cursor: batchRunning ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Rerun Failed ({batchFailedCount})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={runAgain}
+                    disabled={batchRunning || selectedSpecIds.size === 0}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      background: "var(--surface)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "6px",
+                      cursor: (batchRunning || selectedSpecIds.size === 0) ? "not-allowed" : "pointer",
+                      opacity: (batchRunning || selectedSpecIds.size === 0) ? 0.5 : 1,
+                    }}
+                  >
+                    Run Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Batch results detail list */}
+            {batchResults.length > 0 && (
+              <div>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: "var(--muted)" }}>Batch Results</h3>
+                {batchResults.map((r, idx) => (
+                  <div key={idx} style={{ padding: "8px 12px", border: "1px solid var(--line)", borderRadius: "6px", background: "var(--surface)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: r.status === "passed" ? "var(--green-deep)" : r.status === "failed" ? "var(--red-deep)" : "var(--muted)" }}>{r.status.toUpperCase()}</span>
+                    <span style={{ fontSize: "13px", color: "var(--ink)" }}>{r.specTitle}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -864,7 +1203,7 @@ export function ExecutionPanel({
           </div>
         )}
 
-        {/* Execute button */}
+        {/* Execute button (single test) */}
         {selectedSpec && (
           <div style={{ marginBottom: "18px" }}>
             <button

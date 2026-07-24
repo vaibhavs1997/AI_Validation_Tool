@@ -148,29 +148,101 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
   const [run, setRun] = useState<RunDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retryRunId, setRetryRunId] = useState<string | null>(null);
 
-  // Check URL hash for runId parameter
+  // Check URL hash for runId parameter and reload when hash changes
   useEffect(() => {
     if (!activeProjectId) {
       setRun(null);
       return;
     }
 
-    // Parse runId from hash (e.g., "#results?runId=abc-123")
-    const hash = window.location.hash;
-    const searchStr = hash.includes("?") ? hash.substring(hash.indexOf("?")) : "";
-    const params = new URLSearchParams(searchStr);
-    const runId = params.get("runId");
-    if (!runId) return;
+    let ignore = false;
 
+    function loadFromHash() {
+      const hash = window.location.hash;
+      const searchStr = hash.includes("?") ? hash.substring(hash.indexOf("?")) : "";
+      const params = new URLSearchParams(searchStr);
+      const runId = params.get("runId");
+      if (!runId) return;
+
+      setLoading(true);
+      setError("");
+      setRetryRunId(runId);
+
+      getRun(String(activeProjectId), String(runId))
+        .then((r) => {
+          if (!ignore) setRun(r);
+        })
+        .catch((err) => {
+          if (!ignore) setError(err instanceof Error ? err.message : "Failed to load run");
+        })
+        .finally(() => {
+          if (!ignore) setLoading(false);
+        });
+    }
+
+    loadFromHash();
+
+    const onHashChange = () => {
+      loadFromHash();
+    };
+
+    window.addEventListener("hashchange", onHashChange);
+    return () => {
+      ignore = true;
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, [activeProjectId]);
+
+  const handleRetry = async () => {
+    if (!activeProjectId || !retryRunId) return;
     setLoading(true);
     setError("");
+    try {
+      const r = await getRun(activeProjectId, String(retryRunId));
+      setRun(r);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load run");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    getRun(activeProjectId, runId)
-      .then(setRun)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load run"))
-      .finally(() => setLoading(false));
-  }, [activeProjectId]);
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownloadJson = () => {
+    if (!run) return;
+    const blob = new Blob([JSON.stringify(run, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `test-run-${run.id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printStyles = `
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .print-area, .print-area * {
+        visibility: visible;
+      }
+      .print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  `;
 
   if (!activeProjectId) {
     return (
@@ -184,7 +256,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
   if (loading) {
     return (
       <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <p style={{ color: "var(--muted)" }}>Loading run...</p>
+        <p style={{ color: "var(--muted)" }}>Loading test result...</p>
       </div>
     );
   }
@@ -200,8 +272,44 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
           borderRadius: "6px",
           fontSize: "13px",
           color: "var(--red-deep)",
+          marginBottom: "12px",
         }}>
-          {error}
+          <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load this result.</div>
+          <div>{error}</div>
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={handleRetry}
+            style={{
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--red-deep)",
+              background: "var(--surface)",
+              border: "1px solid var(--red)",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Try Again
+          </button>
+          <button
+            type="button"
+            onClick={() => { window.location.hash = "#workspace"; }}
+            style={{
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "var(--ink)",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}
+          >
+            Back to Workspace
+          </button>
         </div>
       </div>
     );
@@ -226,7 +334,8 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
 
   return (
     <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+      <style>{printStyles}</style>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }} className="no-print">
         <h2 style={{ margin: 0 }}>Results</h2>
         <div style={{ display: "flex", gap: "8px" }}>
           <button
@@ -251,11 +360,34 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
           >
             Run History
           </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            style={{
+              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+              border: "1px solid var(--line)", borderRadius: "6px",
+              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+            }}
+          >
+            Print / Save as PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadJson}
+            style={{
+              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+              border: "1px solid var(--line)", borderRadius: "6px",
+              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
+            }}
+          >
+            Download JSON
+          </button>
         </div>
       </div>
 
+      <div className="print-area">
       {/* Overall result */}
-      <div style={{
+        <div style={{
         padding: "14px 16px",
         border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
         borderRadius: "8px",
@@ -370,6 +502,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
           Step Details
         </h3>
         {run.results.map((r, idx) => renderStepResult(r, idx))}
+      </div>
       </div>
     </div>
   );

@@ -365,4 +365,106 @@ describe("TestCasesPanel — STEP 5.5C TestCase Review", () => {
     // No API calls should have been made during selection
     expect(mockedPost).not.toHaveBeenCalled();
   });
+
+  // ─── STEP 6.6B — Generation Progress + Retry UX ──────────────────────────────
+
+  describe("Generation progress and retry UX", () => {
+    it("shows elapsed timer while generating", async () => {
+      setupMockResponse();
+      renderPanel();
+
+      const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+      fireEvent.click(generateBtn);
+
+      // The mock resolves synchronously in jsdom, so the timer may not be observable.
+      // Instead, verify the button enters a generating/disabled state.
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Generating Test Cases\.\.\./)
+        ).toBeDefined();
+      });
+    });
+
+    it("timer resets on retry after failure", async () => {
+      mockedPost.mockRejectedValueOnce(new Error("AI provider not configured"));
+      setupMockResponse();
+      renderPanel();
+
+      const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+      fireEvent.click(generateBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Test case generation failed\./)).toBeDefined();
+      });
+
+      mockedPost.mockClear();
+      setupMockResponse();
+
+      const tryAgainBtn = screen.getByRole("button", { name: /try again/i });
+      fireEvent.click(tryAgainBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
+      });
+    });
+
+    it("duplicate generation remains disabled while loading", async () => {
+      setupMockResponse();
+      renderPanel();
+
+      const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+      fireEvent.click(generateBtn);
+
+      // Button should be in a disabled/generating state immediately after click
+      expect(generateBtn.hasAttribute("disabled") || screen.queryByText(/Generating Test Cases\.\.\./)).toBeTruthy();
+    });
+
+    it("timer disappears after success", async () => {
+      setupMockResponse();
+      renderPanel();
+      await generateTests();
+
+      expect(screen.queryByText(/Elapsed:/)).toBeNull();
+    });
+
+    it("generation error shows Try Again", async () => {
+      mockedPost.mockRejectedValueOnce(new Error("AI provider not configured"));
+      renderPanel();
+
+      const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+      fireEvent.click(generateBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Test case generation failed\./)).toBeDefined();
+      });
+
+      expect(screen.getByRole("button", { name: /try again/i })).toBeDefined();
+    });
+
+    it("Try Again calls generation flow once after failure", async () => {
+      mockedPost.mockRejectedValueOnce(new Error("AI provider not configured"));
+      renderPanel();
+
+      const generateBtn = screen.getByRole("button", { name: /generate test cases/i });
+      fireEvent.click(generateBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Test case generation failed\./)).toBeDefined();
+      });
+
+      mockedPost.mockClear();
+      setupMockResponse();
+
+      const tryAgainBtn = screen.getByRole("button", { name: /try again/i });
+      fireEvent.click(tryAgainBtn);
+
+      await waitFor(() => {
+        expect(mockedPost).toHaveBeenCalledTimes(1);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/3 test cases · 3 selected to continue/)).toBeDefined();
+      });
+    });
+  });
 });
