@@ -53,6 +53,8 @@ const {
   listRuns,
   ensureReady: ensureRunRepositoryReady,
 } = require("./domain/RunRepository");
+const { migrate } = require("./db/migrate");
+const { closePool } = require("./db/pool");
 
 storage.ensureStorage();
 
@@ -581,6 +583,12 @@ async function handleRequest(req, res) {
 const server = http.createServer(handleRequest);
 
 async function startServer() {
+  if (config.features && config.features.pgEnabled) {
+    const migrationResult = await migrate();
+    if (migrationResult && migrationResult.error) {
+      throw new Error(migrationResult.error);
+    }
+  }
   await ensureProjectRepositoryReady();
   await seedDefaultProject();
   await ensureServiceRepositoryReady();
@@ -598,7 +606,12 @@ startServer().catch((error) => {
 
 function shutdown(signal) {
   console.log(`\n[server] Received ${signal}. Shutting down gracefully...`);
-  server.close(() => {
+  server.close(async () => {
+    try {
+      await closePool();
+    } catch (error) {
+      console.error(`[server] Error closing PostgreSQL pool: ${error.message}`);
+    }
     console.log("[server] Server closed. Goodbye.");
     process.exit(0);
   });

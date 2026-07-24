@@ -75,9 +75,6 @@ const config = {
   },
   ai: {
     enabledByDefault: boolEnv("AI_ENABLED_BY_DEFAULT", false),
-    // Provider-agnostic configuration (preferred)
-    // Falls back to OPENAI_* for backward compatibility
-    // For Ollama: apiKey is not required, use baseUrl=http://localhost:11434/v1
     provider: strEnv("AI_PROVIDER") || process.env.OPENAI_PROVIDER || detectProviderFromUrl(strEnv("AI_BASE_URL") || process.env.OPENAI_BASE_URL || ""),
     apiKey: strEnv("AI_API_KEY") || process.env.OPENAI_API_KEY || "",
     model: strEnv("AI_MODEL") || process.env.OPENAI_MODEL || "gpt-4.1-mini",
@@ -88,6 +85,8 @@ const config = {
     pgEnabled: boolEnv("PG_ENABLED", false),
   },
   pg: {
+    enabled: boolEnv("PG_ENABLED", false),
+    databaseUrl: strEnv("PG_CONNECTION_STRING", "") || strEnv("DATABASE_URL", ""),
     connectionString: strEnv("PG_CONNECTION_STRING", "") || strEnv("DATABASE_URL", ""),
     host: strEnv("PGHOST", ""),
     port: intEnv("PGPORT", 5432),

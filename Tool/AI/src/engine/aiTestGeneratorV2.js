@@ -39,6 +39,14 @@ const REQUIREMENT_ONLY_PROMPT = `You are an expert QA engineer. Analyze the requ
 
 CRITICAL RULE: One acceptance criterion (AC) does NOT equal one test case. Each AC can — and often should — generate MULTIPLE distinct test cases.
 
+TITLE RULE: Use short, scenario-specific titles like "Login with valid credentials", "Login with invalid username", "Login with empty password". Do NOT use labels such as "Verify AC" or generic titles.
+
+DESCRIPTION RULE: Each description must be a clear, human-readable test intent in 1-3 sentences. Describe:
+- the condition/context (who/what state),
+- the user action,
+- the expected behavior/outcome.
+Do NOT mention HTTP methods, endpoints, paths, service IDs, operation IDs, or any API implementation details.
+
 For each AC, enumerate EVERY distinct testable condition. Each condition becomes its own testCase with its own title, type, and evidence.
 
 For each AC, consider these dimensions independently:

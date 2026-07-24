@@ -4,9 +4,9 @@
  */
 
 const assert = require('node:assert');
+const fs = require('fs');
 const { createTestCase } = require('./src/domain/TestCase');
 const { generateTestCases } = require('./src/engine/testCaseGenerator');
-const { generateScenariosV2 } = require('./src/engine/v2Production');
 
 let passed = 0;
 let failed = 0;
@@ -118,28 +118,144 @@ test('Unmatched API state does not remove TestCases', async () => {
   assert.ok(Array.isArray(result.warnings));
 });
 
-test('Existing V2 generation flow remains unchanged', async () => {
-  const { generateScenariosV2 } = require('./src/engine/v2Production');
-  assert.ok(typeof generateScenariosV2 === 'function');
+test('Existing generation routes and imports remain intact', () => {
+  const serverPath = fs.existsSync('./src/server.js') ? './src/server.js' : 'Tool/AI/src/server.js';
+  const serverCode = fs.readFileSync(serverPath, 'utf8');
 
-  const contract = { title: 'Test', baseUrl: 'http://example.com', endpoints: [] };
-  const ticket = { key: 'REQ-3', summary: 'Test', acceptanceCriteria: ['AC'] };
-  const result = await generateScenariosV2({ ticket, contract });
-
-  assert.ok('mode' in result);
-  assert.ok('scenarios' in result);
-  assert.ok('warnings' in result);
-  assert.ok(Array.isArray(result.scenarios));
+  assert.ok(serverCode.includes('/api/test-cases/generate'), 'Generation route must remain');
+  assert.ok(serverCode.includes('/api/test-cases/match'), 'Matching route must remain');
+  assert.ok(serverCode.includes('/api/test-specifications/prepare'), 'Prepare route must remain');
+  assert.ok(serverCode.includes('generateTestCases'), 'generateTestCases import must remain');
+  assert.ok(serverCode.includes('matchTestCasesToApis'), 'matchTestCasesToApis import must remain');
+  assert.ok(serverCode.includes('prepareTestSpecifications'), 'prepareTestSpecifications import must remain');
 });
 
-test('Existing test-specifications endpoint behavior is preserved', () => {
-  // Verify the old route still exists and imports are intact
-  const fs = require('fs');
-  const serverCode = fs.readFileSync('./src/server.js', 'utf8');
 
-  assert.ok(serverCode.includes('/api/test-specifications/generate'), 'Old route must remain');
-  assert.ok(serverCode.includes('/api/scenarios/generate'), 'V2 scenario route must remain');
-  assert.ok(serverCode.includes('planTestSpecifications'), 'Old planner import must remain');
+// ============================================================
+// STEP 6.5A — Human-Readable TestCase Quality
+// ============================================================
+
+test('Meaningful AC produces meaningful description', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'User should be able to login to dev site.',
+    description: '',
+    acceptanceCriteria: ['User can login with valid credentials'],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 1, 'Should generate at least one test case');
+
+  const tc = result.testCases[0];
+  assert.ok(tc.title && tc.title.length > 0, 'Title must exist');
+  assert.ok(tc.description && tc.description.length > 0, 'Description must exist');
+
+  const lower = tc.description.toLowerCase();
+  assert.ok(!lower.includes('verify that ac'), 'Description should not be "Verify that AC."');
+  assert.ok(tc.description.trim().slice(-1) === '.', 'Description should end with punctuation');
+});
+
+test('Weak "AC" label does not produce meaningless description', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'Minimal ticket',
+    description: '',
+    acceptanceCriteria: ['AC', 'AC.'],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 2, 'Should generate one test per AC');
+
+  for (const tc of result.testCases) {
+    assert.ok(tc.description !== 'Verify that AC.', `Weak AC produced bad description for ${tc.title}`);
+    assert.ok(tc.description.length > 0, 'Description should not be empty when better sources exist');
+  }
+});
+
+test('Requirement summary/description fallback produces human-readable description', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'Login to dev site',
+    description: '',
+    acceptanceCriteria: [],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 1, 'Should fallback to summary');
+
+  const tc = result.testCases[0];
+  assert.ok(tc.description && tc.description.length > 0, 'Description should be derived from summary');
+  assert.ok(tc.description.toLowerCase().includes('login') || tc.description.toLowerCase().includes('dev site'),
+    'Description should reflect requirement context');
+});
+
+test('Positive and negative tests have scenario-specific descriptions', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'Login scenarios',
+    description: '',
+    acceptanceCriteria: [
+      'User can login with valid credentials',
+      'Login is rejected for invalid username',
+      'Login is rejected for invalid password',
+    ],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 3, 'Should generate multiple test cases');
+
+  const titles = result.testCases.map(tc => tc.title.toLowerCase());
+  assert.ok(titles.some(t => t.includes('valid')), 'Should include positive scenario title');
+  assert.ok(titles.some(t => t.includes('invalid username')), 'Should include negative scenario title');
+  assert.ok(titles.some(t => t.includes('invalid password')), 'Should include negative scenario title');
+
+  for (const tc of result.testCases) {
+    assert.ok(tc.description && tc.description.length > 0, 'Each test should have a description');
+    assert.ok(!tc.description.toLowerCase().includes('endpoint'), 'Description must not mention endpoints');
+    assert.ok(!tc.description.toLowerCase().includes('/api/'), 'Description must not mention paths');
+  }
+});
+
+test('No API coupling appears in generated TestCases', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'Business logic test',
+    description: '',
+    acceptanceCriteria: ['System validates input correctly'],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 1);
+
+  for (const tc of result.testCases) {
+    assert.equal(tc.serviceId, undefined, 'Must not contain serviceId');
+    assert.equal(tc.operationId, undefined, 'Must not contain operationId');
+    assert.equal(tc.endpointId, undefined, 'Must not contain endpointId');
+    assert.equal(tc.method, undefined, 'Must not contain method');
+    assert.equal(tc.path, undefined, 'Must not contain path');
+    assert.equal(tc.ExecutionPlan, undefined, 'Must not contain ExecutionPlan');
+    assert.equal(tc.proposedOperation, undefined, 'Must not contain proposedOperation');
+  }
+});
+
+test('Canonical type normalization remains correct', async () => {
+  const projectId = 'default';
+  const ticket = {
+    summary: 'Type normalization',
+    description: '',
+    acceptanceCriteria: [
+      'Valid positive path',
+      'unauthorized access is blocked',
+      'invalid input fails validation',
+    ],
+  };
+
+  const result = await generateTestCases({ projectId, ticket });
+  assert.ok(result.testCases.length >= 3);
+
+  const types = result.testCases.map(tc => tc.type);
+  assert.ok(types.some(t => t === 'positive'), 'Should detect positive type');
+  assert.ok(types.some(t => t === 'negative'), 'Should detect negative type from indicators');
 });
 
 // ============================================================

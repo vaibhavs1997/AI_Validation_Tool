@@ -410,10 +410,10 @@ export function ApiMatchingPanel({
             background: "var(--blue)",
             color: "#fff",
           }}>
-            [3]
+            3
           </span>
           <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue)" }}>
-            API Matching
+            Connect Tests to APIs
           </h2>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -432,16 +432,16 @@ export function ApiMatchingPanel({
       <div className="panel-body" style={{ padding: "18px" }}>
         {/* Prerequisites */}
         <div style={{ marginBottom: "18px" }}>
-          <h3 style={{
-            margin: "0 0 12px 0",
-            fontSize: "13px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)",
-          }}>
-            PREREQUISITES
-          </h3>
+            <h3 style={{
+              margin: "0 0 12px 0",
+              fontSize: "13px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "var(--muted)",
+            }}>
+              BEFORE YOU CONTINUE
+            </h3>
           <div style={{
             display: "grid",
             gridTemplateColumns: "repeat(2, 1fr)",

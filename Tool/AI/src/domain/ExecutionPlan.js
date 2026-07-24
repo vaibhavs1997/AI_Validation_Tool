@@ -48,7 +48,7 @@ function buildExecutionPlan({ targetServiceId, targetOperationId, services = [],
 }
 
 function validatePlan(plan) {
-  if (!plan || !plan.steps) return false;
+  if (!plan || !Array.isArray(plan.steps) || plan.steps.length === 0) return false;
   for (const step of plan.steps) {
     if (!step.operation || !step.operation.serviceId || !step.operation.operationId) {
       return false;

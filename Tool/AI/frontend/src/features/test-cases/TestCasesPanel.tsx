@@ -31,6 +31,8 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
   const [response, setResponse] = useState<GenerateTestCasesResponse | null>(null);
   const [includedTestCaseIds, setIncludedTestCaseIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [timerStarted, setTimerStarted] = useState(false);
 
   const hasProject = Boolean(activeProjectId);
   const hasRequirement = Boolean(activeRequirement && activeRequirement.requirement !== null);
@@ -38,7 +40,6 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
 
   const generatedCount = response?.testCases.length || 0;
   const includedCount = includedTestCaseIds.size;
-  const excludedCount = generatedCount - includedCount;
 
   // Report generated count and included set up to parent (e.g. WorkflowStatus)
   useEffect(() => {
@@ -70,6 +71,8 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
     setResponse(null);
     setIncludedTestCaseIds(new Set());
     setExpandedIds(new Set());
+    setElapsedSeconds(0);
+    setTimerStarted(true);
 
     try {
       const result = await generateTestCases(activeProjectId, activeRequirement);
@@ -80,7 +83,21 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
       setError(err instanceof Error ? err.message : "Unable to generate test cases.");
     } finally {
       setLoading(false);
+      setTimerStarted(false);
     }
+  };
+
+  useEffect(() => {
+    if (!timerStarted) return;
+    const id = setInterval(() => setElapsedSeconds(prev => prev + 1), 1000);
+    return () => clearInterval(id);
+  }, [timerStarted]);
+
+  const formatElapsed = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    if (m > 0) return `Elapsed: ${m}m ${s}s`;
+    return `Elapsed: ${s}s`;
   };
 
   const handleToggleIncluded = (testCaseId: string) => {
@@ -316,7 +333,7 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
           fontSize: "13px",
           color: "var(--muted)"
         }}>
-          No test cases could be generated from the current requirement. Try refining the acceptance criteria.
+          No test cases could be generated from the current requirement. Try refining the requirement description.
         </div>
       );
     }
@@ -491,7 +508,7 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
               borderRadius: "6px",
               cursor: canGenerate ? "pointer" : "not-allowed",
               opacity: canGenerate ? 1 : 0.6,
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               gap: "8px"
             }}
@@ -499,6 +516,11 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
             {loading && <span className="spinner" />}
             {loading ? "Generating Test Cases..." : "Generate Test Cases"}
           </button>
+          {loading && (
+            <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
+              {formatElapsed(elapsedSeconds)}
+            </div>
+          )}
         </div>
 
         {error && (
@@ -511,7 +533,24 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
             fontSize: "13px",
             color: "var(--red-deep)"
           }}>
-            {error}
+            <div style={{ fontWeight: 600, marginBottom: "4px" }}>Test case generation failed.</div>
+            <div style={{ marginBottom: "8px" }}>{error}</div>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              style={{
+                padding: "6px 12px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "var(--red-deep)",
+                background: "var(--surface)",
+                border: "1px solid var(--red)",
+                borderRadius: "6px",
+                cursor: "pointer"
+              }}
+            >
+              Try Again
+            </button>
           </div>
         )}
         {renderSuccess()}
@@ -542,7 +581,7 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
               color: "var(--ink)"
             }}>
               <span>
-                Generated: {generatedCount} · Included: {includedCount} · Excluded: {excludedCount}
+                {generatedCount} test case{generatedCount !== 1 ? "s" : ""} · {includedCount} selected to continue
               </span>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button

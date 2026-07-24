@@ -24,14 +24,50 @@ function normalizeType(raw, title = "") {
 }
 
 function buildDescription(title, acText, summary) {
-  const source = acText || summary || title || "";
-  if (!source) return "";
-  const lower = source.toLowerCase();
-  if (lower.startsWith("verify that ")) return source;
-  if (lower.startsWith("verify ")) return source;
-  if (lower.startsWith("user can ")) return "Verify that " + source + ".";
-  if (lower.startsWith("system ")) return "Verify " + source + ".";
-  return "Verify that " + source + ".";
+  // Already well-formed description
+  const lower = acText.toLowerCase();
+  if (acText && (lower.startsWith("verify that ") || lower.startsWith("verify ") || lower.startsWith("test "))) {
+    return acText;
+  }
+  const source = summary || title || "";
+  if (source) {
+    const s = source.toLowerCase();
+    if (s.startsWith("verify that ") || s.startsWith("verify ") || s.startsWith("test ")) {
+      return source;
+    }
+    return "Verify that " + source + ".";
+  }
+  return "";
+}
+
+function sanitizeWeakAcText(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (lower === "ac" || lower === "a.c." || lower === "ac.") return "";
+  if (/^ac\s*\d*$/i.test(text)) return "";
+  if (lower.startsWith("verify that ac.")) return "";
+  return text;
+}
+
+function generateDescriptionForAc(acText, summary, title) {
+  const cleanedAc = sanitizeWeakAcText(acText);
+  if (cleanedAc) {
+    const last = cleanedAc.trim().slice(-1);
+    if (last === "." || last === "!" || last === "?") return cleanedAc;
+    return cleanedAc + ".";
+  }
+  if (summary) {
+    const last = summary.trim().slice(-1);
+    if (last === "." || last === "!" || last === "?") return summary;
+    return summary + ".";
+  }
+  if (title && title !== "Generated TestCase") {
+    const last = title.trim().slice(-1);
+    if (last === "." || last === "!" || last === "?") return title;
+    return title + ".";
+  }
+  return "";
 }
 
 function generateLocalFallbackTestCases(ticket) {
@@ -45,10 +81,10 @@ function generateLocalFallbackTestCases(ticket) {
     const raw = acs[i];
     const acText = typeof raw === "string" ? raw : (raw.text || raw.acText || String(raw));
     const acIndex = typeof raw === "object" && raw.acIndex !== undefined ? raw.acIndex : i;
-    const title = `Verify: ${acText}`;
+    const title = acText || summary || `Generated TestCase ${i + 1}`;
     testCases.push({
       title,
-      description: buildDescription(title, acText, summary),
+      description: generateDescriptionForAc(acText, summary),
       type: "positive",
       sourceAcIndex: acIndex,
       testData: { pathParams: {}, queryParams: {}, headers: {}, body: {} },
@@ -60,7 +96,7 @@ function generateLocalFallbackTestCases(ticket) {
     const title = summary;
     testCases.push({
       title,
-      description: buildDescription(title, "", summary),
+      description: generateDescriptionForAc("", summary, title),
       type: "positive",
       sourceAcIndex: 0,
       testData: { pathParams: {}, queryParams: {}, headers: {}, body: {} },
@@ -99,15 +135,19 @@ async function generateTestCases({ projectId, ticket }) {
 
   const testCases = rawTestCases.map((raw) => {
     const acIndex = typeof raw.sourceAcIndex === "number" ? raw.sourceAcIndex : 0;
-    const acText = raw.sourceAc || raw.description || "";
     const title = typeof raw.title === "string" ? raw.title : "Generated TestCase";
-    const description = buildDescription(title, acText, ticket.summary);
+
+    // Preserve meaningful AI description; only improve weak/vague descriptions
+    let description = typeof raw.description === "string" ? raw.description.trim() : "";
+    if (!description) {
+      description = generateDescriptionForAc(raw.sourceAc || raw.acText || "", ticket.summary, title);
+    }
 
     return createTestCase({
       title,
       description,
       type: normalizeType(raw.type, title),
-      requirementRefs: [{ acIndex, acText }],
+      requirementRefs: [{ acIndex, acText: raw.sourceAc || raw.acText || "" }],
       testData: {
         pathParams: raw.testData?.pathParams || {},
         queryParams: raw.testData?.queryParams || {},

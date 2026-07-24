@@ -54,20 +54,20 @@ interface ExecutionResult extends ExecuteDependentResponse {
 function deriveDependencyExplanation(step: ExecutionPlanStep): string {
   const explanations: string[] = [];
   for (const binding of step.bindings || []) {
-    const fromLocation = binding.source?.split(".").slice(-1)[0] || "value";
-    const toLocation = binding.target?.split(".").slice(-1)[0] || "value";
+    const fromLocation = binding.source?.split(".").slice(-1)[0] || "input";
+    const toLocation = binding.target?.split(".").slice(-1)[0] || "input";
     if (binding.type === "auth" || binding.type === "token") {
-      explanations.push(`uses token/credentials from prerequisite`);
+      explanations.push(`uses authentication from previous step`);
     } else if (binding.transform) {
-      explanations.push(`transforms "${fromLocation}" → "${toLocation}"`);
+      explanations.push(`uses "${fromLocation}" as "${toLocation}"`);
     } else {
-      explanations.push(`uses "${fromLocation}" from prerequisite as "${toLocation}"`);
+      explanations.push(`uses "${fromLocation}" from previous step`);
     }
   }
   if (explanations.length === 0 && step.prerequisites.length > 0) {
-    return `must run after prerequisite${step.prerequisites.length > 1 ? "s" : ""}`;
+    return `runs after previous step${step.prerequisites.length > 1 ? "s" : ""}`;
   }
-  return explanations.join("; ") || "depends on prerequisite";
+  return explanations.join("; ") || "depends on previous step";
 }
 
 function renderPlanPreview(plan: ExecutionPlan) {
@@ -404,22 +404,113 @@ function getRecoveryGuidance(error: string): string | null {
   return null;
 }
 
+type OverrideErrors = {
+  bodyJson?: string;
+  status?: string;
+  assertion?: string;
+  paramKey?: string;
+};
+
+function parseJsonSafely(text: string): { value?: unknown; error?: string } {
+  if (!text || !text.trim()) return { value: {} };
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return { value: undefined, error: "Invalid JSON" };
+  }
+}
+
+function validateOverride(override: {
+  testData: { pathParams: Record<string, string>; queryParams: Record<string, string>; headers: Record<string, string>; body: unknown };
+  expectedBehavior: { status: number; responseAssertions: string[] };
+}): OverrideErrors {
+  const errors: OverrideErrors = {};
+  const bodyText = typeof override.testData.body === "string" ? override.testData.body : JSON.stringify(override.testData.body, null, 2);
+  const parsed = parseJsonSafely(bodyText);
+  if (parsed.error) errors.bodyJson = parsed.error;
+
+  const status = override.expectedBehavior.status;
+  if (typeof status !== "number" || !Number.isInteger(status) || status < 100 || status >= 600) {
+    errors.status = "Enter a valid HTTP status (100-599)";
+  }
+
+  for (const assertion of override.expectedBehavior.responseAssertions) {
+    if (!assertion || !assertion.trim()) {
+      errors.assertion = "Assertion cannot be empty";
+      break;
+    }
+  }
+
+  const checkParams = (params: Record<string, string>) => {
+    for (const k of Object.keys(params)) {
+      if (!k.trim()) {
+        errors.paramKey = "Parameter name cannot be empty";
+        break;
+      }
+    }
+  };
+  checkParams(override.testData.pathParams);
+  checkParams(override.testData.queryParams);
+  checkParams(override.testData.headers);
+
+  return errors;
+}
+
 export function ExecutionPanel({
   activeProjectId,
   prepareResponse,
 }: ExecutionPanelProps) {
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
+  const [selectedSpecIds, setSelectedSpecIds] = useState<Set<string>>(new Set());
   const [execState, setExecState] = useState<ExecutionStatus>("IDLE");
   const [execResult, setExecResult] = useState<ExecutionResult | null>(null);
   const [execError, setExecError] = useState<string>("");
+  const [override, setOverride] = useState<{
+    testData: { pathParams: Record<string, string>; queryParams: Record<string, string>; headers: Record<string, string>; body: string };
+    expectedBehavior: { status: number; responseAssertions: string[] };
+  } | null>(null);
+  const [overrideErrors, setOverrideErrors] = useState<OverrideErrors>({});
+
+  // Batch execution state
+  const [batchResults, setBatchResults] = useState<ExecutionResult[]>([]);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchCompleted, setBatchCompleted] = useState(false);
 
   // Reset state when prepareResponse changes (new preparation)
   useEffect(() => {
     setSelectedSpecId(null);
+    setSelectedSpecIds(new Set());
     setExecState("IDLE");
     setExecResult(null);
     setExecError("");
+    setOverride(null);
+    setOverrideErrors({});
+    setBatchResults([]);
+    setBatchRunning(false);
+    setBatchCompleted(false);
   }, [prepareResponse]);
+
+  const initOverride = (specId: string) => {
+    const spec = prepareResponse.testSpecifications.find(s => s.id === specId);
+    if (!spec) return;
+    setOverride({
+      testData: {
+        pathParams: { ...(spec.testData?.pathParams || {}) } as Record<string, string>,
+        queryParams: { ...(spec.testData?.queryParams || {}) } as Record<string, string>,
+        headers: { ...(spec.testData?.headers || {}) } as Record<string, string>,
+        body: spec.testData?.body ? JSON.stringify(spec.testData.body, null, 2) : "{}",
+      },
+      expectedBehavior: {
+        status: spec.expectedBehavior?.status ?? 200,
+        responseAssertions: [...(spec.expectedBehavior?.responseAssertions || [])],
+      },
+    });
+    setOverrideErrors({});
+  };
+
+  useEffect(() => {
+    if (selectedSpecId) initOverride(selectedSpecId);
+  }, [selectedSpecId]);
 
   const selectedSpec = prepareResponse.testSpecifications.find(s => s.id === selectedSpecId);
   const selectedPlan = selectedSpecId ? prepareResponse.plans[selectedSpecId] : undefined;
@@ -431,9 +522,59 @@ export function ExecutionPanel({
     activeProjectId
   );
 
+  // Build list of executable specs (have a valid plan)
+  const executableSpecs = prepareResponse.testSpecifications.filter(
+    (s): s is typeof s => {
+      const plan = prepareResponse.plans[s.id];
+      return plan !== undefined && plan.isValid !== false;
+    }
+  );
+
+  const buildExecutionSpec = (spec: PrepareResponse["testSpecifications"][0], plan: ExecutionPlan) => {
+    if (!spec || !plan || !override) return null;
+    const errors = validateOverride(override);
+    if (Object.keys(errors).length > 0) return null;
+
+    const parseBody = (text: string): unknown => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return spec.testData?.body || {};
+      }
+    };
+
+    return {
+      ...spec,
+      testData: {
+        ...(spec.testData || {}),
+        pathParams: { ...(spec.testData?.pathParams || {}), ...(override.testData.pathParams || {}) },
+        queryParams: { ...(spec.testData?.queryParams || {}), ...(override.testData.queryParams || {}) },
+        headers: { ...(spec.testData?.headers || {}), ...(override.testData.headers || {}) },
+        body: parseBody(override.testData.body as string),
+      },
+      expectedBehavior: {
+        ...(spec.expectedBehavior || {}),
+        status: override.expectedBehavior.status,
+        responseAssertions: override.expectedBehavior.responseAssertions.filter(a => a.trim()),
+      },
+      assertions: override.expectedBehavior.responseAssertions.filter(a => a.trim()),
+    };
+  };
+
   const handleRun = useCallback(async () => {
     if (!selectedSpec || !selectedPlan || !activeProjectId) return;
     if (execState === "RUNNING") return;
+    if (!override) return;
+
+    const errors = validateOverride(override);
+    setOverrideErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setExecError("Fix the highlighted issues before running.");
+      return;
+    }
+
+    const executionSpec = buildExecutionSpec(selectedSpec, selectedPlan);
+    if (!executionSpec) return;
 
     setExecState("RUNNING");
     setExecResult(null);
@@ -442,7 +583,7 @@ export function ExecutionPanel({
     try {
       const response = await executePreparedTest({
         projectId: activeProjectId,
-        testSpecification: selectedSpec,
+        testSpecification: executionSpec,
         executionPlan: selectedPlan,
         environment: {},
       });
@@ -460,15 +601,103 @@ export function ExecutionPanel({
       setExecError(msg);
       setExecState("ERROR");
     }
-  }, [selectedSpec, selectedPlan, activeProjectId, execState]);
+  }, [selectedSpec, selectedPlan, activeProjectId, execState, override]);
 
-  // Build list of executable specs (have a valid plan)
-  const executableSpecs = prepareResponse.testSpecifications.filter(
-    (s): s is typeof s => {
-      const plan = prepareResponse.plans[s.id];
-      return plan !== undefined && plan.isValid !== false;
+  const runBatch = useCallback(async () => {
+    if (!activeProjectId || batchRunning) return;
+    setBatchRunning(true);
+    setBatchCompleted(false);
+    setBatchResults([]);
+
+    const uniqueIds = Array.from(selectedSpecIds);
+    const results: ExecutionResult[] = [];
+
+    for (const specId of uniqueIds) {
+      const spec = executableSpecs.find(s => s.id === specId);
+      const plan = prepareResponse.plans[specId];
+      if (!spec || !plan) continue;
+
+      const executionSpec = buildExecutionSpec(spec, plan);
+      if (!executionSpec) continue;
+
+      try {
+        const response = await executePreparedTest({
+          projectId: activeProjectId,
+          testSpecification: executionSpec,
+          executionPlan: plan,
+          environment: {},
+        });
+        results.push({
+          ...response,
+          specId: spec.id,
+          specTitle: spec.title,
+          specDescription: spec.description,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Execution failed";
+        results.push({
+          specId: spec.id,
+          spec: { title: spec.title, description: spec.description },
+          status: "failed",
+          results: [],
+          errors: [msg],
+          success: false,
+          specTitle: spec.title,
+          specDescription: spec.description,
+        });
+      }
+      setBatchResults([...results]);
     }
-  );
+
+    setBatchRunning(false);
+    setBatchCompleted(true);
+  }, [activeProjectId, batchRunning, selectedSpecIds, executableSpecs, prepareResponse.plans, override]);
+
+  const toggleSelectedSpecId = useCallback((specId: string) => {
+    if (batchRunning) return;
+    setSelectedSpecIds(prev => {
+      const next = new Set(prev);
+      if (next.has(specId)) next.delete(specId);
+      else next.add(specId);
+      return next;
+    });
+  }, [batchRunning]);
+
+  const selectAllReady = useCallback(() => {
+    if (batchRunning) return;
+    const ids = new Set(executableSpecs.map(s => s.id));
+    setSelectedSpecIds(ids);
+  }, [batchRunning, executableSpecs]);
+
+  const clearSelection = useCallback(() => {
+    if (batchRunning) return;
+    setSelectedSpecIds(new Set());
+  }, [batchRunning]);
+
+  const rerunFailed = useCallback(() => {
+    if (batchRunning) return;
+    const failedIds = new Set(
+      batchResults
+        .filter(r => r.status === "failed")
+        .map(r => r.specId)
+    );
+    setSelectedSpecIds(failedIds);
+  }, [batchRunning, batchResults]);
+
+  const runAgain = useCallback(() => {
+    if (batchRunning || selectedSpecIds.size === 0) return;
+    runBatch();
+  }, [batchRunning, selectedSpecIds, runBatch]);
+
+  // Derive batch progress for live UI
+  const selectedIdsArray = Array.from(selectedSpecIds);
+  const batchCompletedCount = batchResults.length;
+  const batchTotalCount = selectedIdsArray.length;
+
+  // Compute summary stats from completed batch results
+  const batchPassedCount = batchResults.filter(r => r.status === "passed").length;
+  const batchFailedCount = batchResults.filter(r => r.status === "failed").length;
+  const batchBlockedCount = batchResults.filter(r => r.results.some(step => step.status === "blocked")).length;
 
   return (
     <section className="panel span-12 panel-execution" data-view-section="workspace">
@@ -493,10 +722,10 @@ export function ExecutionPanel({
             background: "var(--amber)",
             color: "#fff",
           }}>
-            [5]
+            4
           </span>
           <h2 style={{ margin: 0, fontSize: "17px", color: "var(--amber-deep)" }}>
-            Execute Tests
+            Run Tests
           </h2>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -523,7 +752,7 @@ export function ExecutionPanel({
             letterSpacing: "0.04em",
             color: "var(--muted)",
           }}>
-            PREREQUISITES
+            BEFORE YOU RUN
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
             <div style={{
@@ -587,20 +816,44 @@ export function ExecutionPanel({
         {/* Spec selection */}
         {executableSpecs.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
-            <h3 style={{
-              margin: "0 0 8px 0",
-              fontSize: "13px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              color: "var(--muted)",
-            }}>
-              Select Test to Execute
-            </h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+              <h3 style={{
+                margin: 0,
+                fontSize: "13px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: "var(--muted)",
+              }}>
+                Select Tests to Execute
+              </h3>
+              {executableSpecs.length > 1 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", color: "var(--muted)" }}>
+                  <span>{selectedSpecIds.size} of {executableSpecs.length} selected</span>
+                  <button
+                    type="button"
+                    onClick={selectAllReady}
+                    disabled={batchRunning}
+                    style={{ padding: "4px 10px", fontSize: "11px", fontWeight: 600, border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: batchRunning ? "not-allowed" : "pointer" }}
+                  >
+                    Select All Ready
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    disabled={batchRunning || selectedSpecIds.size === 0}
+                    style={{ padding: "4px 10px", fontSize: "11px", fontWeight: 600, border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: (batchRunning || selectedSpecIds.size === 0) ? "not-allowed" : "pointer", opacity: (batchRunning || selectedSpecIds.size === 0) ? 0.5 : 1 }}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={{ display: "grid", gap: "6px" }}>
               {executableSpecs.map(spec => {
                 const plan = prepareResponse.plans[spec.id];
                 const isSelected = spec.id === selectedSpecId;
+                const isBatchSelected = selectedSpecIds.has(spec.id);
                 const opRef = spec.operationRefs?.[0];
                 const isIndependent = !plan || plan.steps.length <= 1;
 
@@ -622,6 +875,16 @@ export function ExecutionPanel({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <input
+                        type="checkbox"
+                        checked={isBatchSelected}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleSelectedSpecId(spec.id);
+                        }}
+                        disabled={batchRunning}
+                        style={{ cursor: batchRunning ? "not-allowed" : "pointer" }}
+                      />
                       <input
                         type="radio"
                         checked={isSelected}
@@ -696,13 +959,257 @@ export function ExecutionPanel({
           </div>
         )}
 
-        {/* Execute button */}
+        {/* Batch actions + progress + completion — single consolidated section */}
+        {executableSpecs.length > 1 && (
+          <div style={{ marginBottom: "18px" }}>
+            {/* Run / progress header */}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "12px" }}>
+              <button
+                type="button"
+                onClick={runBatch}
+                disabled={!activeProjectId || batchRunning || selectedSpecIds.size === 0}
+                style={{
+                  padding: "10px 18px",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  color: "#fff",
+                  background: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? "var(--blue)" : "var(--line)",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? "pointer" : "not-allowed",
+                  opacity: (activeProjectId && !batchRunning && selectedSpecIds.size > 0) ? 1 : 0.6,
+                }}
+              >
+                {batchRunning ? "Running Tests..." : `Run Selected Tests (${selectedSpecIds.size})`}
+              </button>
+              {batchRunning && (
+                <span style={{ fontSize: "13px", color: "var(--muted)" }}>Running tests...</span>
+              )}
+            </div>
+
+            {/* Live progress while running */}
+            {batchRunning && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", marginBottom: "8px" }}>
+                  Running Tests
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+                  {batchCompletedCount} of {batchTotalCount} completed
+                </div>
+                <div style={{ display: "grid", gap: "4px" }}>
+                  {selectedIdsArray.map((specId, idx) => {
+                    const spec = executableSpecs.find(s => s.id === specId);
+                    const title = spec?.title || specId;
+                    if (idx < batchCompletedCount) {
+                      const r = batchResults[idx];
+                      const isPassed = r?.status === "passed";
+                      const isFailed = r?.status === "failed";
+                      return (
+                        <div key={specId} style={{
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          background: "var(--surface)",
+                          fontSize: "12px",
+                          color: isPassed ? "var(--green-deep)" : isFailed ? "var(--red-deep)" : "var(--muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}>
+                          <span>{isPassed ? "✓" : isFailed ? "✕" : "⊘"}</span>
+                          <span>{title}</span>
+                        </div>
+                      );
+                    }
+                    if (idx === batchCompletedCount) {
+                      return (
+                        <div key={specId} style={{
+                          padding: "6px 10px",
+                          borderRadius: "4px",
+                          background: "var(--surface)",
+                          fontSize: "12px",
+                          color: "var(--ink)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}>
+                          <span>●</span>
+                          <span>{title} — Running</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={specId} style={{
+                        padding: "6px 10px",
+                        borderRadius: "4px",
+                        background: "var(--surface)",
+                        fontSize: "12px",
+                        color: "var(--muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        opacity: 0.6,
+                      }}>
+                        <span>○</span>
+                        <span>{title} — Waiting</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Completion summary */}
+            {batchCompleted && batchResults.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--ink)", marginBottom: "8px" }}>
+                  Batch Complete
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+                  {batchResults.length} test{batchResults.length !== 1 ? "s" : ""} completed · {batchPassedCount} passed · {batchFailedCount} failed · {batchBlockedCount} blocked
+                </div>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  {batchFailedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={rerunFailed}
+                      disabled={batchRunning}
+                      style={{
+                        padding: "8px 16px",
+                        fontSize: "13px",
+                        fontWeight: 600,
+                        color: "var(--red-deep)",
+                        background: "var(--red-soft)",
+                        border: "1px solid var(--red)",
+                        borderRadius: "6px",
+                        cursor: batchRunning ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Rerun Failed ({batchFailedCount})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={runAgain}
+                    disabled={batchRunning || selectedSpecIds.size === 0}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      color: "var(--ink)",
+                      background: "var(--surface)",
+                      border: "1px solid var(--line)",
+                      borderRadius: "6px",
+                      cursor: (batchRunning || selectedSpecIds.size === 0) ? "not-allowed" : "pointer",
+                      opacity: (batchRunning || selectedSpecIds.size === 0) ? 0.5 : 1,
+                    }}
+                  >
+                    Run Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Batch results detail list */}
+            {batchResults.length > 0 && (
+              <div>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: "var(--muted)" }}>Batch Results</h3>
+                {batchResults.map((r, idx) => (
+                  <div key={idx} style={{ padding: "8px 12px", border: "1px solid var(--line)", borderRadius: "6px", background: "var(--surface)", marginBottom: "6px", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: r.status === "passed" ? "var(--green-deep)" : r.status === "failed" ? "var(--red-deep)" : "var(--muted)" }}>{r.status.toUpperCase()}</span>
+                    <span style={{ fontSize: "13px", color: "var(--ink)" }}>{r.specTitle}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Test Data & Expected Result editor */}
+        {selectedSpec && override && (
+          <div style={{ marginBottom: "18px" }}>
+            <details open>
+              <summary style={{
+                fontSize: "13px",
+                fontWeight: 700,
+                color: "var(--ink)",
+                cursor: "pointer",
+                padding: "8px 0",
+              }}>
+                Test Data & Expected Result
+              </summary>
+              <div style={{ marginTop: "10px", padding: "12px", border: "1px solid var(--line)", borderRadius: "6px", background: "var(--surface)" }}>
+                <div style={{ display: "grid", gap: "14px" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Path Parameters</div>
+                    {Object.entries(override.testData.pathParams).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, pathParams: { ...prev.testData.pathParams, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                    {overrideErrors.paramKey && <div style={{ fontSize: "12px", color: "var(--red-deep)" }}>{overrideErrors.paramKey}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Query Parameters</div>
+                    {Object.entries(override.testData.queryParams).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, queryParams: { ...prev.testData.queryParams, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Headers</div>
+                    {Object.entries(override.testData.headers).map(([key, value]) => (
+                      <div key={key} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                        <input value={key} disabled style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px", background: "var(--surface-alt)" }} />
+                        <input value={value} onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, headers: { ...prev.testData.headers, [key]: e.target.value } } } : prev)} style={{ flex: 2, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Request Body</div>
+                    <textarea
+                      value={typeof override.testData.body === "string" ? override.testData.body : JSON.stringify(override.testData.body, null, 2)}
+                      onChange={(e) => setOverride(prev => prev ? { ...prev, testData: { ...prev.testData, body: e.target.value } } : prev)}
+                      style={{ width: "100%", minHeight: "120px", padding: "8px", border: "1px solid var(--line)", borderRadius: "4px", fontFamily: "monospace", fontSize: "12px" }}
+                    />
+                    {overrideErrors.bodyJson && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.bodyJson}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Expected Status</div>
+                    <input
+                      type="number"
+                      value={override.expectedBehavior.status}
+                      onChange={(e) => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, status: parseInt(e.target.value || "200", 10) } } : prev)}
+                      style={{ width: "120px", padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }}
+                    />
+                    {overrideErrors.status && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.status}</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "6px" }}>Assertions</div>
+                    {override.expectedBehavior.responseAssertions.map((assertion, idx) => (
+                      <div key={idx} style={{ display: "flex", gap: "8px", marginBottom: "6px", alignItems: "center" }}>
+                        <input value={assertion} onChange={(e) => setOverride(prev => { if (!prev) return null; const next = [...prev.expectedBehavior.responseAssertions]; next[idx] = e.target.value; return { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: next } }; })} style={{ flex: 1, padding: "6px 8px", border: "1px solid var(--line)", borderRadius: "4px" }} />
+                        <button type="button" onClick={() => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: prev.expectedBehavior.responseAssertions.filter((_, i) => i !== idx) } } : null)} style={{ padding: "4px 8px", border: "1px solid var(--red)", borderRadius: "4px", background: "var(--surface)", color: "var(--red-deep)", cursor: "pointer" }}>Remove</button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setOverride(prev => prev ? { ...prev, expectedBehavior: { ...prev.expectedBehavior, responseAssertions: [...prev.expectedBehavior.responseAssertions, ""] } } : null)} style={{ padding: "6px 12px", border: "1px dashed var(--line)", borderRadius: "4px", background: "var(--surface)", color: "var(--ink)", cursor: "pointer" }}>+ Add Assertion</button>
+                    {overrideErrors.assertion && <div style={{ fontSize: "12px", color: "var(--red-deep)", marginTop: "4px" }}>{overrideErrors.assertion}</div>}
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+
+        {/* Execute button (single test) */}
         {selectedSpec && (
           <div style={{ marginBottom: "18px" }}>
             <button
               type="button"
               onClick={handleRun}
-              disabled={!canRun}
+              disabled={!canRun || !override}
               style={{
                 padding: "10px 24px",
                 fontSize: "14px",
@@ -773,7 +1280,7 @@ export function ExecutionPanel({
                   type="button"
                   onClick={() => {
                     const runId = execResult.runId as string;
-                    window.location.href = `#results?runId=${encodeURIComponent(runId)}`;
+                    window.location.hash = `#results?runId=${encodeURIComponent(runId)}`;
                   }}
                   style={{
                     padding: "8px 20px",
