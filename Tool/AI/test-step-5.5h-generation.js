@@ -4,23 +4,23 @@
 
 const assert = require("assert");
 const { createService, saveApiModel } = require("./src/domain/ServiceRepository");
-const { seedDefaultProject } = require("./src/domain/ProjectRepository");
+const { seedDefaultProject, createProject } = require("./src/domain/ProjectRepository");
 const { generateTestCases } = require("./src/engine/testCaseGenerator");
 const { matchTestCasesToApis } = require("./src/engine/matching/testCaseMatcher");
 const { prepareTestSpecifications } = require("./src/engine/testSpecificationBridge");
 
 const DEFAULT_PROJECT = "default";
 
-function setupProject() {
-  seedDefaultProject();
+async function setupProject() {
+  await seedDefaultProject();
   const serviceId = `gen-test-api-${Date.now()}`;
-  createService(DEFAULT_PROJECT, {
+  await createService(DEFAULT_PROJECT, {
     id: serviceId,
     name: "Generation Test API",
     protocol: "rest",
     description: "",
   });
-  saveApiModel(DEFAULT_PROJECT, serviceId, {
+  await saveApiModel(DEFAULT_PROJECT, serviceId, {
     service: { id: serviceId, name: "Generation Test API", protocol: "rest" },
     title: "Generation API",
     baseUrl: "http://localhost:3000",
@@ -47,7 +47,7 @@ async function test(name, fn) {
 }
 
 async function run() {
-  setupProject();
+  await setupProject();
 
   await test("generateTestCases returns result with testCases array", async () => {
     const ticket = { summary: "User registration", description: "", acceptanceCriteria: ["User can register"] };
@@ -87,7 +87,7 @@ async function run() {
   await test("matching still works on generated TestCases", async () => {
     const ticket = { summary: "Match test", description: "", acceptanceCriteria: ["Valid AC"] };
     const result = await generateTestCases({ projectId: DEFAULT_PROJECT, ticket });
-    const matchResult = matchTestCasesToApis({ projectId: DEFAULT_PROJECT, testCases: result.testCases });
+    const matchResult = await matchTestCasesToApis({ projectId: DEFAULT_PROJECT, testCases: result.testCases });
     assert.ok(Array.isArray(matchResult.matches), "Should return matches");
     assert.strictEqual(matchResult.matches.length, result.testCases.length, "One match per TestCase");
   });
@@ -95,7 +95,7 @@ async function run() {
   await test("prepare still works with generated TestCases", async () => {
     const ticket = { summary: "Prepare test", description: "", acceptanceCriteria: ["Valid AC"] };
     const result = await generateTestCases({ projectId: DEFAULT_PROJECT, ticket });
-    const matchResult = matchTestCasesToApis({ projectId: DEFAULT_PROJECT, testCases: result.testCases });
+    const matchResult = await matchTestCasesToApis({ projectId: DEFAULT_PROJECT, testCases: result.testCases });
     const mappings = matchResult.matches.filter(m => m.selectedMatch).map(m => ({
       testCaseId: m.testCaseId,
       serviceId: m.selectedMatch.serviceId,
@@ -104,7 +104,7 @@ async function run() {
       path: m.selectedMatch.path,
       source: "automatic",
     }));
-    const prepareResult = prepareTestSpecifications({ projectId: DEFAULT_PROJECT, testCases: result.testCases, mappings });
+    const prepareResult = await prepareTestSpecifications({ projectId: DEFAULT_PROJECT, testCases: result.testCases, mappings });
     assert.ok(prepareResult.testSpecifications, "Should have testSpecifications");
     assert.ok(prepareResult.plans, "Should have plans");
   });
@@ -112,12 +112,14 @@ async function run() {
   await test("same requirement yields API-independent TestCases across projects", async () => {
     const ticket = { summary: "Cross-project", description: "", acceptanceCriteria: ["Valid AC"] };
     const projectA = `proj-a-${Date.now()}`;
-    seedDefaultProject();
-    createService(projectA, { id: "users-api", name: "Users", protocol: "rest", description: "" });
-    saveApiModel(projectA, "users-api", { service: { id: "users-api", name: "Users", protocol: "rest" }, title: "Users", baseUrl: "http://localhost:3000", operations: [{ id: "getUser", method: "GET", path: "/users/{userId}" }] });
+    await seedDefaultProject();
+    await createProject({ id: projectA, name: "Project A" });
+    await createService(projectA, { id: "users-api", name: "Users", protocol: "rest", description: "" });
+    await saveApiModel(projectA, "users-api", { service: { id: "users-api", name: "Users", protocol: "rest" }, title: "Users", baseUrl: "http://localhost:3000", operations: [{ id: "getUser", method: "GET", path: "/users/{userId}" }] });
     const projectB = `proj-b-${Date.now()}`;
-    createService(projectB, { id: "payments-api", name: "Payments", protocol: "rest", description: "" });
-    saveApiModel(projectB, "payments-api", { service: { id: "payments-api", name: "Payments", protocol: "rest" }, title: "Payments", baseUrl: "http://localhost:3000", operations: [{ id: "getPayment", method: "GET", path: "/payments/{paymentId}" }] });
+    await createProject({ id: projectB, name: "Project B" });
+    await createService(projectB, { id: "payments-api", name: "Payments", protocol: "rest", description: "" });
+    await saveApiModel(projectB, "payments-api", { service: { id: "payments-api", name: "Payments", protocol: "rest" }, title: "Payments", baseUrl: "http://localhost:3000", operations: [{ id: "getPayment", method: "GET", path: "/payments/{paymentId}" }] });
     const resultA = await generateTestCases({ projectId: projectA, ticket });
     const resultB = await generateTestCases({ projectId: projectB, ticket });
     assert.ok(resultA.testCases.length >= 1);

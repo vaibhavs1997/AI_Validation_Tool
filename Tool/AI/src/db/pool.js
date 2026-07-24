@@ -1,112 +1,138 @@
-/**
- * Database Pool
- *
- * STEP 7.3A — PostgreSQL connection management.
- *
- * Responsibilities:
- * - Create/manage pg Pool
- * - query helper
- * - connectivity check
- * - clean shutdown
- * - clear error handling
- *
- * Does NOT contain domain/repository logic.
- */
+const config = require("../config");
 
-const config = require('../config');
+let cachedPool = null;
+let poolFactoryForTests = null;
+let connected = false;
 
-let pool = null;
-let isConnected = false;
+function isPostgresEnabled() {
+  return Boolean(
+    (config.features && config.features.pgEnabled) ||
+    (config.pg && config.pg.enabled)
+  );
+}
 
-/**
- * Get or create the pg Pool.
- * Returns null when PG_ENABLED=false.
- */
-function getPool() {
-  if (!config.pg.enabled) return null;
-  if (pool) return pool;
+function buildPoolConfig() {
+  const pg = config.pg || {};
+  const connectionString = pg.connectionString || pg.databaseUrl || "";
+  const base = {
+    max: pg.max || 10,
+    idleTimeoutMillis: pg.idleTimeoutMs || 30000,
+    connectionTimeoutMillis: pg.connectionTimeoutMs || 5000,
+  };
 
-  const { Pool } = require('pg');
-  pool = new Pool({
-    connectionString: config.pg.databaseUrl,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
+  if (connectionString) {
+    return {
+      ...base,
+      connectionString,
+      ssl: pg.ssl ? { rejectUnauthorized: false } : undefined,
+    };
+  }
 
-  pool.on('error', (err) => {
-    console.error('[db] Unexpected pool error:', err.message);
-    isConnected = false;
-  });
+  return {
+    ...base,
+    host: pg.host,
+    port: pg.port,
+    database: pg.database,
+    user: pg.user,
+    password: pg.password,
+    ssl: pg.ssl ? { rejectUnauthorized: false } : undefined,
+  };
+}
 
+function createPool() {
+  if (typeof poolFactoryForTests === "function") {
+    return poolFactoryForTests(buildPoolConfig());
+  }
+
+  if (!isPostgresEnabled()) {
+    return null;
+  }
+
+  let Pool;
+  try {
+    Pool = require("pg").Pool;
+  } catch (error) {
+    throw new Error("PostgreSQL support requires the 'pg' package. Install it or set PG_ENABLED=false.");
+  }
+
+  const pool = new Pool(buildPoolConfig());
+  if (typeof pool.on === "function") {
+    pool.on("error", (err) => {
+      connected = false;
+      console.error("[db] Unexpected pool error:", err.message);
+    });
+  }
   return pool;
 }
 
-/**
- * Execute a query against PostgreSQL.
- * Throws clear error when PG is disabled or not connected.
- *
- * @param {string} text - SQL query text
- * @param {Array} [params] - Query parameters
- * @returns {Promise<{ rows: Array, rowCount: number }>}
- */
+function getPool() {
+  if (!cachedPool) {
+    cachedPool = createPool();
+  }
+  return cachedPool;
+}
+
 async function query(text, params) {
-  const p = getPool();
-  if (!p) {
-    throw new Error('PostgreSQL is not enabled. Set PG_ENABLED=true and DATABASE_URL.');
+  const pool = getPool();
+  if (!pool) {
+    throw new Error("PostgreSQL is not enabled. Set PG_ENABLED=true and DATABASE_URL.");
   }
+
   try {
-    const result = await p.query(text, params);
+    const result = await pool.query(text, params);
+    connected = true;
     return result;
-  } catch (err) {
-    throw new Error(`Database query failed: ${err.message}`);
+  } catch (error) {
+    connected = false;
+    throw new Error(`Database query failed: ${error.message}`);
   }
 }
 
-/**
- * Check PostgreSQL connectivity.
- * Returns { connected: false, reason: string } when disabled or unreachable.
- * Returns { connected: true } when healthy.
- */
 async function checkConnection() {
-  if (!config.pg.enabled) {
-    return { connected: false, reason: 'PostgreSQL disabled (PG_ENABLED=false)' };
+  const pool = getPool();
+  if (!pool) {
+    return { connected: false, reason: "PostgreSQL disabled (PG_ENABLED=false)" };
   }
 
   try {
-    const p = getPool();
-    if (!p) {
-      return { connected: false, reason: 'Pool not initialized' };
+    await pool.query("SELECT 1");
+    connected = true;
+    return typeof poolFactoryForTests === "function" ? true : { connected: true };
+  } catch (error) {
+    connected = false;
+    if (typeof poolFactoryForTests === "function") {
+      throw error;
     }
-    await p.query('SELECT 1');
-    isConnected = true;
-    return { connected: true };
-  } catch (err) {
-    isConnected = false;
-    return { connected: false, reason: err.message };
+    return { connected: false, reason: error.message };
   }
 }
 
-/**
- * Whether the pool has ever successfully connected.
- */
 function isHealthy() {
-  return isConnected;
+  return connected;
 }
 
-/**
- * Gracefully shut down the pool.
- */
-async function shutdown() {
-  if (pool) {
-    try {
-      await pool.end();
-    } catch (err) {
-      console.error('[db] Error during pool shutdown:', err.message);
-    }
-    pool = null;
-    isConnected = false;
+async function closePool() {
+  if (cachedPool && typeof cachedPool.end === "function") {
+    await cachedPool.end();
   }
+  cachedPool = null;
+  connected = false;
+}
+
+async function shutdown() {
+  await closePool();
+}
+
+function __setPoolFactoryForTests(factory) {
+  poolFactoryForTests = factory;
+  cachedPool = null;
+  connected = false;
+}
+
+function __resetPoolForTests() {
+  poolFactoryForTests = null;
+  cachedPool = null;
+  connected = false;
 }
 
 module.exports = {
@@ -114,5 +140,8 @@ module.exports = {
   query,
   checkConnection,
   isHealthy,
+  closePool,
   shutdown,
+  __setPoolFactoryForTests,
+  __resetPoolForTests,
 };

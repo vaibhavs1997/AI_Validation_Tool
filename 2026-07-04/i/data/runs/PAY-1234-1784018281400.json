@@ -1,0 +1,870 @@
+{
+  "id": "PAY-1234-1784018281400",
+  "ticket": {
+    "key": "PAY-1234",
+    "summary": "Add payment refund API",
+    "issueType": "Story",
+    "status": "Ready for QA",
+    "priority": "High",
+    "labels": [
+      "payments",
+      "refunds",
+      "api"
+    ],
+    "description": "As a support user, I want to initiate a refund for a settled payment so that customers can receive money back when required.\n\nAcceptance Criteria:\n- Refund should be allowed only for settled payments.\n- Refund amount cannot exceed the captured amount.\n- Refund amount must be greater than zero.\n- Reason is mandatory for every refund request.\n- Duplicate refund request with same idempotency key should not create multiple refunds.",
+    "acceptanceCriteria": [
+      "Refund should be allowed only for settled payments.",
+      "Refund amount cannot exceed the captured amount.",
+      "Refund amount must be greater than zero.",
+      "Reason is mandatory for every refund request.",
+      "Duplicate refund request with same idempotency key should not create multiple refunds."
+    ],
+    "comments": [],
+    "fetchedAt": "2026-07-04T00:00:00.000Z"
+  },
+  "contract": {
+    "title": "Payments API",
+    "version": "1.0.0",
+    "baseUrl": "https://api.qa.example.com",
+    "endpointCount": 2
+  },
+  "environment": {
+    "name": "dev env",
+    "baseUrl": "https://api.qa.example.com",
+    "dryRun": true,
+    "authType": "none"
+  },
+  "authStatus": null,
+  "summary": {
+    "total": 16,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 0,
+    "needs_review": 0,
+    "dry_run": 16
+  },
+  "scenarios": [
+    {
+      "id": "createRefund-TC-001",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "Primary acceptance criteria"
+      ],
+      "risk": "medium",
+      "sourceAc": "Add payment refund API",
+      "title": "Add payment refund API - happy path",
+      "type": "positive",
+      "expectedStatus": "201"
+    },
+    {
+      "id": "getPayment-TC-002",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "Primary acceptance criteria"
+      ],
+      "risk": "medium",
+      "sourceAc": "Add payment refund API",
+      "title": "Add payment refund API - happy path",
+      "type": "positive",
+      "expectedStatus": "200"
+    },
+    {
+      "id": "createRefund-TC-003",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund should be allowed only for settled payments."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund should be allowed only for settled payments.",
+      "title": "Refund should be allowed only for settled payments.",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "getPayment-TC-004",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund should be allowed only for settled payments."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund should be allowed only for settled payments.",
+      "title": "Refund should be allowed only for settled payments.",
+      "type": "negative",
+      "expectedStatus": 400
+    },
+    {
+      "id": "createRefund-TC-005",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "boundaryMax",
+          "value": 999999999
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund amount cannot exceed the captured amount."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund amount cannot exceed the captured amount.",
+      "title": "Refund amount cannot exceed the captured amount.",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "getPayment-TC-006",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "boundaryMax",
+          "value": 999999999
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund amount cannot exceed the captured amount."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund amount cannot exceed the captured amount.",
+      "title": "Refund amount cannot exceed the captured amount.",
+      "type": "negative",
+      "expectedStatus": 400
+    },
+    {
+      "id": "createRefund-TC-007",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "boundaryMax",
+          "value": 999999999
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund amount must be greater than zero."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund amount must be greater than zero.",
+      "title": "Refund amount must be greater than zero.",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "getPayment-TC-008",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "boundaryMax",
+          "value": 999999999
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Refund amount must be greater than zero."
+      ],
+      "risk": "medium",
+      "sourceAc": "Refund amount must be greater than zero.",
+      "title": "Refund amount must be greater than zero.",
+      "type": "negative",
+      "expectedStatus": 400
+    },
+    {
+      "id": "createRefund-TC-009",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "remove"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Reason is mandatory for every refund request."
+      ],
+      "risk": "medium",
+      "sourceAc": "Reason is mandatory for every refund request.",
+      "title": "Reason is mandatory for every refund request.",
+      "type": "positive",
+      "expectedStatus": "201"
+    },
+    {
+      "id": "getPayment-TC-010",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "remove"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Reason is mandatory for every refund request."
+      ],
+      "risk": "medium",
+      "sourceAc": "Reason is mandatory for every refund request.",
+      "title": "Reason is mandatory for every refund request.",
+      "type": "positive",
+      "expectedStatus": "200"
+    },
+    {
+      "id": "createRefund-TC-011",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "invalidType"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Duplicate refund request with same idempotency key should not create multiple refunds."
+      ],
+      "risk": "medium",
+      "sourceAc": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "title": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "getPayment-TC-012",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "invalidType"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion: Duplicate refund request with same idempotency key should not create multiple refunds."
+      ],
+      "risk": "medium",
+      "sourceAc": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "title": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "type": "negative",
+      "expectedStatus": 400
+    },
+    {
+      "id": "createRefund-TC-013",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "API rejects unauthenticated request"
+      ],
+      "risk": "medium",
+      "sourceAc": "Security",
+      "title": "Add payment refund API - missing authorization",
+      "type": "auth",
+      "expectedStatus": "401"
+    },
+    {
+      "id": "getPayment-TC-014",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "API rejects unauthenticated request"
+      ],
+      "risk": "medium",
+      "sourceAc": "Security",
+      "title": "Add payment refund API - missing authorization",
+      "type": "auth",
+      "expectedStatus": "401"
+    },
+    {
+      "id": "createRefund-TC-015",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "API returns validation error for invalid type"
+      ],
+      "risk": "medium",
+      "sourceAc": "Derived",
+      "title": "Add payment refund API - invalid payload type",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "getPayment-TC-016",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [
+        {
+          "field": "value",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "API returns validation error for invalid type"
+      ],
+      "risk": "medium",
+      "sourceAc": "Derived",
+      "title": "Add payment refund API - invalid payload type",
+      "type": "negative",
+      "expectedStatus": 400
+    }
+  ],
+  "results": [
+    {
+      "scenarioId": "createRefund-TC-001",
+      "title": "Add payment refund API - happy path",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.401Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "rule-violation-value",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-002",
+      "title": "Add payment refund API - happy path",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-003",
+      "title": "Refund should be allowed only for settled payments.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "rule-violation-value",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-004",
+      "title": "Refund should be allowed only for settled payments.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-005",
+      "title": "Refund amount cannot exceed the captured amount.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 999999999,
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-006",
+      "title": "Refund amount cannot exceed the captured amount.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-007",
+      "title": "Refund amount must be greater than zero.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 999999999,
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-008",
+      "title": "Refund amount must be greater than zero.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.403Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-009",
+      "title": "Reason is mandatory for every refund request.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.403Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-010",
+      "title": "Reason is mandatory for every refund request.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-011",
+      "title": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "not-a-number",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-012",
+      "title": "Duplicate refund request with same idempotency key should not create multiple refunds.",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-013",
+      "title": "Add payment refund API - missing authorization",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "rule-violation-value",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-014",
+      "title": "Add payment refund API - missing authorization",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-015",
+      "title": "Add payment refund API - invalid payload type",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "rule-violation-value",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-016",
+      "title": "Add payment refund API - invalid payload type",
+      "status": "dry_run",
+      "startedAt": "2026-07-14T08:38:01.404Z",
+      "finishedAt": "2026-07-14T08:38:01.404Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    }
+  ],
+  "createdAt": "2026-07-14T08:38:01.404Z"
+}

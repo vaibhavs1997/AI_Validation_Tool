@@ -1,5 +1,6 @@
 const state = {
   view: "workspace",
+  navKey: "testing-workspace",
   // Requirement state - the actual loaded ticket (shared)
   ticket: null,
   // UI state for Jira tab (independent from Manual)
@@ -17,6 +18,8 @@ const state = {
   },
   contract: null,
   scenarios: [],
+  apiOverrides: {},
+  connectionsConfirmed: false,
   unusedEndpoints: [],
   run: null,
   reportUrl: "",
@@ -35,6 +38,8 @@ function saveState() {
       ticket: state.ticket,
       contract: state.contract,
       scenarios: state.scenarios,
+      apiOverrides: state.apiOverrides,
+      connectionsConfirmed: state.connectionsConfirmed,
       ticketVersion: state.ticketVersion,
       contractVersion: state.contractVersion,
     };
@@ -50,6 +55,8 @@ function loadState() {
     state.ticket = persistedState.ticket || null;
     state.contract = persistedState.contract || null;
     state.scenarios = persistedState.scenarios || [];
+    state.apiOverrides = persistedState.apiOverrides || {};
+    state.connectionsConfirmed = Boolean(persistedState.connectionsConfirmed);
     state.ticketVersion = persistedState.ticketVersion || 0;
     state.contractVersion = persistedState.contractVersion || 0;
     return true;
@@ -222,12 +229,31 @@ function statusLabel(value) {
 function setActiveView(view, options = {}) {
   const allowedViews = new Set(["workspace", "history", "results"]);
   state.view = allowedViews.has(view) ? view : "workspace";
+  if (options.navKey) state.navKey = options.navKey;
+
   $$("[data-view-section]").forEach((section) => {
     section.classList.toggle("view-hidden", section.dataset.viewSection !== state.view);
   });
   $$("[data-view-trigger]").forEach((trigger) => {
-    trigger.classList.toggle("active", trigger.dataset.viewTrigger === state.view);
+    const matchesNavKey = state.navKey && trigger.dataset.navKey === state.navKey;
+    const matchesFallback = !state.navKey && trigger.dataset.viewTrigger === state.view;
+    trigger.classList.toggle("active", Boolean(matchesNavKey || matchesFallback));
   });
+
+  const pageTitle = $("#pageTitle");
+  if (pageTitle) {
+    const titles = {
+      overview: "Overview",
+      "testing-workspace": "Test Workspace",
+      "apis-services": "API Services",
+      "apis-dependencies": "Dependencies",
+      results: "Results",
+      history: "History",
+      settings: "Settings",
+    };
+    pageTitle.textContent = titles[state.navKey] || "Test Workspace";
+  }
+
   if (!options.skipHash) {
     const hash = state.view === "workspace" ? "#workspace" : `#${state.view}`;
     if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
@@ -237,6 +263,34 @@ function setActiveView(view, options = {}) {
 function initialViewFromHash() {
   const hash = window.location.hash.replace("#", "");
   return ["workspace", "history", "results"].includes(hash) ? hash : "workspace";
+}
+
+function initialNavKeyFromView(view) {
+  if (view === "results") return "results";
+  if (view === "history") return "history";
+  return "testing-workspace";
+}
+
+function scrollToWorkspaceSection(section) {
+  if (!section || section === "top") {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  const target = document.querySelector(`[data-section="${section}"]`);
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function panelBySection(section) {
+  return document.querySelector(`.panel[data-section="${section}"]`);
+}
+
+function expandPanel(section) {
+  const panel = panelBySection(section);
+  if (!panel) return;
+  panel.classList.remove("collapsed");
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function dominantStatus(summary = {}) {
@@ -271,13 +325,13 @@ function renderAppMetrics() {
 function updateScenariosPrereqStatus() {
   const reqPrereq = $("#scPrereqReq");
   const apiPrereq = $("#scPrereqApi");
-  const generateBtn = $("#generateScenariosBtn");
+  const generateBtn = $("#generateFromRequirementBtn");
   const helpText = $("#generateHelpText");
   if (reqPrereq) reqPrereq.className = "prereq-item" + (state.ticket ? " loaded" : "");
-  if (apiPrereq) apiPrereq.className = "prereq-item" + (state.contract ? " loaded" : "");
-  const ready = state.ticket && state.contract;
+  if (apiPrereq) apiPrereq.className = "prereq-item" + (state.scenarios.length ? " loaded" : "");
+  const ready = Boolean(state.ticket);
   if (generateBtn) generateBtn.disabled = !ready;
-  if (helpText) helpText.hidden = ready;
+  if (helpText) helpText.hidden = state.scenarios.length > 0;
 }
 
 function updateScenariosSummary() {
@@ -291,16 +345,26 @@ function setScenariosState(stateName) {
   const emptyState = $("#scenariosEmptyState");
   const loadingState = $("#scenariosLoading");
   const summaryBar = $("#scenariosSummary");
-  const tableWrap = $(".table-wrap");
+  const tableWrap = document.querySelector(".panel-scenarios .table-wrap");
+  const controls = $("#scenarioControls");
   if (emptyState) emptyState.hidden = stateName !== "empty";
   if (loadingState) loadingState.hidden = stateName !== "loading";
   if (summaryBar) summaryBar.hidden = stateName !== "generated";
   if (tableWrap) tableWrap.hidden = stateName !== "generated";
+  if (controls) controls.hidden = stateName !== "generated";
 }
 
 function updateStepSummaries() {
   const reqSummary = $("#reqStepSummary");
-  if (reqSummary) reqSummary.textContent = state.ticket ? `${state.ticket.key} · ${state.ticket.summary || "Loaded"}` : "Not configured";
+  if (reqSummary) {
+    if (!state.ticket) {
+      reqSummary.textContent = "Not configured";
+    } else {
+      const desc = (state.ticket.description || "").trim().slice(0, 90);
+      const acCount = Array.isArray(state.ticket.acceptanceCriteria) ? state.ticket.acceptanceCriteria.length : 0;
+      reqSummary.textContent = `${state.ticket.summary || state.ticket.key || "Requirement"}${desc ? ` — ${desc}` : ""} · ${acCount} acceptance criteria`;
+    }
+  }
   const reqStepStatus = $("#reqStepStatus");
   if (reqStepStatus) { reqStepStatus.textContent = state.ticket ? "✓" : ""; reqStepStatus.className = "step-status" + (state.ticket ? " loaded" : ""); }
 
@@ -320,6 +384,43 @@ function updateStepSummaries() {
   if (execStepStatus) { execStepStatus.textContent = state.scenarios.length && state.contract && state.ticket ? "✓" : ""; execStepStatus.className = "step-status" + (state.scenarios.length && state.contract && state.ticket ? " loaded" : ""); }
 }
 
+function updateWorkspaceProgression() {
+  const hasRequirement = Boolean(state.ticket);
+  const hasTests = Array.isArray(state.scenarios) && state.scenarios.length > 0;
+  const hasConnections = hasTests && state.contract && state.connectionsConfirmed;
+  const stage = !hasRequirement ? "requirements" : !hasTests ? "scenarios" : !hasConnections ? "collection" : "execution";
+
+  const sequence = ["requirements", "scenarios", "collection", "execution"];
+  sequence.forEach((section, index) => {
+    const panel = panelBySection(section);
+    if (!panel) return;
+    const currentIndex = sequence.indexOf(stage);
+    const status = index < currentIndex ? "completed" : index === currentIndex ? "current" : "future";
+    panel.classList.remove("stage-completed", "stage-current", "stage-future");
+    panel.classList.add(`stage-${status}`);
+
+    if (status === "completed") {
+      panel.classList.add("collapsed");
+    } else if (status === "current") {
+      panel.classList.remove("collapsed");
+    } else {
+      panel.classList.add("collapsed");
+    }
+  });
+}
+
+function refreshWorkspaceUI() {
+  updateStepSummaries();
+  updateScenariosPrereqStatus();
+  updateScenariosSummary();
+  updateContinueWithTests();
+  updateWorkspaceProgression();
+  renderConnections();
+  updateRunSimpleView();
+  updateRunResultCompact();
+  updateExecutionPanelState();
+}
+
 function renderCompactWorkflow() {
   const ticket = state.ticket;
   const contract = state.contract;
@@ -331,20 +432,25 @@ function renderCompactWorkflow() {
   const reqStepValue = ticket ? (ticket.key || "Loaded") : "Not configured";
   const reqClass = ticket ? "completed" : "";
   
-  // Step 2 - API Collection
-  const apiStepText = contract ? "✓ API Collection" : "2 API Collection";
+  // Step 2 - Review Tests
+  const reviewStepText = scenarios.length ? "✓ Review Tests" : "2 Review Tests";
+  const reviewStepValue = scenarios.length ? `${scenarios.length} generated` : "Generate from requirement";
+  const reviewClass = scenarios.length ? "completed" : "";
+
+  // Step 3 - Connect APIs
+  const apiStepText = contract ? "✓ Connect APIs" : "3 Connect APIs";
   const apiStepValue = contract ? `${contract.endpoints?.length || 0} endpoints` : "Not configured";
   const apiClass = contract ? "completed" : "";
-  
-  // Step 3 - Test Scenarios
-  const scStepText = scenarios.length ? "✓ Test Scenarios" : "3 Test Scenarios";
-  const scStepValue = scenarios.length ? `${scenarios.length} generated` : "Not generated";
-  const scClass = scenarios.length ? "completed" : "";
-  
-  // Step 4 - Run
-  const execStepText = run ? "✓ Run" : (scenarios.length && contract && ticket ? "4 Run" : "4 Run");
+
+  // Step 4 - Run Tests
+  const execStepText = run ? "✓ Run Tests" : "4 Run Tests";
   const execStepValue = run ? `${(run.summary?.passed || 0)} passed` : (scenarios.length && contract && ticket ? "Ready" : "Not ready");
   const execClass = run ? "completed" : (scenarios.length && contract && ticket ? "active" : "");
+
+  // Step 5 - Results
+  const resultsStepText = run ? "✓ Results" : "5 Results";
+  const resultsStepValue = run ? "Available" : "Not available";
+  const resultsClass = run ? "completed" : "";
   
   const compact = $("#compactWorkflow");
   if (!compact) return;
@@ -354,31 +460,44 @@ function renderCompactWorkflow() {
       <span class="cw-step-value">${escapeHtml(reqStepValue)}</span>
     </span>
     <span class="cw-sep">→</span>
+    <span class="cw-step ${reviewClass}">
+      <span class="cw-step-label">${escapeHtml(reviewStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(reviewStepValue)}</span>
+    </span>
+    <span class="cw-sep">→</span>
     <span class="cw-step ${apiClass}">
       <span class="cw-step-label">${escapeHtml(apiStepText)}</span>
       <span class="cw-step-value">${escapeHtml(apiStepValue)}</span>
-    </span>
-    <span class="cw-sep">→</span>
-    <span class="cw-step ${scClass}">
-      <span class="cw-step-label">${escapeHtml(scStepText)}</span>
-      <span class="cw-step-value">${escapeHtml(scStepValue)}</span>
     </span>
     <span class="cw-sep">→</span>
     <span class="cw-step ${execClass}">
       <span class="cw-step-label">${escapeHtml(execStepText)}</span>
       <span class="cw-step-value">${escapeHtml(execStepValue)}</span>
     </span>
+    <span class="cw-sep">→</span>
+    <span class="cw-step ${resultsClass}">
+      <span class="cw-step-label">${escapeHtml(resultsStepText)}</span>
+      <span class="cw-step-value">${escapeHtml(resultsStepValue)}</span>
+    </span>
   `;
+  updateHeaderProjectName();
+  updateHeaderEnvironment();
 }
 
-async function loadConfigStatus() {
-  const data = await api("/api/config/status");
-  $("#serverState").textContent = "Online";
-  $("#configStatus").textContent = [
-    data.jiraConfigured ? "Jira connected" : "Jira not configured",
-    data.aiConfigured ? `AI ready: ${data.aiModel}` : "AI optional",
-    `Port ${data.port}`,
-  ].join(" | ");
+function updateHeaderProjectName() {
+  const el = $("#headerProjectName");
+  if (!el) return;
+  const key = state.ticket && state.ticket.key ? String(state.ticket.key) : "";
+  const project = key.includes("-") ? key.split("-")[0] : "";
+  el.textContent = project || "Default Project";
+}
+
+function updateHeaderEnvironment() {
+  const indicator = $("#headerEnvironment");
+  if (!indicator) return;
+  const envValue = $("#envName")?.value.trim() || "Not set";
+  indicator.textContent = envValue;
+  indicator.className = `status ${envValue === "Not set" ? "needs_review" : "dry_run"}`;
 }
 
 async function loadSampleTicket(options = {}) {
@@ -389,6 +508,7 @@ async function loadSampleTicket(options = {}) {
   renderTicketSummary();
   renderAppMetrics();
   renderCompactWorkflow();
+  refreshWorkspaceUI();
   saveState();
   if (!options.silent) { toast("Sample ticket loaded."); }
 }
@@ -424,6 +544,7 @@ async function fetchJiraTicket(options = {}) {
     renderTicketSummary();
     renderAppMetrics();
     renderCompactWorkflow();
+    refreshWorkspaceUI();
     saveState();
     if (!options.silent) toast(`Fetched ${data.ticket.key}.`);
   } catch (error) {
@@ -451,6 +572,7 @@ function getTicketFromText() {
     renderTicketSummary();
     renderAppMetrics();
     renderCompactWorkflow();
+    refreshWorkspaceUI();
     saveState();
     hideInlineError();
     return ticket;
@@ -635,10 +757,12 @@ async function parseContract(options = {}) {
 
   const data = await api("/api/contracts/parse", { method: "POST", body: JSON.stringify(payload) });
   state.contract = data.contract;
+  state.connectionsConfirmed = false;
   state.contractVersion++;
   renderContractSummary();
   renderAppMetrics();
   renderCompactWorkflow();
+  refreshWorkspaceUI();
   saveState();
   toast(`Parsed ${data.contract.endpoints.length} endpoint(s).`);
 }
@@ -666,6 +790,7 @@ async function handleTicketFileUpload(event) {
     renderTicketSummary();
     renderAppMetrics();
     renderCompactWorkflow();
+    refreshWorkspaceUI();
     saveState();
     hideInlineError();
     toast(`Loaded ${file.name}.`);
@@ -731,28 +856,55 @@ function endpointLabel(scenario) {
   return `${scenario.method || ""} ${scenario.path || ""}`.trim();
 }
 
+function scenarioAcceptanceText(scenario) {
+  const ref = Array.isArray(scenario.requirementRefs) && scenario.requirementRefs.length > 0 ? scenario.requirementRefs[0] : null;
+  if (ref && ref.acText) return ref.acText;
+  return "No acceptance criterion provided.";
+}
+
+function scenarioDescriptionText(scenario) {
+  if (scenario.description) return scenario.description;
+  if (scenario.expectedBehavior && scenario.expectedBehavior.primaryAssertion) return scenario.expectedBehavior.primaryAssertion;
+  return "No additional description provided.";
+}
+
 function renderScenarios() {
   const rows = $("#scenarioRows");
   if (!state.scenarios.length) {
-    rows.innerHTML = '<tr><td colspan="4" class="empty">No scenarios generated yet.</td></tr>';
+    rows.innerHTML = '<div class="empty">No tests generated yet.</div>';
+    updateContinueWithTests();
     return;
   }
   $("#scenariosEmptyState").hidden = true;
   $("#scenariosSummary").hidden = false;
 
   rows.innerHTML = state.scenarios.map((scenario) => `
-      <tr>
-        <td><input class="scenario-check" type="checkbox" data-id="${escapeHtml(scenario.id)}" checked></td>
-        <td>
-          <strong>${escapeHtml(scenario.title)}</strong>
-          <div class="muted">${escapeHtml(scenario.id)}${scenario.unlinked ? " · unlinked" : ""}</div>
-        </td>
-        <td><span class="pill">${escapeHtml(scenario.type || "scenario")}</span></td>
-        <td>${escapeHtml(endpointLabel(scenario))}${scenario.unlinked ? ' <span class="muted">(no endpoint)</span>' : ''}</td>
-      </tr>`).join("");
+      <article class="test-review-item">
+        <div class="test-review-main">
+          <label class="test-check-label">
+            <input class="scenario-check" type="checkbox" data-id="${escapeHtml(scenario.id)}" checked>
+            <span class="test-title">${escapeHtml(scenario.title || scenario.id || "Untitled test")}</span>
+          </label>
+          <span class="pill">${escapeHtml(scenario.type || "test")}</span>
+        </div>
+        <p class="test-description">${escapeHtml(scenarioDescriptionText(scenario))}</p>
+        <p class="test-ac"><strong>Acceptance criterion:</strong> ${escapeHtml(scenarioAcceptanceText(scenario))}</p>
+        <details class="test-details">
+          <summary>View details</summary>
+          <pre>${escapeHtml(pretty(scenario))}</pre>
+        </details>
+      </article>`).join("");
 
-  $$(".scenario-check").forEach((input) => input.addEventListener("change", renderAppMetrics));
+  $$(".scenario-check").forEach((input) => input.addEventListener("change", () => {
+    renderAppMetrics();
+    updateScenariosSummary();
+    updateContinueWithTests();
+    updateRunSimpleView();
+  }));
   updateScenarioControls();
+  updateContinueWithTests();
+  renderConnections();
+  updateRunSimpleView();
 }
 
 function updateScenarioControls() {
@@ -764,12 +916,155 @@ function updateScenarioControls() {
 function setScenarioSelection(checked) {
   $$(".scenario-check").forEach((input) => { input.checked = checked; });
   renderAppMetrics();
+  updateScenariosSummary();
+  updateContinueWithTests();
+  updateRunSimpleView();
   renderCompactWorkflow();
 }
 
 function selectedScenarios() {
   const selected = new Set($$(".scenario-check:checked").map((input) => input.dataset.id));
   return state.scenarios.filter((scenario) => selected.has(String(scenario.id)));
+}
+
+function updateContinueWithTests() {
+  const selected = selectedScenarios().length;
+  const button = $("#continueWithTestsBtn");
+  if (!button) return;
+  button.textContent = `Continue with ${selected} Test${selected === 1 ? "" : "s"}`;
+  button.disabled = selected === 0;
+}
+
+function getContractEndpoints() {
+  if (!state.contract || !Array.isArray(state.contract.endpoints)) return [];
+  return state.contract.endpoints;
+}
+
+function matchLabelForScenario(scenario) {
+  if (scenario.unlinked) return "No match";
+  if (scenario.method && scenario.path) return "Strong match";
+  return "Review suggested";
+}
+
+function endpointKey(endpoint) {
+  return `${endpoint.method || "GET"} ${endpoint.path || "/"}`;
+}
+
+function renderConnections() {
+  const list = $("#apiConnectionList");
+  const empty = $("#connectionEmptyState");
+  const useBtn = $("#useConnectionsBtn");
+  if (!list || !empty || !useBtn) return;
+
+  const scenarios = selectedScenarios();
+  const endpoints = getContractEndpoints();
+  const ready = scenarios.length > 0 && endpoints.length > 0;
+
+  empty.hidden = ready;
+  list.hidden = !ready;
+  useBtn.disabled = !ready;
+
+  if (!ready) {
+    list.innerHTML = "";
+    return;
+  }
+
+  list.innerHTML = scenarios.map((scenario) => {
+    const override = state.apiOverrides[String(scenario.id)] || endpointLabel(scenario);
+    const recommended = override || endpointLabel(scenario) || "No recommended API";
+    const status = matchLabelForScenario(scenario);
+    const options = endpoints.map((endpoint) => {
+      const key = endpointKey(endpoint);
+      return `<option value="${escapeHtml(key)}"${key === override ? " selected" : ""}>${escapeHtml(key)}</option>`;
+    }).join("");
+
+    return `
+      <article class="connection-item">
+        <div class="connection-test">${escapeHtml(scenario.title || scenario.id || "Untitled test")}</div>
+        <div class="connection-arrow">↓</div>
+        <div class="connection-api">${escapeHtml(recommended)}</div>
+        <div class="connection-meta"><span class="status ${status === "Strong match" ? "passed" : status === "Review suggested" ? "needs_review" : "blocked"}">${escapeHtml(status)}</span></div>
+        <div class="connection-actions">
+          <button class="link-button change-api-btn" type="button" data-scenario-id="${escapeHtml(scenario.id)}">Change API</button>
+          <select class="api-override-select" data-scenario-id="${escapeHtml(scenario.id)}" hidden>
+            ${options}
+          </select>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  $$(".change-api-btn").forEach((btn) => btn.addEventListener("click", () => {
+    const id = btn.dataset.scenarioId;
+    const select = document.querySelector(`.api-override-select[data-scenario-id="${id}"]`);
+    if (!select) return;
+    select.hidden = !select.hidden;
+  }));
+
+  $$(".api-override-select").forEach((select) => select.addEventListener("change", () => {
+    const scenarioId = select.dataset.scenarioId;
+    state.apiOverrides[String(scenarioId)] = select.value;
+    const scenario = state.scenarios.find((item) => String(item.id) === String(scenarioId));
+    if (scenario) {
+      const [method, ...rest] = String(select.value).split(" ");
+      scenario.method = method;
+      scenario.path = rest.join(" ");
+      scenario.unlinked = false;
+    }
+    state.connectionsConfirmed = false;
+    saveState();
+    renderConnections();
+    renderScenarios();
+  }));
+}
+
+function updateRunSimpleView() {
+  const summary = $("#runSimpleSummary");
+  const order = $("#runOrderPreview");
+  if (!summary || !order) return;
+  const selected = selectedScenarios();
+  const env = $("#envName")?.value.trim() || "local";
+  summary.textContent = `${selected.length} tests ready in ${env}`;
+  if (!selected.length) {
+    order.innerHTML = "";
+    return;
+  }
+  order.innerHTML = selected.map((s, index) => `
+    <span class="run-order-step">${escapeHtml(s.title || s.id || `Test ${index + 1}`)}</span>
+    ${index < selected.length - 1 ? '<span class="run-order-sep">↓</span>' : ""}
+  `).join("");
+}
+
+function updateRunResultCompact() {
+  const wrapper = $("#runResultCompact");
+  const text = $("#runResultCompactText");
+  if (!wrapper || !text) return;
+  const summary = state.run && state.run.summary;
+  if (!summary) {
+    wrapper.hidden = true;
+    return;
+  }
+  text.textContent = `${summary.total || 0} Tests · ${summary.passed || 0} Passed · ${summary.failed || 0} Failed · ${summary.blocked || 0} Blocked`;
+  wrapper.hidden = false;
+}
+
+function updateExecutionPanelState() {
+  const hasPrereq = Boolean(state.ticket) && Array.isArray(state.scenarios) && state.scenarios.length > 0;
+  const empty = $("#execEmpty");
+  const full = $("#execFullContent");
+  if (empty) empty.hidden = hasPrereq;
+  if (full) full.hidden = !hasPrereq;
+
+  const selected = selectedScenarios().length;
+  const total = state.scenarios.length;
+  const readyCount = $("#readyCount");
+  const selectedCount = $("#selectedCount");
+  const selectedSpan = $("#selectedCountSpan");
+  const blockedCount = $("#blockedCount");
+  if (readyCount) readyCount.textContent = String(total);
+  if (blockedCount) blockedCount.textContent = String(Math.max(total - selected, 0));
+  if (selectedCount) selectedCount.textContent = String(selected);
+  if (selectedSpan) selectedSpan.hidden = selected === 0;
 }
 
 function renderAuthFields() {
@@ -820,23 +1115,19 @@ async function generateScenarios() {
     if (raw) { ticket = parseTicketInput(raw); state.ticket = ticket; renderTicketSummary(); }
   }
   if (!ticket || !ticket.summary) { showModal("Step 1: No Ticket Loaded", "Cannot generate scenarios without a ticket."); return; }
-  if (!state.contract) {
-    const raw = $("#contractJson").value.trim();
-    if (!raw) { showModal("Step 2: No Contract Loaded", "Cannot generate scenarios without an API contract."); return; }
-    await parseContract({ silent: true });
-    if (!state.contract) { showModal("Step 2: Contract Parse Failed", "The contract JSON could not be parsed."); return; }
-  }
   setScenariosState("loading");
   try {
-    const data = await api("/api/scenarios/generate", { method: "POST", body: JSON.stringify({ ticket, contract: state.contract, useAi: $("#useAi")?.checked }) });
-    state.scenarios = data.scenarios || [];
-    state.unusedEndpoints = data.unusedEndpoints || [];
+    const data = await api("/api/test-cases/generate", { method: "POST", body: JSON.stringify({ projectId: "default", ticket }) });
+    state.scenarios = data.testCases || [];
+    state.unusedEndpoints = [];
+    state.connectionsConfirmed = false;
+    state.apiOverrides = {};
     renderScenarios();
     renderAppMetrics();
     renderCompactWorkflow();
-    updateScenariosSummary();
+    refreshWorkspaceUI();
     saveState();
-    toast(`Generated ${state.scenarios.length} scenario(s) using ${data.mode}.`);
+    toast(`Generated ${state.scenarios.length} tests.`);
   } catch (error) {
     showInlineError("Scenario generation failed. Your existing inputs have been preserved.");
     setScenariosState("empty");
@@ -847,7 +1138,10 @@ function bindEvents() {
   $$("[data-view-trigger]").forEach((trigger) => {
     trigger.addEventListener("click", (event) => {
       event.preventDefault();
-      setActiveView(trigger.dataset.viewTrigger);
+      setActiveView(trigger.dataset.viewTrigger, { navKey: trigger.dataset.navKey });
+      if (trigger.dataset.viewTrigger === "workspace") {
+        scrollToWorkspaceSection(trigger.dataset.scrollSection || "top");
+      }
       if (trigger.dataset.viewTrigger === "history") { loadRunHistory({ silent: true }).catch((error) => toast(error.message)); }
     });
   });
@@ -879,6 +1173,7 @@ function bindEvents() {
 
   $("#loadSampleTicketBtn")?.addEventListener("click", () => loadSampleTicket().catch((error) => toast(error.message)));
   $("#fetchJiraBtn")?.addEventListener("click", () => fetchJiraTicket().catch((error) => toast(error.message)));
+  $("#generateFromRequirementBtn")?.addEventListener("click", () => generateScenarios().catch((error) => toast(error.message)));
   $("#changeRequirementBtn")?.addEventListener("click", () => {
     // Focus the jiraKey input to allow user to change requirement
     const jiraKeyInput = $("#jiraKey");
@@ -906,9 +1201,36 @@ function bindEvents() {
     });
   }
   $("#replaceContractBtn")?.addEventListener("click", () => contractFileInput?.click());
-  $("#removeContractBtn")?.addEventListener("click", () => { clearContractFileSummary(); $("#contractJson").value = ""; });
+  $("#removeContractBtn")?.addEventListener("click", () => {
+    clearContractFileSummary();
+    $("#contractJson").value = "";
+    state.contract = null;
+    state.connectionsConfirmed = false;
+    renderConnections();
+    updateWorkspaceProgression();
+  });
 
-  $("#generateScenariosBtn")?.addEventListener("click", () => generateScenarios().catch((error) => toast(error.message)));
+  $("#selectAllScenariosBtn")?.addEventListener("click", () => setScenarioSelection(true));
+  $("#deselectAllScenariosBtn")?.addEventListener("click", () => setScenarioSelection(false));
+  $("#continueWithTestsBtn")?.addEventListener("click", () => {
+    if (selectedScenarios().length === 0) return;
+    setActiveView("workspace", { navKey: "apis-services" });
+    scrollToWorkspaceSection("collection");
+    updateWorkspaceProgression();
+  });
+  $("#useConnectionsBtn")?.addEventListener("click", () => {
+    state.connectionsConfirmed = true;
+    saveState();
+    updateWorkspaceProgression();
+    setActiveView("workspace", { navKey: "testing-workspace" });
+    scrollToWorkspaceSection("execution");
+    toast("API connections confirmed.");
+  });
+  $("#viewConnectionsBtn")?.addEventListener("click", () => expandPanel("collection"));
+  $("#editCollectionBtn")?.addEventListener("click", () => expandPanel("collection"));
+  $("#editReqBtn")?.addEventListener("click", () => expandPanel("requirements"));
+  $("#editExecBtn")?.addEventListener("click", () => expandPanel("execution"));
+  $("#viewResultsBtn")?.addEventListener("click", () => setActiveView("results", { navKey: "results" }));
 
 $$("[data-source]").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -941,8 +1263,10 @@ $$("[data-source]").forEach((chip) => {
   });
 
   $("#authType")?.addEventListener("change", renderAuthFields);
+  $("#envName")?.addEventListener("input", updateHeaderEnvironment);
   $("#historySearch")?.addEventListener("input", renderHistory);
   $("#historyStatus")?.addEventListener("change", renderHistory);
+  $("#refreshHistoryBtn")?.addEventListener("click", () => loadRunHistory().catch((error) => toast(error.message)));
   $("#themeToggle")?.addEventListener("click", toggleTheme);
 }
 
@@ -952,6 +1276,7 @@ function loadRunHistory(options = {}) {
     renderHistory();
     renderAppMetrics();
     renderCompactWorkflow();
+    refreshWorkspaceUI();
     if (!options.silent) toast("Run history refreshed.");
   }).catch((error) => toast(error.message));
 }
@@ -972,7 +1297,7 @@ function renderHistory() {
           <div class="muted">${escapeHtml(run.ticketSummary || "Manual run")}</div>
         </td>
         <td>
-          <strong>${escapeHtml(run.id)}</strong>
+          <strong>Validation run</strong>
           <div class="muted">${escapeHtml(run.contractTitle)}</div>
         </td>
         <td>
@@ -1010,9 +1335,13 @@ async function boot() {
   bindEvents();
   initTheme();
   renderAuthFields();
-  setActiveView(initialViewFromHash(), { skipHash: true });
+  loadState();
+  const initialView = initialViewFromHash();
+  setActiveView(initialView, { skipHash: true, navKey: initialNavKeyFromView(initialView) });
   renderAppMetrics();
   renderCompactWorkflow();
+  renderScenarios();
+  renderConnections();
   
   // Initialize Requirements section state - show empty helper at bottom for Jira tab
   renderJiraTabState();
@@ -1023,14 +1352,10 @@ async function boot() {
   // Do NOT auto-load samples - require explicit user action
   // User should click "Sample" or enter a ticket key to load data
   
-  await loadConfigStatus();
   await loadRunHistory({ silent: true });
-  
-  updateStepSummaries();
-  updateScenariosPrereqStatus();
+  refreshWorkspaceUI();
 }
 
 boot().catch((error) => {
-  $("#serverState").textContent = "Attention";
   toast(error.message);
 });

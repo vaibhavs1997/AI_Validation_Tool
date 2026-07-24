@@ -1,0 +1,579 @@
+{
+  "id": "Ticket-01-1783884554769",
+  "ticket": {
+    "key": "Ticket-01",
+    "summary": "Acceptance Criteria",
+    "issueType": "Manual",
+    "status": "Draft",
+    "priority": "",
+    "labels": [
+      "manual-input"
+    ],
+    "description": "Acceptance Criteria\nUnique Constraints\n\nGiven a request with an existing email or username\n\nWhen the API is called\n\nThen the system should return 409 Conflict with an error message indicating duplication.",
+    "acceptanceCriteria": [
+      "Unique Constraints"
+    ],
+    "comments": [],
+    "fetchedAt": "2026-07-12T19:29:02.448Z",
+    "source": "plain_text"
+  },
+  "contract": {
+    "title": "Payments API",
+    "version": "1.0.0",
+    "baseUrl": "https://api.qa.example.com",
+    "endpointCount": 2
+  },
+  "environment": {
+    "name": "local-qa",
+    "baseUrl": "https://api.qa.example.com",
+    "dryRun": true,
+    "authType": "none"
+  },
+  "authStatus": null,
+  "summary": {
+    "total": 10,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 0,
+    "needs_review": 0,
+    "dry_run": 10
+  },
+  "scenarios": [
+    {
+      "id": "createRefund-TC-001",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [],
+      "assertions": [
+        "Response matches success contract",
+        "Business operation is completed"
+      ],
+      "risk": "high",
+      "sourceAc": "API contract",
+      "title": "POST /payments/{paymentId}/refunds accepts a valid request",
+      "type": "positive",
+      "expectedStatus": "201"
+    },
+    {
+      "id": "createRefund-TC-002",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "remove"
+        }
+      ],
+      "assertions": [
+        "API returns a validation error for missing amount"
+      ],
+      "risk": "medium",
+      "sourceAc": "Request schema",
+      "title": "Missing required field: amount",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "createRefund-TC-003",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "reason",
+          "operation": "remove"
+        }
+      ],
+      "assertions": [
+        "API returns a validation error for missing reason"
+      ],
+      "risk": "medium",
+      "sourceAc": "Request schema",
+      "title": "Missing required field: reason",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "createRefund-TC-004",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "idempotencyKey",
+          "operation": "remove"
+        }
+      ],
+      "assertions": [
+        "API returns a validation error for missing idempotencyKey"
+      ],
+      "risk": "medium",
+      "sourceAc": "Request schema",
+      "title": "Missing required field: idempotencyKey",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "createRefund-TC-005",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "invalidType"
+        }
+      ],
+      "assertions": [
+        "API rejects invalid type for amount"
+      ],
+      "risk": "medium",
+      "sourceAc": "Request schema",
+      "title": "Invalid data type for amount",
+      "type": "negative",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "createRefund-TC-006",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "boundaryMin",
+          "value": 0.01
+        }
+      ],
+      "assertions": [
+        "API enforces boundary rules for amount"
+      ],
+      "risk": "medium",
+      "sourceAc": "Boundary validation",
+      "title": "Boundary validation for amount",
+      "type": "boundary",
+      "expectedStatus": "400"
+    },
+    {
+      "id": "createRefund-TC-007",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [],
+      "assertions": [
+        "API rejects unauthenticated request"
+      ],
+      "risk": "high",
+      "sourceAc": "Security validation",
+      "title": "Missing authorization for POST /payments/{paymentId}/refunds",
+      "type": "auth",
+      "authMode": "missing",
+      "expectedStatus": "401"
+    },
+    {
+      "id": "getPayment-TC-008",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [],
+      "assertions": [
+        "Response matches success contract",
+        "Business operation is completed"
+      ],
+      "risk": "high",
+      "sourceAc": "API contract",
+      "title": "GET /payments/{paymentId} accepts a valid request",
+      "type": "positive",
+      "expectedStatus": "200"
+    },
+    {
+      "id": "getPayment-TC-009",
+      "endpointId": "ab1c0cb24e",
+      "method": "GET",
+      "path": "/payments/{paymentId}",
+      "basePayload": {},
+      "mutations": [],
+      "assertions": [
+        "API rejects unauthenticated request"
+      ],
+      "risk": "high",
+      "sourceAc": "Security validation",
+      "title": "Missing authorization for GET /payments/{paymentId}",
+      "type": "auth",
+      "authMode": "missing",
+      "expectedStatus": "401"
+    },
+    {
+      "id": "createRefund-TC-010",
+      "endpointId": "4bf15ddc9f",
+      "method": "POST",
+      "path": "/payments/{paymentId}/refunds",
+      "basePayload": {
+        "amount": 50,
+        "reason": "Customer request",
+        "idempotencyKey": "refund-PAY-1234-001",
+        "metadata": {
+          "requestedBy": "qa.user@example.com"
+        }
+      },
+      "mutations": [
+        {
+          "field": "amount",
+          "operation": "replace",
+          "value": "rule-violation-value"
+        }
+      ],
+      "assertions": [
+        "Acceptance criterion is satisfied: Unique Constraints"
+      ],
+      "risk": "high",
+      "sourceAc": "Unique Constraints",
+      "title": "Business rule: Unique Constraints",
+      "type": "business_rule",
+      "expectedStatus": "201"
+    }
+  ],
+  "results": [
+    {
+      "scenarioId": "createRefund-TC-001",
+      "title": "POST /payments/{paymentId}/refunds accepts a valid request",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.770Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 50,
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-002",
+      "title": "Missing required field: amount",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-003",
+      "title": "Missing required field: reason",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 50,
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-004",
+      "title": "Missing required field: idempotencyKey",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 50,
+          "reason": "Customer request",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-005",
+      "title": "Invalid data type for amount",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "not-a-number",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-006",
+      "title": "Boundary validation for amount",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 0.01,
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-007",
+      "title": "Missing authorization for POST /payments/{paymentId}/refunds",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.771Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": 50,
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-008",
+      "title": "GET /payments/{paymentId} accepts a valid request",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.771Z",
+      "finishedAt": "2026-07-12T19:29:14.772Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "getPayment-TC-009",
+      "title": "Missing authorization for GET /payments/{paymentId}",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.772Z",
+      "finishedAt": "2026-07-12T19:29:14.772Z",
+      "request": {
+        "method": "GET",
+        "url": "https://api.qa.example.com/payments/sample-id",
+        "headers": {
+          "Accept": "application/json"
+        },
+        "body": null
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    },
+    {
+      "scenarioId": "createRefund-TC-010",
+      "title": "Business rule: Unique Constraints",
+      "status": "dry_run",
+      "startedAt": "2026-07-12T19:29:14.772Z",
+      "finishedAt": "2026-07-12T19:29:14.772Z",
+      "request": {
+        "method": "POST",
+        "url": "https://api.qa.example.com/payments/sample-id/refunds",
+        "headers": {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "amount": "rule-violation-value",
+          "reason": "Customer request",
+          "idempotencyKey": "refund-PAY-1234-001",
+          "metadata": {
+            "requestedBy": "qa.user@example.com"
+          }
+        }
+      },
+      "response": null,
+      "validation": {
+        "assertions": [],
+        "passed": false,
+        "failed": false
+      },
+      "note": "Dry run only. No API request was sent."
+    }
+  ],
+  "createdAt": "2026-07-12T19:29:14.772Z"
+}

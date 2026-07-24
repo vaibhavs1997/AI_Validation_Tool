@@ -1,0 +1,127 @@
+name: Promote branch to environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: Branch to promote from
+        required: true
+        default: main
+      target_environment:
+        description: Target branch to receive the code
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+          - test
+          - both
+      delivery_mode:
+        description: Create a PR or sync the target branch directly
+        required: true
+        type: choice
+        default: pull_request
+        options:
+          - pull_request
+          - direct_sync
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+    steps:
+      - name: Resolve target branches
+        id: targets
+        shell: bash
+        run: |
+          case "${{ inputs.target_environment }}" in
+            both)
+              echo 'targets=["dev","test"]' >> "$GITHUB_OUTPUT"
+              ;;
+            dev)
+              echo 'targets=["dev"]' >> "$GITHUB_OUTPUT"
+              ;;
+            test)
+              echo 'targets=["test"]' >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unsupported target environment: ${{ inputs.target_environment }}"
+              exit 1
+              ;;
+          esac
+
+  promote:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.prepare.outputs.targets) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate source and target branches
+        shell: bash
+        run: |
+          git fetch origin "${{ inputs.source_branch }}" "${{ matrix.target }}"
+          git rev-parse --verify "origin/${{ inputs.source_branch }}"
+          git rev-parse --verify "origin/${{ matrix.target }}"
+
+      - name: Create promotion pull request
+        if: ${{ inputs.delivery_mode == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          existing_pr="$(gh pr list \
+            --state open \
+            --base "${{ matrix.target }}" \
+            --head "${{ inputs.source_branch }}" \
+            --json number \
+            --jq '.[0].number')"
+
+          if [ -n "$existing_pr" ]; then
+            echo "Open promotion PR already exists: #$existing_pr"
+            exit 0
+          fi
+
+          gh pr create \
+            --base "${{ matrix.target }}" \
+            --head "${{ inputs.source_branch }}" \
+            --title "Promote ${{ inputs.source_branch }} to ${{ matrix.target }}" \
+            --body "## Summary
+
+Automated promotion from \`${{ inputs.source_branch }}\` to \`${{ matrix.target }}\`.
+
+## Trigger
+
+- Workflow: \`${{ github.workflow }}\`
+- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+- Requested by: @${{ github.actor }}
+
+## Notes
+
+- This PR was created by the manual environment promotion workflow.
+- Merge it when you are ready to move code into \`${{ matrix.target }}\`."
+
+      - name: Sync target branch directly
+        if: ${{ inputs.delivery_mode == 'direct_sync' }}
+        shell: bash
+        run: |
+          source_sha="$(git rev-parse "origin/${{ inputs.source_branch }}")"
+          target_sha="$(git rev-parse "origin/${{ matrix.target }}")"
+
+          if [ "$source_sha" = "$target_sha" ]; then
+            echo "${{ matrix.target }} is already in sync with ${{ inputs.source_branch }}"
+            exit 0
+          fi
+
+          git push origin "refs/remotes/origin/${{ inputs.source_branch }}:refs/heads/${{ matrix.target }}"

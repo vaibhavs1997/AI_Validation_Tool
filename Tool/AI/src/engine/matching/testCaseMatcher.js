@@ -154,12 +154,12 @@ function convertCandidate(candidate, endpointMap) {
  * @param {Array} options.testCases — canonical TestCase objects
  * @returns {Object} { projectId, matches, diagnostics, warnings }
  */
-function matchTestCasesToApis({ projectId, testCases }) {
-  const warnings = [];
+function isPromise(value) {
+  return Boolean(value && typeof value.then === "function");
+}
 
-  // Load registered services and API models
-  const services = listServices(projectId);
-  const apiModels = services.map((s) => getApiModel(projectId, s.id)).filter(Boolean);
+function buildMatchResponse(projectId, testCases, services, apiModels) {
+  const warnings = [];
 
   if (services.length === 0) {
     warnings.push("No registered services found for this project.");
@@ -250,6 +250,22 @@ function matchTestCasesToApis({ projectId, testCases }) {
     },
     warnings,
   };
+}
+
+function matchTestCasesToApis({ projectId, testCases }) {
+  const servicesMaybe = listServices(projectId);
+  if (isPromise(servicesMaybe)) {
+    return servicesMaybe
+      .then((services) =>
+        Promise.all(services.map((s) => getApiModel(projectId, s.id))).then((apiModels) =>
+          buildMatchResponse(projectId, testCases, services, apiModels.filter(Boolean))
+        )
+      );
+  }
+
+  const services = servicesMaybe;
+  const apiModels = services.map((s) => getApiModel(projectId, s.id)).filter(Boolean);
+  return buildMatchResponse(projectId, testCases, services, apiModels);
 }
 
 module.exports = {

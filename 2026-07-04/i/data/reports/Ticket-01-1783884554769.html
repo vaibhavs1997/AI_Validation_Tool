@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Validation Report - Ticket-01</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; color: #17212b; background: #f6f8fa; }
+    header { background: #17212b; color: white; padding: 28px 40px; }
+    main { padding: 28px 40px; max-width: 1120px; margin: 0 auto; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0; font-size: 18px; }
+    h3 { margin-bottom: 6px; font-size: 14px; }
+    .summary { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)); gap: 12px; margin: 20px 0; }
+    .metric, .case { background: white; border: 1px solid #d9e0e7; border-radius: 8px; }
+    .metric { padding: 14px; }
+    .metric strong { display: block; font-size: 22px; }
+    .case { padding: 18px; margin-bottom: 16px; }
+    .case-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .passed { background: #dff7ea; color: #126b3a; }
+    .failed { background: #ffe2e0; color: #a32018; }
+    .blocked { background: #fff0ca; color: #735100; }
+    .needs_review, .dry_run { background: #e5ebf7; color: #294a7a; }
+    dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; }
+    dt { color: #667485; font-weight: 700; }
+    dd { margin: 0; word-break: break-word; }
+    pre { white-space: pre-wrap; background: #101820; color: #eef6ff; padding: 12px; border-radius: 6px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>API Validation Report</h1>
+    <div>Ticket-01 - Acceptance Criteria</div>
+  </header>
+  <main>
+    <section class="summary">
+      <div class="metric"><span>Total</span><strong>10</strong></div>
+      <div class="metric"><span>Passed</span><strong>0</strong></div>
+      <div class="metric"><span>Failed</span><strong>0</strong></div>
+      <div class="metric"><span>Blocked</span><strong>0</strong></div>
+      <div class="metric"><span>Review</span><strong>0</strong></div>
+      <div class="metric"><span>Dry Run</span><strong>10</strong></div>
+    </section>
+    
+        <section class="case">
+          <div class="case-head">
+            <h2>POST /payments/{paymentId}/refunds accepts a valid request</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-001</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: 50,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Missing required field: amount</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-002</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Missing required field: reason</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-003</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: 50,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Missing required field: idempotencyKey</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-004</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: 50,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Invalid data type for amount</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-005</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: &quot;not-a-number&quot;,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Boundary validation for amount</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-006</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: 0.01,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Missing authorization for POST /payments/{paymentId}/refunds</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-007</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: 50,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>GET /payments/{paymentId} accepts a valid request</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>getPayment-TC-008</dd>
+            <dt>Request</dt><dd>GET https://api.qa.example.com/payments/sample-id</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;GET&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: null
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Missing authorization for GET /payments/{paymentId}</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>getPayment-TC-009</dd>
+            <dt>Request</dt><dd>GET https://api.qa.example.com/payments/sample-id</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;GET&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: null
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+        <section class="case">
+          <div class="case-head">
+            <h2>Business rule: Unique Constraints</h2>
+            <span class="badge dry_run">Dry Run</span>
+          </div>
+          <dl>
+            <dt>Scenario ID</dt><dd>createRefund-TC-010</dd>
+            <dt>Request</dt><dd>POST https://api.qa.example.com/payments/sample-id/refunds</dd>
+            <dt>Actual Status</dt><dd>dry_run</dd>
+            <dt>Error</dt><dd></dd>
+          </dl>
+          <h3>Assertions</h3>
+          <ul></ul>
+          <details>
+            <summary>Request evidence</summary>
+            <pre>{
+  &quot;method&quot;: &quot;POST&quot;,
+  &quot;url&quot;: &quot;https://api.qa.example.com/payments/sample-id/refunds&quot;,
+  &quot;headers&quot;: {
+    &quot;Accept&quot;: &quot;application/json&quot;,
+    &quot;Content-Type&quot;: &quot;application/json&quot;
+  },
+  &quot;body&quot;: {
+    &quot;amount&quot;: &quot;rule-violation-value&quot;,
+    &quot;reason&quot;: &quot;Customer request&quot;,
+    &quot;idempotencyKey&quot;: &quot;refund-PAY-1234-001&quot;,
+    &quot;metadata&quot;: {
+      &quot;requestedBy&quot;: &quot;qa.user@example.com&quot;
+    }
+  }
+}</pre>
+          </details>
+          <details>
+            <summary>Response evidence</summary>
+            <pre></pre>
+          </details>
+        </section>
+      
+  </main>
+</body>
+</html>
