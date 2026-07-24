@@ -22,7 +22,7 @@ function safeName(value) {
     .replace(/^-|-$/g, "")
     .slice(0, 100);
   if (hasSpecial && !str.startsWith(sanitized)) {
-    const hash = crypto.createHash("md5").update(str).digest("hex").slice(0, 6);
+    const hash = crypto.createHash("sha256").update(str).digest("hex").slice(0, 6);
     return `${sanitized}-${hash}`;
   }
   return sanitized || crypto.randomUUID().slice(0, 12);
