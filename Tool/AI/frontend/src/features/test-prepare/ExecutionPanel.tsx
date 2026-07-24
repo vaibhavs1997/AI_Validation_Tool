@@ -38,6 +38,7 @@ interface ExecutionPanelProps {
   prepareResponse: PrepareResponse;
   /** Called when the execution state should be invalidated (e.g. project changes) */
   onInvalidate?: () => void;
+  onRunComplete?: (outcome: { passed: number; failed: number; blocked: number; runId?: string }) => void;
 }
 
 type ExecutionStatus = "IDLE" | "RUNNING" | "COMPLETED" | "ERROR";
@@ -459,6 +460,7 @@ function validateOverride(override: {
 export function ExecutionPanel({
   activeProjectId,
   prepareResponse,
+  onRunComplete,
 }: ExecutionPanelProps) {
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
   const [selectedSpecIds, setSelectedSpecIds] = useState<Set<string>>(new Set());
@@ -596,6 +598,12 @@ export function ExecutionPanel({
 
       setExecResult(result);
       setExecState("COMPLETED");
+      onRunComplete?.({
+        passed: result.results.filter(r => r.status === "passed").length,
+        failed: result.results.filter(r => r.status === "failed").length,
+        blocked: result.results.filter(r => r.status === "blocked").length,
+        runId: result.runId,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Execution failed";
       setExecError(msg);
@@ -699,6 +707,53 @@ export function ExecutionPanel({
   const batchFailedCount = batchResults.filter(r => r.status === "failed").length;
   const batchBlockedCount = batchResults.filter(r => r.results.some(step => step.status === "blocked")).length;
 
+  const renderPrerequisites = () => {
+    if (!activeProjectId || executableSpecs.length === 0) {
+      return (
+        <div style={{ marginBottom: "18px" }}>
+          <div style={{
+            padding: "16px",
+            borderRadius: "var(--radius)",
+            background: "var(--surface-alt)",
+            border: "1px dashed var(--line)",
+            textAlign: "center",
+            color: "var(--muted)",
+            fontSize: "13px"
+          }}>
+            {!activeProjectId
+              ? "Select a project to run tests."
+              : "Prepare tests before running."}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderRunSummary = () => {
+    if (execState === "IDLE" && executableSpecs.length > 0) {
+      return (
+        <div style={{
+          padding: "12px 14px",
+          borderRadius: "var(--radius)",
+          background: "var(--green-soft)",
+          border: "1px solid var(--green)",
+          marginBottom: "18px",
+          fontSize: "13px",
+          color: "var(--green-deep)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between"
+        }}>
+          <span>
+            <strong>{executableSpecs.length}</strong> test{executableSpecs.length !== 1 ? "s" : ""} ready · {selectedSpecIds.size > 0 ? `${selectedSpecIds.size} selected` : "Select tests to run"}
+          </span>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <section className="panel span-12 panel-execution" data-view-section="workspace">
       <div className="panel-head" style={{
@@ -709,109 +764,37 @@ export function ExecutionPanel({
         padding: "12px 16px",
         borderBottom: "1px solid var(--line)",
         background: "var(--amber-soft)",
+        borderBottomColor: "var(--amber)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="step" style={{
-            width: "30px",
-            height: "30px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "8px",
-            fontWeight: 800,
-            background: "var(--amber)",
-            color: "#fff",
-          }}>
-            4
-          </span>
-          <h2 style={{ margin: 0, fontSize: "17px", color: "var(--amber-deep)" }}>
-            Run Tests
-          </h2>
+          <span className="step-indicator execution">4</span>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--amber-deep)" }}>Run Tests</h2>
+            {executableSpecs.length > 0 && (
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {executableSpecs.length} ready · {prepareResponse.unresolvedTestCases.length} need attention
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)",
-          }}>
-            {execState}
-          </span>
+          {execState === "RUNNING" && (
+            <span style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "var(--amber)",
+            }}>
+              Running
+            </span>
+          )}
         </div>
       </div>
 
       <div className="panel-body" style={{ padding: "18px" }}>
-        {/* Prerequisites */}
-        <div style={{ marginBottom: "18px" }}>
-          <h3 style={{
-            margin: "0 0 12px 0",
-            fontSize: "13px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)",
-          }}>
-            BEFORE YOU RUN
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: activeProjectId ? "var(--green)" : "var(--line)",
-                }}>
-                  {activeProjectId ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Project</span>
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {activeProjectId || "Not selected"}
-              </div>
-            </div>
-
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: executableSpecs.length > 0 ? "var(--green)" : "var(--line)",
-                }}>
-                  {executableSpecs.length > 0 ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Prepared Tests</span>
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {executableSpecs.length} executable · {prepareResponse.unresolvedTestCases.length} unresolved
-              </div>
-            </div>
-          </div>
-        </div>
+        {renderPrerequisites()}
+        {renderRunSummary()}
 
         {/* Spec selection */}
         {executableSpecs.length > 0 && (

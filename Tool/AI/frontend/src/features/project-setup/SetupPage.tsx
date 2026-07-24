@@ -1,8 +1,8 @@
 /**
- * Project Setup Page (Step 5.2)
+ * Project Setup Page
  *
  * Sections:
- * 1. Project selector + create
+ * 1. Project selector + create (when no active project)
  * 2. APIs / Services (reuses existing contract parsing)
  * 3. Project Knowledge (instructions)
  * 4. Relationships (proposed/confirmed/rejected)
@@ -19,6 +19,39 @@ import { ContractUploader } from "../api-collection/ContractUploader";
 import type { ApiContract } from "../api-collection/ApiCollectionTypes";
 import type { ApiError } from "../../services";
 
+// SVG Icon Components
+const IconFolder = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+  </svg>
+);
+
+const IconPlus = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const IconChevronRight = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
+const IconFolderPlus = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+    <path d="M12 11v6M9 14h6" />
+  </svg>
+);
+
+const IconInfo = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4M12 8h.01" />
+  </svg>
+);
+
 interface SetupPageProps {
   activeProjectId: string | null;
   onActiveProjectChange: (projectId: string) => void;
@@ -30,6 +63,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   const [newProjectId, setNewProjectId] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [projectError, setProjectError] = useState("");
+  const [creating, setCreating] = useState(false);
 
   // ─── Services Section ─────────────────────────────────────────────────────
   const [services, setServices] = useState<ServiceDefinition[]>([]);
@@ -89,6 +123,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       return;
     }
     setProjectError("");
+    setCreating(true);
     try {
       const project = await createProject({ id: trimmedId, name: trimmedName });
       setProjects((prev) => [...prev, project]);
@@ -96,12 +131,22 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       setNewProjectId("");
       setNewProjectName("");
     } catch (err) {
-      setProjectError(err instanceof Error ? err.message : "Failed to create project.");
+      const message = (err as { message?: string })?.message || (err as { error?: string })?.error || "Failed to create project.";
+      setProjectError(message);
+    } finally {
+      setCreating(false);
     }
   };
 
   const handleSelectProject = (projectId: string) => {
     onActiveProjectChange(projectId);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleCreateProject();
+    }
   };
 
   // ─── Contract/Service Handlers ────────────────────────────────────────────
@@ -203,98 +248,141 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
     }
   };
 
+  /* ───────────────────────────────────────────────────────────────────
+     NO ACTIVE PROJECT — Project Setup / Overview page
+     ─────────────────────────────────────────────────────────────────── */
   if (!activeProjectId) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Project Setup</h2>
-        <p style={{ color: "var(--muted)", marginBottom: "20px" }}>
-          Select or create a project to get started.
-        </p>
-
-        {/* Existing projects */}
-        {projects.length > 0 && (
-          <section style={{ marginBottom: "24px" }}>
-            <h3 style={{
-              fontSize: "13px", fontWeight: 700, textTransform: "uppercase",
-              color: "var(--muted)", marginBottom: "8px"
-            }}>
-              Existing Projects
-            </h3>
-            <div style={{ display: "grid", gap: "8px" }}>
-              {projects.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handleSelectProject(p.id)}
-                  style={{
-                    textAlign: "left", padding: "10px 14px",
-                    border: "1px solid var(--line)", borderRadius: "6px",
-                    background: "var(--surface)", cursor: "pointer",
-                    color: "var(--ink)", fontSize: "14px"
-                  }}
-                >
-                  <strong>{p.name}</strong>
-                  <span style={{ color: "var(--muted)", marginLeft: "8px", fontSize: "12px" }}>
-                    {p.id}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Create project */}
-        <section style={{ marginBottom: "24px" }}>
-          <h3 style={{
-            fontSize: "13px", fontWeight: 700, textTransform: "uppercase",
-            color: "var(--muted)", marginBottom: "8px"
-          }}>
-            Create New Project
-          </h3>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-            <input
-              type="text"
-              placeholder="Project ID (e.g. my-project)"
-              value={newProjectId}
-              onChange={(e) => setNewProjectId(e.target.value)}
-              style={{
-                flex: 1, padding: "8px 12px", fontSize: "14px",
-                border: "1px solid var(--line)", borderRadius: "6px",
-                background: "var(--surface)", color: "var(--ink)"
-              }}
-            />
-            <input
-              type="text"
-              placeholder="Project Name (optional)"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              style={{
-                flex: 1, padding: "8px 12px", fontSize: "14px",
-                border: "1px solid var(--line)", borderRadius: "6px",
-                background: "var(--surface)", color: "var(--ink)"
-              }}
-            />
-            <button
-              type="button"
-              onClick={handleCreateProject}
-              style={{
-                padding: "8px 16px", fontSize: "14px", fontWeight: 600,
-                color: "#fff", background: "var(--violet)",
-                border: "none", borderRadius: "6px", cursor: "pointer"
-              }}
-            >
-              Create
-            </button>
+      <section id="project-setup-page" className="project-setup-page">
+        <div className="project-setup-container">
+          {/* Page Introduction */}
+          <div className="project-page-intro">
+            <h2 id="project-setup-title">Project Setup</h2>
+            <p>Create or select a project to start testing your APIs.</p>
           </div>
-          {projectError && (
-            <p style={{ color: "var(--red)", fontSize: "13px", margin: 0 }}>{projectError}</p>
-          )}
-        </section>
-      </div>
+
+          {/* Main Project Setup Card */}
+          <div id="project-setup-card" className="project-setup-card">
+            {/* Card Intro Header */}
+            <div className="project-card-header">
+              <div className="project-card-icon"><IconFolder /></div>
+              <div>
+                <h3>Choose your project</h3>
+                <p>Projects organize your APIs, tests, dependencies, runs, and results.</p>
+              </div>
+            </div>
+
+            {/* Existing Projects Section */}
+            <div id="existing-projects-section">
+              <div className="existing-projects-header">Existing Projects</div>
+              {projects.length > 0 ? (
+                projects.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="project-option"
+                    data-project-id={p.id}
+                    onClick={() => handleSelectProject(p.id)}
+                  >
+                    <div className="project-option-icon"><IconFolder /></div>
+                    <div className="project-option-content">
+                      <div className="project-option-name">{p.name || p.id}</div>
+                      <div className="project-option-meta">
+                        Project ID: <span className="project-id-badge">{p.id}</span>
+                      </div>
+                    </div>
+                    <div className="project-option-action"><IconChevronRight /></div>
+                  </button>
+                ))
+              ) : (
+                <div id="projects-empty-state" className="projects-empty-state">
+                  <div className="projects-empty-state-icon"><IconFolderPlus /></div>
+                  <div>
+                    <strong>No projects yet</strong>
+                    <span>Create your first project below to start testing APIs.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="project-section-divider" />
+
+            {/* Create New Project Section */}
+            <div id="create-project-section">
+              <div className="create-project-heading">
+                <div className="section-icon"><IconPlus /></div>
+                <div>
+                  <h3>Create New Project</h3>
+                  <p>Start a new workspace for a product, service, or API collection.</p>
+                </div>
+              </div>
+
+              <div id="create-project-form" className="create-project-form">
+                <div className="form-field">
+                  <label htmlFor="project-id-input" className="form-label">Project ID</label>
+                  <input
+                    id="project-id-input"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. payments-api"
+                    value={newProjectId}
+                    onChange={(e) => setNewProjectId(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+                  <div className="form-helper">Used as the unique project identifier.</div>
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="project-name-input" className="form-label">
+                    Project Name
+                    <span className="optional-label">Optional</span>
+                  </label>
+                  <input
+                    id="project-name-input"
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Payments API"
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                  />
+                  <div className="form-helper">A friendly display name for your team.</div>
+                </div>
+
+                <button
+                  id="create-project-button"
+                  type="button"
+                  onClick={handleCreateProject}
+                  disabled={creating}
+                >
+                  <IconPlus />
+                  Create Project
+                </button>
+              </div>
+
+              {projectError && (
+                <div className="project-error">{projectError}</div>
+              )}
+            </div>
+          </div>
+
+          {/* Information Callout */}
+          <div id="project-info-callout" className="project-info-callout">
+            <div className="info-icon"><IconInfo /></div>
+            <div>
+              <strong>Everything stays organized</strong>
+              <span>Your APIs, tests, dependencies, runs, and results stay together within each project.</span>
+            </div>
+          </div>
+        </div>
+      </section>
     );
   }
 
-  // Active project loaded
+  /* ───────────────────────────────────────────────────────────────────
+     ACTIVE PROJECT — Project detail view (services, knowledge, etc.)
+     ─────────────────────────────────────────────────────────────────── */
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
@@ -305,13 +393,13 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
         marginBottom: "24px"
       }}>
         <div>
-          <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--muted)" }}>
+          <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
             Active Project
           </span>
-          <h2 style={{ margin: "4px 0 0 0" }}>
+          <h2 style={{ margin: "4px 0 0 0", color: "var(--color-text-primary)" }}>
             {activeProject?.name || activeProjectId}
           </h2>
-          <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+          <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
             ID: {activeProjectId}
           </span>
         </div>
@@ -320,8 +408,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           onClick={() => onActiveProjectChange("")}
           style={{
             padding: "6px 12px", fontSize: "13px",
-            border: "1px solid var(--line)", borderRadius: "4px",
-            background: "var(--surface)", cursor: "pointer", color: "var(--ink)"
+            border: "1px solid var(--color-border)", borderRadius: "4px",
+            background: "var(--color-bg-surface)", cursor: "pointer", color: "var(--color-text-primary)"
           }}
         >
           Change Project
@@ -331,11 +419,11 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       {/* ─── Section: APIs / Services ─────────────────────────────────────── */}
       <section style={{
         marginBottom: "24px",
-        border: "1px solid var(--line)", borderRadius: "8px",
-        background: "var(--surface)", overflow: "hidden"
+        border: "1px solid var(--color-border)", borderRadius: "8px",
+        background: "var(--color-bg-surface)", overflow: "hidden"
       }}>
         <div style={{
-          padding: "12px 16px", borderBottom: "1px solid var(--line)",
+          padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
           background: "var(--blue-soft)"
         }}>
           <span style={{
@@ -354,18 +442,18 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           {/* Registered services list */}
           {services.length > 0 && (
             <div style={{ marginBottom: "16px" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--muted)" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
                 Registered Services ({services.length})
               </span>
               <div style={{ marginTop: "8px", display: "grid", gap: "6px" }}>
                 {services.map((s) => (
                   <div key={s.id} style={{
-                    padding: "8px 12px", border: "1px solid var(--line)",
-                    borderRadius: "6px", background: "var(--surface-alt)",
+                    padding: "8px 12px", border: "1px solid var(--color-border)",
+                    borderRadius: "6px", background: "var(--color-bg-subtle)",
                     fontSize: "13px"
                   }}>
                     <strong>{s.name}</strong>
-                    <span style={{ color: "var(--muted)", marginLeft: "8px" }}>{s.id}</span>
+                    <span style={{ color: "var(--color-text-muted)", marginLeft: "8px" }}>{s.id}</span>
                   </div>
                 ))}
               </div>
@@ -376,11 +464,11 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           <div style={{
             display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px"
           }}>
-            <label style={{ fontSize: "12px", fontWeight: 800, color: "var(--muted)", textTransform: "uppercase" }}>
+            <label style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase" }}>
               Source
             </label>
             <div style={{
-              display: "flex", gap: "4px", border: "1px solid var(--line)",
+              display: "flex", gap: "4px", border: "1px solid var(--color-border)",
               borderRadius: "6px", overflow: "hidden"
             }}>
               <span
@@ -388,8 +476,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                 style={{
                   padding: "6px 14px", fontSize: "13px", fontWeight: 700,
                   cursor: "pointer",
-                  color: contractInputMode === "upload" ? "#fff" : "var(--muted)",
-                  background: contractInputMode === "upload" ? "var(--blue)" : "var(--surface)"
+                  color: contractInputMode === "upload" ? "#fff" : "var(--color-text-muted)",
+                  background: contractInputMode === "upload" ? "var(--blue)" : "var(--color-bg-surface)"
                 }}
               >
                 Upload File
@@ -399,8 +487,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                 style={{
                   padding: "6px 14px", fontSize: "13px", fontWeight: 700,
                   cursor: "pointer",
-                  color: contractInputMode === "paste" ? "#fff" : "var(--muted)",
-                  background: contractInputMode === "paste" ? "var(--blue)" : "var(--surface)"
+                  color: contractInputMode === "paste" ? "#fff" : "var(--color-text-muted)",
+                  background: contractInputMode === "paste" ? "var(--blue)" : "var(--color-bg-surface)"
                 }}
               >
                 Paste JSON
@@ -445,7 +533,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                 disabled={registerLoading}
                 style={{
                   padding: "8px 16px", fontSize: "14px", fontWeight: 600,
-                  color: "#fff", background: registerLoading ? "var(--line)" : "var(--blue)",
+                  color: "#fff", background: registerLoading ? "var(--color-border)" : "var(--blue)",
                   border: "none", borderRadius: "6px",
                   cursor: registerLoading ? "not-allowed" : "pointer"
                 }}
@@ -456,7 +544,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           )}
 
           {registerSuccess && (
-            <p style={{ color: "var(--green)", fontSize: "13px", marginTop: "8px" }}>
+            <p style={{ color: "var(--color-success)", fontSize: "13px", marginTop: "8px" }}>
               ✓ {registerSuccess}
             </p>
           )}
@@ -466,11 +554,11 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       {/* ─── Section: Project Knowledge ───────────────────────────────────── */}
       <section style={{
         marginBottom: "24px",
-        border: "1px solid var(--line)", borderRadius: "8px",
-        background: "var(--surface)", overflow: "hidden"
+        border: "1px solid var(--color-border)", borderRadius: "8px",
+        background: "var(--color-bg-surface)", overflow: "hidden"
       }}>
         <div style={{
-          padding: "12px 16px", borderBottom: "1px solid var(--line)",
+          padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
           background: "var(--violet-soft)"
         }}>
           <span style={{
@@ -488,7 +576,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
         <div style={{ padding: "18px" }}>
           <label style={{
             display: "block", fontSize: "12px", fontWeight: 600,
-            color: "var(--muted)", textTransform: "uppercase", marginBottom: "6px"
+            color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "6px"
           }}>
             Instructions
           </label>
@@ -502,8 +590,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
             rows={5}
             style={{
               width: "100%", padding: "10px 12px", fontSize: "14px",
-              border: "1px solid var(--line)", borderRadius: "6px",
-              background: "var(--surface)", color: "var(--ink)",
+              border: "1px solid var(--color-border)", borderRadius: "6px",
+              background: "var(--color-bg-surface)", color: "var(--color-text-primary)",
               resize: "vertical", fontFamily: "inherit",
               boxSizing: "border-box"
             }}
@@ -516,7 +604,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
               style={{
                 padding: "8px 16px", fontSize: "14px", fontWeight: 600,
                 color: "#fff",
-                background: (!instructionsDirty || instructionsLoading) ? "var(--line)" : "var(--violet)",
+                background: (!instructionsDirty || instructionsLoading) ? "var(--color-border)" : "var(--violet)",
                 border: "none", borderRadius: "6px",
                 cursor: (!instructionsDirty || instructionsLoading) ? "not-allowed" : "pointer"
               }}
@@ -524,7 +612,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
               {instructionsLoading ? "Saving..." : "Save & Analyze"}
             </button>
             {knowledge && (
-              <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+              <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
                 Last updated: {new Date(knowledge.updatedAt).toLocaleString()}
               </span>
             )}
@@ -540,11 +628,11 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       {/* ─── Section: Relationships ────────────────────────────────────────── */}
       {knowledge && knowledge.relationships.length > 0 && (
         <section style={{
-          border: "1px solid var(--line)", borderRadius: "8px",
-          background: "var(--surface)", overflow: "hidden"
+          border: "1px solid var(--color-border)", borderRadius: "8px",
+          background: "var(--color-bg-surface)", overflow: "hidden"
         }}>
           <div style={{
-            padding: "12px 16px", borderBottom: "1px solid var(--line)",
+            padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
             background: "var(--green-soft)"
           }}>
             <span style={{
@@ -560,13 +648,13 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
             </h3>
           </div>
           <div style={{ padding: "18px" }}>
-            <div style={{ fontSize: "13px", color: "var(--ink)", marginBottom: "12px" }}>
+            <div style={{ fontSize: "13px", color: "var(--color-text-primary)", marginBottom: "12px" }}>
               {knowledge.relationships.filter((r) => r.status === "confirmed").length} dependency configured
               {knowledge.relationships.filter((r) => r.status === "proposed").length > 0 && (
-                <span style={{ color: "var(--muted)" }}> · {knowledge.relationships.filter((r) => r.status === "proposed").length} pending review</span>
+                <span style={{ color: "var(--color-text-muted)" }}> · {knowledge.relationships.filter((r) => r.status === "proposed").length} pending review</span>
               )}
             </div>
-            <details style={{ fontSize: "12px", color: "var(--muted)" }}>
+            <details style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600 }}>Advanced Relationships</summary>
               {(["proposed", "confirmed", "rejected"] as const).map((status) => {
                 const filtered = knowledge.relationships.filter((r) => r.status === status);
@@ -585,8 +673,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                       {filtered.map((rel, idx) => (
                         <div key={idx} style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "8px 12px", border: "1px solid var(--line)",
-                          borderRadius: "6px", background: "var(--surface-alt)",
+                          padding: "8px 12px", border: "1px solid var(--color-border)",
+                          borderRadius: "6px", background: "var(--color-bg-subtle)",
                           fontSize: "13px"
                         }}>
                           <div>

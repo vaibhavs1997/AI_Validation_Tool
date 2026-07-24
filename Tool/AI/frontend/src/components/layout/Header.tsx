@@ -1,123 +1,91 @@
+import { useState, useEffect } from "react";
+
+const IconSun = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5" />
+    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+  </svg>
+);
+
+const IconMoon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+  </svg>
+);
+
 interface HeaderProps {
   view: "workspace" | "results" | "history";
+  projectName?: string;
+  environment?: string;
 }
 
-export function Header({ view }: HeaderProps) {
-  const viewTitles = {
-    workspace: { eyebrow: "QA automation platform", title: "Ticket-to-API Validation" },
-    results: { eyebrow: "Results", title: "Recent Run Results" },
-    history: { eyebrow: "History", title: "Run History" }
+export function Header({ view, projectName, environment }: HeaderProps) {
+  const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const theme = document.documentElement.getAttribute("data-theme") as "light" | "dark" || "light";
+    setCurrentTheme(theme);
+  }, []);
+
+  const setTheme = (theme: "light" | "dark") => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("testforge-theme", theme);
+    setCurrentTheme(theme);
   };
 
-  const titles = viewTitles[view];
+  const viewConfig = {
+    workspace: { eyebrow: "API TESTING", title: "Test Workspace" },
+    results: { eyebrow: "API TESTING", title: "Results" },
+    history: { eyebrow: "API TESTING", title: "History" }
+  };
+
+  const config = viewConfig[view];
 
   return (
-    <header className="topbar" style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: "24px",
-      padding: "24px 28px",
-      background: "#192633",
-      color: "#fff",
-      borderBottom: "1px solid #263746"
-    }}>
-      <div>
-        <span className="eyebrow" style={{
-          display: "block",
-          marginBottom: "5px",
-          color: "#91d0b4",
-          fontSize: "12px",
-          fontWeight: 800,
-          textTransform: "uppercase",
-          letterSpacing: "0.08em"
-        }}>
-          {titles.eyebrow}
-        </span>
-        <h1 style={{ margin: 0, fontSize: "27px" }}>
-          {titles.title}
-        </h1>
+    <header id="testforge-header" className="app-header">
+      <div className="header-left">
+        <span className="product-context-badge">{config.eyebrow}</span>
+        <h1 className="header-title">{config.title}</h1>
       </div>
-      <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-        <button
-          type="button"
-          title="Toggle dark mode"
-          style={{
-            minHeight: "34px",
-            border: "1px solid rgba(255,255,255,0.22)",
-            background: "rgba(255,255,255,0.08)",
-            color: "#fff",
-            borderRadius: "6px",
-            padding: "7px 12px",
-            cursor: "pointer"
-          }}
-        >
-          🌙
-        </button>
-        <details className="dev-dropdown" style={{ position: "relative" }}>
-          <summary
-            className="dev-trigger link-button ghost"
-            title="Developer tools"
-             style={{
-               listStyle: "none",
-               cursor: "pointer",
-               minHeight: "34px",
-               border: "1px solid rgba(255,255,255,0.22)",
-               background: "rgba(255,255,255,0.08)",
-               color: "#fff",
-               borderRadius: "6px",
-               padding: "7px 12px"
-             }}
-          >
-            Dev
-          </summary>
-          <div className="dev-menu" style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            zIndex: 50,
-            minWidth: "140px",
-            marginTop: "4px",
-            padding: "4px",
-            background: "var(--surface)",
-            border: "1px solid var(--line)",
-            borderRadius: "6px",
-            boxShadow: "var(--shadow)"
-          }}>
-            <a
-              href="/api/health"
-              target="_blank"
-              rel="noreferrer"
-              className="dev-item"
-              style={{
-                display: "block",
-                padding: "8px 12px",
-                borderRadius: "4px",
-                color: "var(--ink)",
-                textDecoration: "none",
-                fontSize: "13px"
-              }}
-            >
-              Health
-            </a>
-            <a
-              href="/api/runs"
-              target="_blank"
-              rel="noreferrer"
-              className="dev-item"
-              style={{
-                display: "block",
-                padding: "8px 12px",
-                borderRadius: "4px",
-                color: "var(--ink)",
-                textDecoration: "none",
-                fontSize: "13px"
-              }}
-            >
-              Runs API
-            </a>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
+        {(projectName || environment) && (
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            {projectName && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+                <span style={{ color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Project:</span>
+                <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{projectName}</span>
+              </div>
+            )}
+            {environment && (
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
+                <span style={{ color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Environment:</span>
+                <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{environment}</span>
+              </div>
+            )}
           </div>
-        </details>
+        )}
+
+        <div id="theme-switcher" className="theme-switcher">
+          <button
+            type="button"
+            className={`theme-option ${currentTheme === "light" ? "active" : ""}`}
+            aria-pressed={currentTheme === "light"}
+            onClick={() => setTheme("light")}
+          >
+            <span className="theme-icon"><IconSun /></span>
+            Light
+          </button>
+          <button
+            type="button"
+            className={`theme-option ${currentTheme === "dark" ? "active" : ""}`}
+            aria-pressed={currentTheme === "dark"}
+            onClick={() => setTheme("dark")}
+          >
+            <span className="theme-icon"><IconMoon /></span>
+            Dark
+          </button>
+        </div>
       </div>
     </header>
   );

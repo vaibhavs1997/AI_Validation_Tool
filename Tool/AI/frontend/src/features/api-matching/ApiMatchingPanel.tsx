@@ -38,12 +38,6 @@ interface ApiMatchingPanelProps {
 
 type PanelStatus = "NOT_MATCHED" | "MATCHING" | "MATCHED" | "ERROR";
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  matched: { bg: "#e3fcef", text: "#0a7c42" },
-  ambiguous: { bg: "#fff3e0", text: "#e65100" },
-  unmatched: { bg: "#fce4e2", text: "#b44236" },
-};
-
 export function ApiMatchingPanel({
   activeProjectId,
   includedTestCases,
@@ -57,8 +51,6 @@ export function ApiMatchingPanel({
   const [mappings, setMappings] = useState<Map<string, TestCaseApiMapping>>(new Map());
 
   const canMatch = Boolean(activeProjectId) && includedTestCases.length > 0;
-
-  const getStatusText = (): PanelStatus => status;
 
   // Report match count to parent (e.g. WorkflowStatus)
   useEffect(() => {
@@ -129,14 +121,6 @@ export function ApiMatchingPanel({
     });
   };
 
-  const handleClearMapping = (testCaseId: string) => {
-    setMappings((prev) => {
-      const next = new Map(prev);
-      next.delete(testCaseId);
-      return next;
-    });
-  };
-
   const handleConfirm = () => {
     if (!onConfirm || !matchResponse) return;
     const mappingsArray = Array.from(mappings.values());
@@ -151,163 +135,91 @@ export function ApiMatchingPanel({
     return matchResponse?.matches.find((m) => m.testCaseId === tcId);
   };
 
-  const renderBadge = (status: string) => {
-    const colors = STATUS_COLORS[status] || { bg: "#f5f5f5", text: "#616161" };
-    return (
-      <span style={{
-        display: "inline-block",
-        padding: "2px 6px",
-        borderRadius: "4px",
-        fontSize: "11px",
-        fontWeight: 700,
-        textTransform: "uppercase",
-        background: colors.bg,
-        color: colors.text,
-      }}>
-        {status}
-      </span>
-    );
-  };
-
-  const renderMatchRow = (tc: TestCase) => {
-    const match = getMatchForTestCase(tc.id);
-    const mapping = mappings.get(tc.id);
-    const colors = STATUS_COLORS[match?.status || "unmatched"] || { bg: "#f5f5f5", text: "#616161" };
-
-    if (!match) {
+  const renderEmptyState = () => {
+    if (includedTestCases.length === 0) {
       return (
-        <div key={tc.id} style={{
-          border: "1px solid var(--line)",
-          borderRadius: "6px",
-          padding: "12px",
-          marginBottom: "8px",
-          background: "var(--surface)",
+        <div style={{
+          padding: "24px",
+          borderRadius: "var(--radius)",
+          background: "var(--surface-alt)",
+          border: "1px dashed var(--line)",
+          textAlign: "center",
+          color: "var(--muted)",
+          fontSize: "13px"
         }}>
-          <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>{tc.title}</div>
-          <div style={{ fontSize: "12px", color: "var(--muted)" }}>{tc.description}</div>
-          <div style={{ fontSize: "11px", color: "var(--muted)", marginTop: "4px" }}>No match result available</div>
+          Select tests in Review Tests to connect them with APIs.
         </div>
       );
     }
+    return null;
+  };
+
+  const renderSimplifiedMatchRow = (tc: TestCase) => {
+    const match = getMatchForTestCase(tc.id);
+    const mapping = mappings.get(tc.id);
+
+    if (!match) return null;
+
+    const confidenceLabel = match.status === "matched" ? "Strong match" : match.status === "ambiguous" ? "Review suggested" : "No match";
+    const confidenceColor = match.status === "matched" ? "var(--green)" : match.status === "ambiguous" ? "var(--amber)" : "var(--red)";
 
     return (
-      <div
-        key={tc.id}
-        style={{
-          border: `1px solid ${colors.text}`,
-          borderRadius: "6px",
-          padding: "12px",
-          marginBottom: "8px",
-          background: colors.bg,
-          opacity: 1,
-        }}
-      >
-        <div style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: "10px",
-          marginBottom: "8px",
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--ink)",
-              marginBottom: "2px",
-            }}>
-              {tc.title}
-            </div>
-            {tc.description && (
-              <div style={{
-                fontSize: "12px",
-                color: "var(--muted)",
-                marginBottom: "4px",
-              }}>
-                {tc.description}
+      <div key={tc.id} style={{
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius)",
+        padding: "12px",
+        marginBottom: "8px",
+        background: "var(--surface)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>{tc.title}</div>
+          <span className="badge" style={{ background: confidenceColor === "var(--green)" ? "var(--green-soft)" : confidenceColor === "var(--amber)" ? "var(--amber-soft)" : "var(--red-soft)", color: confidenceColor === "var(--green)" ? "var(--green-deep)" : confidenceColor === "var(--amber)" ? "var(--amber-deep)" : "var(--red-deep)", border: `1px solid ${confidenceColor}` }}>
+            {confidenceLabel}
+          </span>
+        </div>
+        <div style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "8px" }}>
+          {tc.description}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)", fontFamily: "monospace" }}>
+            {mapping ? `${mapping.method} ${mapping.path}` : "Not mapped"}
+          </div>
+          {match.status !== "matched" && (
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById(`candidates-${tc.id}`);
+                if (el) el.hidden = !el.hidden;
+              }}
+              style={{
+                padding: "4px 10px",
+                fontSize: "11px",
+                border: "1px solid var(--line)",
+                borderRadius: "4px",
+                background: "var(--surface)",
+                color: "var(--ink)",
+                cursor: "pointer"
+              }}
+            >
+              Change API
+            </button>
+          )}
+        </div>
+        {match.status !== "matched" && (
+          <div id={`candidates-${tc.id}`} hidden style={{ marginTop: "8px" }}>
+            {match.candidates && match.candidates.length > 0 && (
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", marginBottom: "4px", textTransform: "uppercase" }}>
+                Alternatives
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              {renderBadge(match.status)}
-              {match.status === "matched" && (
-                <span style={{
-                  fontSize: "11px",
-                  fontWeight: 700,
-                  color: "var(--green-deep)",
-                  background: "var(--green-soft)",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                  fontFamily: "monospace",
-                }}>
-                  {match.selectedMatch ? `${match.selectedMatch.confidence}%` : "N/A"}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Selected match display */}
-        {mapping ? (
-          <div style={{
-            padding: "8px 10px",
-            background: "var(--surface-alt)",
-            borderRadius: "4px",
-            marginBottom: "8px",
-            fontSize: "12px",
-          }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
-              <span style={{ fontWeight: 600, color: "var(--ink)" }}>
-                Mapped: {mapping.method} {mapping.path}
-              </span>
-              <span style={{
-                fontSize: "10px",
-                color: mapping.source === "automatic" ? "var(--muted)" : "var(--blue-deep)",
-                background: mapping.source === "automatic" ? "var(--surface)" : "var(--blue-soft)",
-                padding: "1px 4px",
-                borderRadius: "3px",
-              }}>
-                {mapping.source}
-              </span>
-            </div>
-            <div style={{ fontSize: "11px", color: "var(--muted)" }}>
-              Service: {mapping.serviceId} · Operation: {mapping.operationId}
-            </div>
-          </div>
-        ) : (
-          <div style={{
-            padding: "8px 10px",
-            background: "var(--surface)",
-            border: "1px dashed var(--line)",
-            borderRadius: "4px",
-            marginBottom: "8px",
-            fontSize: "12px",
-            color: "var(--muted)",
-          }}>
-            No API mapping selected
-          </div>
-        )}
-
-        {/* Candidate selection */}
-        {match.candidates && match.candidates.length > 0 && (
-          <div style={{ marginBottom: "8px" }}>
-            <div style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              color: "var(--muted)",
-              marginBottom: "4px",
-              textTransform: "uppercase",
-            }}>
-              Candidates ({match.candidates.length})
-            </div>
-            {match.candidates.slice(0, 5).map((cand, idx) => {
-              const isSelected = mapping &&
-                mapping.operationId === cand.operationId &&
-                mapping.serviceId === cand.serviceId;
+            {match.candidates?.slice(0, 5).map((cand, idx) => {
+              const isSelected = mapping && mapping.operationId === cand.operationId && mapping.serviceId === cand.serviceId;
               return (
                 <div
                   key={`${cand.operationId}-${idx}`}
                   style={{
                     padding: "6px 8px",
-                    background: isSelected ? "var(--violet-soft)" : "var(--surface)",
+                    background: isSelected ? "var(--violet-soft)" : "var(--surface-alt)",
                     border: `1px solid ${isSelected ? "var(--violet)" : "var(--line)"}`,
                     borderRadius: "4px",
                     marginBottom: "4px",
@@ -315,72 +227,24 @@ export function ApiMatchingPanel({
                     cursor: cand.serviceId ? "pointer" : "default",
                   }}
                   onClick={() => {
-                    if (cand.serviceId) {
-                      handleSelectCandidate(tc.id, cand, "manual");
-                    }
+                    if (cand.serviceId) handleSelectCandidate(tc.id, cand, "manual");
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      color: "var(--ink)",
-                      minWidth: "60px",
-                    }}>
+                    <span style={{ fontWeight: 700, color: "var(--ink)", minWidth: "60px" }}>
                       {cand.method || "—"} {cand.path || "—"}
                     </span>
-                    <span style={{
-                      fontSize: "10px",
-                      color: "var(--muted)",
-                      background: "var(--surface-alt)",
-                      padding: "1px 4px",
-                      borderRadius: "3px",
-                    }}>
+                    <span style={{ fontSize: "10px", color: "var(--muted)", background: "var(--surface)", padding: "1px 4px", borderRadius: "3px" }}>
                       {cand.confidence}%
                     </span>
                     {isSelected && (
-                      <span style={{
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        color: "var(--violet)",
-                      }}>
-                        SELECTED
-                      </span>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--violet)" }}>SELECTED</span>
                     )}
                   </div>
-                  {cand.reasons && cand.reasons.length > 0 && (
-                    <div style={{
-                      fontSize: "10px",
-                      color: "var(--muted)",
-                      marginTop: "2px",
-                      opacity: 0.8,
-                    }}>
-                      {cand.reasons.slice(0, 2).join("; ")}
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
-        )}
-
-        {/* Clear mapping button */}
-        {mapping && (
-          <button
-            type="button"
-            onClick={() => handleClearMapping(tc.id)}
-            style={{
-              padding: "4px 8px",
-              fontSize: "11px",
-              border: "1px solid var(--line)",
-              borderRadius: "4px",
-              background: "var(--surface)",
-              color: "var(--muted)",
-              cursor: "pointer",
-            }}
-          >
-            Clear Mapping
-          </button>
         )}
       </div>
     );
@@ -396,141 +260,55 @@ export function ApiMatchingPanel({
         padding: "12px 16px",
         borderBottom: "1px solid var(--line)",
         background: "var(--blue-soft)",
-        cursor: "pointer",
+        borderBottomColor: "var(--blue)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="step" style={{
-            width: "30px",
-            height: "30px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "8px",
-            fontWeight: 800,
-            background: "var(--blue)",
-            color: "#fff",
-          }}>
-            3
-          </span>
-          <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue)" }}>
-            Connect Tests to APIs
-          </h2>
+          <span className="step-indicator collection">3</span>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Connect APIs</h2>
+            {includedTestCases.length > 0 && (
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {includedTestCases.length} test{includedTestCases.length !== 1 ? "s" : ""} selected
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)",
-          }}>
-            {getStatusText()}
-          </span>
+          {matchResponse && (
+            <span className="status-badge loaded">{mappings.size} mapped</span>
+          )}
         </div>
       </div>
 
       <div className="panel-body" style={{ padding: "18px" }}>
-        {/* Prerequisites */}
-        <div style={{ marginBottom: "18px" }}>
-            <h3 style={{
-              margin: "0 0 12px 0",
-              fontSize: "13px",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              color: "var(--muted)",
-            }}>
-              BEFORE YOU CONTINUE
-            </h3>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gap: "12px",
-          }}>
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: activeProjectId ? "var(--green)" : "var(--line)",
-                }}>
-                  {activeProjectId ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Project</span>
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {activeProjectId || "Not selected"}
-              </div>
-            </div>
+        {renderEmptyState()}
 
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: includedTestCases.length > 0 ? "var(--green)" : "var(--line)",
-                }}>
-                  {includedTestCases.length > 0 ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Included Test Cases</span>
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {includedTestCases.length} test case{includedTestCases.length !== 1 ? "s" : ""} ready for matching
-              </div>
-            </div>
+        {!matchResponse && includedTestCases.length > 0 && (
+          <div style={{ marginBottom: "18px" }}>
+            <button
+              type="button"
+              onClick={handleMatch}
+              disabled={!canMatch || status === "MATCHING"}
+              style={{
+                padding: "10px 20px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#fff",
+                background: canMatch && status !== "MATCHING" ? "var(--blue)" : "var(--line)",
+                border: "none",
+                borderRadius: "6px",
+                cursor: canMatch && status !== "MATCHING" ? "pointer" : "not-allowed",
+                opacity: canMatch && status !== "MATCHING" ? 1 : 0.6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              {status === "MATCHING" ? "Matching..." : "Match Test Cases"}
+            </button>
           </div>
-        </div>
+        )}
 
-        {/* Match button */}
-        <div style={{ marginBottom: "18px" }}>
-          <button
-            type="button"
-            onClick={handleMatch}
-            disabled={!canMatch || status === "MATCHING"}
-            style={{
-              padding: "10px 20px",
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "#fff",
-              background: canMatch && status !== "MATCHING" ? "var(--blue)" : "var(--line)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: canMatch && status !== "MATCHING" ? "pointer" : "not-allowed",
-              opacity: canMatch && status !== "MATCHING" ? 1 : 0.6,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            {status === "MATCHING" ? "Matching Test Cases..." : "Match Test Cases"}
-          </button>
-        </div>
-
-        {/* Error */}
         {error && (
           <div style={{
             marginTop: "12px",
@@ -545,41 +323,35 @@ export function ApiMatchingPanel({
           </div>
         )}
 
-        {/* Match results */}
         {matchResponse && (
           <>
-            {/* Summary */}
             <div style={{
-              marginTop: "14px",
-              marginBottom: "10px",
+              marginBottom: "12px",
               padding: "10px 12px",
-              background: "var(--surface)",
+              background: "var(--surface-alt)",
               border: "1px solid var(--line)",
-              borderRadius: "6px",
+              borderRadius: "var(--radius)",
               fontSize: "13px",
               color: "var(--ink)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between"
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>
-                  Total: {matchResponse.diagnostics.total} ·
-                  Matched: {matchResponse.diagnostics.matched} ·
-                  Ambiguous: {matchResponse.diagnostics.ambiguous} ·
-                  Unmatched: {matchResponse.diagnostics.unmatched}
-                </span>
-                <span style={{ fontSize: "11px", color: "var(--muted)" }}>
-                  {mappings.size} mapping{mappings.size !== 1 ? "s" : ""} confirmed
-                </span>
-              </div>
+              <span>
+                {matchResponse.diagnostics.matched} matched · {matchResponse.diagnostics.ambiguous} need review · {matchResponse.diagnostics.unmatched} unmatched
+              </span>
+              <span style={{ fontSize: "11px", color: "var(--muted)" }}>
+                {mappings.size} mapping{mappings.size !== 1 ? "s" : ""} confirmed
+              </span>
             </div>
 
-            {/* Warnings */}
             {matchResponse.warnings && matchResponse.warnings.length > 0 && (
               <div style={{
-                marginBottom: "8px",
+                marginBottom: "12px",
                 padding: "10px 12px",
                 background: "var(--amber-soft)",
                 border: "1px solid var(--amber)",
-                borderRadius: "6px",
+                borderRadius: "var(--radius)",
                 fontSize: "13px",
                 color: "var(--amber-deep)",
               }}>
@@ -587,52 +359,36 @@ export function ApiMatchingPanel({
               </div>
             )}
 
-            {/* Test case rows */}
-            <div>
-              {includedTestCases.map(renderMatchRow)}
+            <div style={{ display: "grid", gap: "8px" }}>
+              {includedTestCases.map(renderSimplifiedMatchRow)}
             </div>
 
-            {/* Confirm placeholder */}
-            {mappings.size > 0 && (
-              <div style={{
-                marginTop: "12px",
-                padding: "10px 12px",
-                background: "var(--blue-soft)",
-                border: "1px solid var(--blue)",
-                borderRadius: "6px",
-                fontSize: "13px",
-                color: "var(--blue-deep)",
-                fontWeight: 600,
-              }}>
-                {mappings.size} test case{mappings.size !== 1 ? "s" : ""} mapped for next step.
+            <div style={{ marginTop: "18px", display: "flex", alignItems: "center", gap: "12px", justifyContent: "space-between" }}>
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {matchResponse.diagnostics.unmatched > 0 && (
+                  <span>{matchResponse.diagnostics.unmatched} unmatched test case{matchResponse.diagnostics.unmatched !== 1 ? "s" : ""} still need a mapping.</span>
+                )}
               </div>
-            )}
-
-            {/* Confirm button */}
-            <div style={{ marginTop: "18px" }}>
-              <button
-                type="button"
-                onClick={handleConfirm}
-                disabled={!onConfirm}
-                style={{
-                  padding: "10px 20px",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: "#fff",
-                  background: onConfirm ? "var(--violet)" : "var(--line)",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: onConfirm ? "pointer" : "not-allowed",
-                  opacity: onConfirm ? 1 : 0.6,
-                }}
-              >
-                Confirm API Mappings
-              </button>
-              {matchResponse.diagnostics.unmatched > 0 && (
-                <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
-                  {matchResponse.diagnostics.unmatched} unmatched test case{matchResponse.diagnostics.unmatched !== 1 ? "s" : ""} remain visible. Review them before confirming.
-                </div>
-              )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={!onConfirm || mappings.size === 0}
+                  style={{
+                    padding: "10px 20px",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#fff",
+                    background: onConfirm && mappings.size > 0 ? "var(--violet)" : "var(--line)",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: onConfirm && mappings.size > 0 ? "pointer" : "not-allowed",
+                    opacity: onConfirm && mappings.size > 0 ? 1 : 0.6,
+                  }}
+                >
+                  Confirm Mappings
+                </button>
+              </div>
             </div>
           </>
         )}

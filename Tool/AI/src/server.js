@@ -566,9 +566,28 @@ async function handleRequest(req, res) {
       return serveFile(res, path.join(config.sampleDir, relative), config.sampleDir);
     }
 
+    // Serve React build with SPA fallback
     const relative = url.pathname === "/" ? "index.html" : decodeURIComponent(url.pathname.replace(/^\/+/, ""));
     const filePath = path.join(config.publicDir, relative);
-    return serveFile(res, filePath, config.publicDir);
+    const resolved = path.resolve(filePath);
+    const base = path.resolve(config.publicDir);
+    const relPath = path.relative(base, resolved);
+
+    let shouldServeIndex = false;
+    if (relPath.startsWith("..") || path.isAbsolute(relPath)) {
+      shouldServeIndex = true;
+    } else {
+      try {
+        const stat = fs.statSync(resolved);
+        if (stat.isDirectory()) shouldServeIndex = true;
+      } catch {
+        shouldServeIndex = true;
+      }
+    }
+
+    const indexPath = path.join(config.publicDir, "index.html");
+    const servePath = shouldServeIndex ? indexPath : filePath;
+    return serveFile(res, servePath, config.publicDir);
   } catch (error) {
     return sendJson(res, 500, { error: error.message });
   } finally {
@@ -583,6 +602,11 @@ async function handleRequest(req, res) {
 const server = http.createServer(handleRequest);
 
 async function startServer() {
+  if (!fs.existsSync(config.publicDir) || !fs.statSync(config.publicDir).isDirectory()) {
+    console.warn(`[server] Warning: publicDir does not exist: ${config.publicDir}`);
+    console.warn(`[server] Run 'npm run frontend:build' to create the React build.`);
+  }
+
   if (config.features && config.features.pgEnabled) {
     const migrationResult = await migrate();
     if (migrationResult && migrationResult.error) {

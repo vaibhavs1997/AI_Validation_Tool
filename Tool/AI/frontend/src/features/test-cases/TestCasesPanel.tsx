@@ -11,8 +11,6 @@ interface TestCasesPanelProps {
   onIncludedChange?: (included: TestCase[]) => void;
 }
 
-type PanelStatus = "NOT_GENERATED" | "GENERATING" | "GENERATED" | "ERROR";
-
 const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   POSITIVE: { bg: "#e3fcef", text: "#0a7c42" },
   NEGATIVE: { bg: "#fce4e2", text: "#b44236" },
@@ -54,14 +52,6 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
       onIncludedChange(included);
     }
   }, [includedTestCaseIds, response, onIncludedChange]);
-
-  const getStatusText = (): PanelStatus => {
-    if (loading) return "GENERATING";
-    if (error) return "ERROR";
-    if (response && response.testCases.length > 0) return "GENERATED";
-    if (response) return "GENERATED";
-    return "NOT_GENERATED";
-  };
 
   const handleGenerate = async () => {
     if (!activeProjectId || !activeRequirement || !activeRequirement.requirement) return;
@@ -143,18 +133,15 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
     if (hasProject) return null;
     return (
       <div style={{
-        padding: "16px",
-        border: "1px solid var(--line)",
-        borderRadius: "6px",
-        background: "var(--surface)",
-        marginBottom: "12px"
+        padding: "12px",
+        borderRadius: "var(--radius)",
+        background: "var(--amber-soft)",
+        border: "1px solid var(--amber)",
+        marginBottom: "12px",
+        fontSize: "13px",
+        color: "var(--amber-deep)"
       }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--ink)", marginBottom: "6px" }}>
-          Select a project before generating tests
-        </div>
-        <div style={{ fontSize: "13px", color: "var(--muted)" }}>
-          Go to Setup to select or create a project. APIs registered in that project will be used automatically.
-        </div>
+        Select a project in Setup before generating tests.
       </div>
     );
   };
@@ -373,6 +360,25 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
     );
   };
 
+  const renderEmptyState = () => {
+    if (response) return null;
+    return (
+      <div style={{
+        padding: "24px",
+        borderRadius: "var(--radius)",
+        background: "var(--surface-alt)",
+        border: "1px dashed var(--line)",
+        textAlign: "center",
+        color: "var(--muted)",
+        fontSize: "13px"
+      }}>
+        {hasRequirement
+          ? "Generate tests from your requirement to review them here."
+          : "Load a requirement first, then generate tests to review."}
+      </div>
+    );
+  };
+
   return (
     <section className="panel span-12 panel-test-cases" data-view-section="workspace">
       <div className="panel-head" style={{
@@ -382,146 +388,62 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
         gap: "14px",
         padding: "12px 16px",
         borderBottom: "1px solid var(--line)",
-        background: "var(--violet-soft)",
-        cursor: "pointer"
+        background: "var(--green-soft)",
+        borderBottomColor: "var(--green)"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="step" style={{
-            width: "30px",
-            height: "30px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "8px",
-            fontWeight: 800,
-            background: "var(--violet)",
-            color: "#fff"
-          }}>
-            [2]
-          </span>
-          <h2 style={{ margin: 0, fontSize: "17px", color: "var(--violet)" }}>
-            Test Cases
-          </h2>
+          <span className="step-indicator scenarios">2</span>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--green-deep)" }}>Review Tests</h2>
+            {generatedCount > 0 && (
+              <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+                {generatedCount} generated · {includedCount} selected
+              </div>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)"
-          }}>
-            {getStatusText()}
-          </span>
+          {generatedCount > 0 && (
+            <span className="status-badge loaded">{includedCount} selected</span>
+          )}
         </div>
       </div>
 
       <div className="panel-body" style={{ padding: "18px" }}>
         {renderProjectGuard()}
+        {renderEmptyState()}
 
-        <div style={{ marginBottom: "18px" }}>
-          <h3 style={{
-            margin: "0 0 12px 0",
-            fontSize: "13px",
-            fontWeight: 700,
-            textTransform: "uppercase",
-            letterSpacing: "0.04em",
-            color: "var(--muted)"
-          }}>
-            PREREQUISITES
-          </h3>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gap: "12px"
-          }}>
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: hasProject ? "var(--green)" : "var(--line)"
-                }}>
-                  {hasProject ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Project</span>
+        {!response && !loading && (
+          <div style={{ marginBottom: "18px" }}>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!canGenerate}
+              style={{
+                padding: "10px 20px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#fff",
+                background: canGenerate ? "var(--green)" : "var(--line)",
+                border: "none",
+                borderRadius: "6px",
+                cursor: canGenerate ? "pointer" : "not-allowed",
+                opacity: canGenerate ? 1 : 0.6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {loading && <span className="spinner" />}
+              {loading ? "Generating..." : "Generate Tests"}
+            </button>
+            {loading && (
+              <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
+                {formatElapsed(elapsedSeconds)}
               </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {activeProjectId || "Not selected"}
-              </div>
-            </div>
-
-            <div style={{
-              padding: "12px 14px",
-              border: "1px solid var(--line)",
-              borderRadius: "8px",
-              background: "var(--surface)"
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{
-                  width: "18px",
-                  height: "18px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: hasRequirement ? "var(--green)" : "var(--line)"
-                }}>
-                  {hasRequirement ? "✓" : "○"}
-                </span>
-                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink)" }}>Requirement</span>
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--ink)", opacity: 0.85, paddingLeft: "26px" }}>
-                {hasRequirement ? "Ready" : "Not selected"}
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-
-        <div style={{ marginBottom: "18px" }}>
-          <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={!canGenerate}
-            style={{
-              padding: "10px 20px",
-              fontSize: "14px",
-              fontWeight: 600,
-              color: "#fff",
-              background: canGenerate ? "var(--violet)" : "var(--line)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: canGenerate ? "pointer" : "not-allowed",
-              opacity: canGenerate ? 1 : 0.6,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "8px"
-            }}
-          >
-            {loading && <span className="spinner" />}
-            {loading ? "Generating Test Cases..." : "Generate Test Cases"}
-          </button>
-          {loading && (
-            <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
-              {formatElapsed(elapsedSeconds)}
-            </div>
-          )}
-        </div>
+        )}
 
         {error && (
           <div style={{

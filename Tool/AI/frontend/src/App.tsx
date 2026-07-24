@@ -14,7 +14,7 @@ export default function App() {
 
   // Apply theme from localStorage or system preference
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
+    const savedTheme = localStorage.getItem("testforge-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const theme = savedTheme || (prefersDark ? "dark" : "light");
     document.documentElement.setAttribute("data-theme", theme);
@@ -54,21 +54,26 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div id="testforge-app" className="app-shell">
       <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-      <div style={{ minHeight: 0, display: "flex", flexDirection: "column" }}>
-        <Header view={currentView === "setup" ? "workspace" : currentView} />
-        {currentView === "setup" && (
-          <SetupPage
-            activeProjectId={activeProjectId}
-            onActiveProjectChange={handleActiveProjectChange}
-          />
-        )}
-        {currentView === "workspace" && (
-          <WorkspacePage activeProjectId={activeProjectId} />
-        )}
-        {currentView === "results" && <ResultsPage activeProjectId={activeProjectId} />}
-        {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
+      <div className="main-shell">
+        <Header
+          view={currentView === "setup" ? "workspace" : currentView}
+          projectName={activeProjectId || undefined}
+        />
+        <main id="testforge-content" className="app-content">
+          {currentView === "setup" && (
+            <SetupPage
+              activeProjectId={activeProjectId}
+              onActiveProjectChange={handleActiveProjectChange}
+            />
+          )}
+          {currentView === "workspace" && (
+            <WorkspacePage activeProjectId={activeProjectId} />
+          )}
+          {currentView === "results" && <ResultsPage activeProjectId={activeProjectId} />}
+          {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
+        </main>
       </div>
     </div>
   );
