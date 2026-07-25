@@ -27,6 +27,14 @@ export interface DeleteProjectResponse {
   id: string;
 }
 
+export interface ListProjectsOptions {
+  search?: string;
+  sort?: "id" | "name" | "createdAt" | "updatedAt";
+  order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
 export interface ListProjectsResponse {
   projects: Project[];
   total: number;

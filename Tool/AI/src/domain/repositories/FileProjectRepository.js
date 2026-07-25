@@ -68,11 +68,11 @@ function projectExists(id) {
   return fs.existsSync(projectFile(id));
 }
 
-function listProjects() {
+function listProjects(options) {
   ensureStorage();
   if (!fs.existsSync(PROJECTS_DIR)) return [];
 
-  return fs
+  let projects = fs
     .readdirSync(PROJECTS_DIR)
     .filter((file) => file.endsWith(".json"))
     .map((file) => {
@@ -81,10 +81,86 @@ function listProjects() {
       return {
         id: data.id,
         name: data.name,
+        createdAt: data.createdAt,
         updatedAt: data.updatedAt,
       };
-    })
-    .sort((a, b) => a.id.localeCompare(b.id));
+    });
+
+  const search = (options && options.search) || "";
+  const sort = (options && options.sort) || "id";
+  const order = (options && options.order) || "asc";
+  const limit = (options && options.limit) || 100;
+  const offset = (options && options.offset) || 0;
+
+  if (search) {
+    const query = search.toLowerCase();
+    projects = projects.filter(
+      (p) =>
+        String(p.id).toLowerCase().includes(query) ||
+        String(p.name).toLowerCase().includes(query)
+    );
+  }
+
+  projects = projects.slice(offset, offset + limit);
+
+  if (sort) {
+    const sorted = [...projects].sort((a, b) => {
+      let aVal = a[sort] || a.id;
+      let bVal = b[sort] || b.id;
+      if (typeof aVal === "string") aVal = aVal.toLowerCase();
+      if (typeof bVal === "string") bVal = bVal.toLowerCase();
+      if (aVal < bVal) return order === "asc" ? -1 : 1;
+      if (aVal > bVal) return order === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }
+
+  return projects;
+}
+
+function updateProject(id, updates) {
+  ensureStorage();
+  const file = projectFile(id);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Project not found: ${id}`);
+  }
+
+  const data = JSON.parse(fs.readFileSync(file, "utf8"));
+  const updated = createProjectIdentity({
+    id: data.id,
+    name: (updates && updates.name) || data.name,
+    createdAt: data.createdAt,
+    updatedAt: new Date().toISOString(),
+  });
+
+  fs.writeFileSync(file, JSON.stringify(updated, null, 2), "utf8");
+  return updated;
+}
+
+function deleteProject(id) {
+  ensureStorage();
+  if (id === DEFAULT_PROJECT.id) {
+    throw new Error("Cannot delete the default project");
+  }
+  const file = projectFile(id);
+  if (!fs.existsSync(file)) {
+    throw new Error(`Project not found: ${id}`);
+  }
+  fs.unlinkSync(file);
+}
+
+function searchProjects(query) {
+  ensureStorage();
+  const projects = listProjects();
+  const lowerQuery = String(query || "").toLowerCase();
+  if (!lowerQuery) return projects;
+
+  return projects.filter((p) => {
+    const idMatch = String(p.id).toLowerCase().includes(lowerQuery);
+    const nameMatch = String(p.name).toLowerCase().includes(lowerQuery);
+    return idMatch || nameMatch;
+  });
 }
 
 function seedDefaultProject() {
@@ -116,6 +192,9 @@ module.exports = {
   createProject,
   getProject,
   listProjects,
+  updateProject,
+  deleteProject,
+  searchProjects,
   projectExists,
   seedDefaultProject,
   getBackendName,
