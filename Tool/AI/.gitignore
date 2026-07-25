@@ -3,3 +3,9 @@ node_modules/
 data/
 work/*.log
 *.local
+
+# Generated artifacts
+tsconfig.tsbuildinfo
+baseline.txt
+.task-progress-*.json
+outputs/
