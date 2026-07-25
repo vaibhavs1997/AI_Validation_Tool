@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## Product Requirements Document (PRD)
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -16,7 +16,7 @@ TestForge is an AI-powered API Quality Engineering Platform that transforms how 
 
 > **Create Project → Import APIs → Analyze Dependencies → Generate Test Cases → Review → Execute → Reports**
 
-This sprint establishes the foundational project management layer — the entry point and organizational boundary for all subsequent API testing work.
+This sprint establishes the complete project management layer — the entry point and organizational boundary for all subsequent API testing work. Users must be able to create, view, search, open, edit, and delete projects.
 
 ---
 
@@ -24,13 +24,14 @@ This sprint establishes the foundational project management layer — the entry 
 
 | # | Goal | Success Metric |
 |---|------|----------------|
-| G-1 | Enable users to create, view, update, and delete projects | All four CRUD operations work end-to-end with proper validation |
+| G-1 | Enable users to create, view, search, open, edit, and delete projects | All six lifecycle operations work end-to-end with proper validation |
 | G-2 | Provide a clear project dashboard showing project status and next steps | Dashboard loads in < 500ms with < 3 API calls |
 | G-3 | Establish project selection/activation flow as the gateway to the workspace | Users can switch between projects seamlessly |
 | G-4 | Implement project search, sort, and filter capabilities | Users can find any project in a list of 100+ projects within 3 keystrokes |
 | G-5 | Ensure all project management screens are fully responsive and accessible | WCAG 2.1 AA compliance; works on screens ≥ 360px wide |
 | G-6 | Establish the project entity as the single source of truth for all future features | All project-scoped operations reference a valid project ID |
 | G-7 | Implement proper error handling and empty states for all project management flows | No unhandled errors; every state has a clear user-facing message |
+| G-8 | Implement safe project deletion with confirmation and cascade cleanup | Deletion removes all project-owned data with no orphaned records |
 
 ---
 
@@ -52,6 +53,7 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 | WebSocket-based real-time updates | Overkill for project CRUD | Sprint 09 |
 | Project export/import | Not needed for MVP | Sprint 10 |
 | Bulk project operations | Not needed for MVP | Sprint 10 |
+| Project archiving | Deletion is sufficient for MVP; archive in Sprint 10 | Sprint 10 |
 
 ---
 
@@ -68,6 +70,8 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 | A-7 | Project names are optional and default to the project ID | Matches existing `createProjectIdentity` behavior | Low |
 | A-8 | Users interact via a web browser (Chrome, Firefox, Safari, Edge) | Frontend is a React SPA | Low |
 | A-9 | The backend runs on Node.js 20+ | Existing `package.json` specifies this | Low |
+| A-10 | Deletion is permanent (hard delete) in MVP | Soft delete/archive is deferred to Sprint 10 | Low |
+| A-11 | Deleting a project removes all associated data | No orphaned services, APIs, tests, or runs | Low |
 
 ---
 
@@ -85,6 +89,7 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 | C-8 | Maximum project ID length: 100 characters | Enforced by `safeName()` |
 | C-9 | CORS is open (`*`) on the backend | Security is not a concern for local development |
 | C-10 | Request body size limit: 10MB | Enforced by `readBody()` in `server.js` |
+| C-11 | Hard delete only in MVP (no recycle bin/archive) | Deleted projects cannot be recovered; archive in Sprint 10 |
 
 ---
 
@@ -146,7 +151,7 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 │  User enters project ID and name                                    │
 │  → Clicks "Create Project"                                          │
 │  → System validates input                                           │
-│  → System creates project                                             │
+│  → System creates project                                           │
 │  → User is redirected to project dashboard                          │
 │                                                                     │
 │  STEP 3: View Dashboard                                             │
@@ -161,9 +166,19 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 │  ─────────────────────────────────────────────────────────────────  │
 │  User navigates back to project list                                │
 │  → Searches for a project                                           │
+│  → Opens a different project                                        │
 │  → Edits a project name                                             │
 │  → Deletes an unused project                                        │
 │  → Switches to another project                                      │
+│                                                                     │
+│  STEP 5: Delete Project                                             │
+│  ─────────────────────────────────────────────────────────────────  │
+│  User clicks "Delete Project" on dashboard                          │
+│  → Confirmation dialog appears                                      │
+│  → User types project ID to confirm                                 │
+│  → User clicks "Delete"                                             │
+│  → Project and all associated data are removed                      │
+│  → User is redirected to project setup page                         │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -201,9 +216,12 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 ### 8.5 Project Deletion
 
 - **Input:** Project ID
-- **Validation:** Cannot delete the default project; cannot delete a project with dependencies (future)
+- **Validation:** Cannot delete the default project; user must type project ID to confirm
 - **Output:** Project removed from storage
-- **Side Effects:** If deleted project was active, redirect to project setup page
+- **Side Effects:** 
+  - All project-owned data is removed (services, APIs, tests, runs, reports)
+  - If deleted project was active, redirect to project setup page
+  - Project no longer appears in project list
 
 ### 8.6 Project Selection / Activation
 
@@ -246,9 +264,9 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 | AC-14 | User can search projects by typing in a search box |
 | AC-15 | Search results update in real-time as the user types |
 | AC-16 | Search is case-insensitive and matches both ID and name |
-| AC-17 | When no projects match the search, an empty state is shown |
+| AC-17 | When no projects match the search, an empty state message is shown |
 | AC-18 | Each project in the list shows its name, ID, and last updated timestamp |
-| AC-19 | Clicking a project in the list navigates to its dashboard |
+| AC-19 | Clicking a project in the list opens that project (navigates to dashboard) |
 | AC-20 | The project list loads within 500ms for up to 100 projects |
 
 ### 9.3 Project Dashboard
@@ -265,86 +283,96 @@ The following are explicitly **out of scope** for Sprint 01 and will be addresse
 | AC-28 | The dashboard provides a "Delete Project" button with confirmation |
 | AC-29 | The dashboard shows a "Next Steps" section with guidance on what to do next |
 | AC-30 | The dashboard loads within 500ms |
+| AC-31 | If the project is not found (e.g., deleted in another session), the user is redirected to the project setup page with an error message |
+| AC-32 | The dashboard shows a breadcrumb or back link to the project list |
 
 ### 9.4 Project Update
 
 | ID | Criterion |
 |----|-----------|
-| AC-31 | User can edit the project name from the dashboard or project list |
-| AC-32 | The edit form pre-fills with the current project name |
-| AC-33 | User can save changes or cancel the edit |
-| AC-34 | On save, the project name is updated and the list/dashboard reflects the change |
-| AC-35 | On cancel, no changes are made |
-| AC-36 | Empty project names are rejected with an error message |
-| AC-37 | The "Save" button is disabled while the update request is in progress |
+| AC-33 | User can edit the project name from the dashboard or project list |
+| AC-34 | The edit form pre-fills with the current project name |
+| AC-35 | User can save changes or cancel the edit |
+| AC-36 | On save, the project name is updated and the list/dashboard reflects the change |
+| AC-37 | On cancel, no changes are made |
+| AC-38 | Empty project names are rejected with an error message |
+| AC-39 | The "Save" button is disabled while the update request is in progress |
+| AC-40 | The "Save" button can be triggered via Enter key when the input is focused |
 
 ### 9.5 Project Deletion
 
 | ID | Criterion |
 |----|-----------|
-| AC-38 | User can initiate deletion from the dashboard |
-| AC-39 | A confirmation dialog is shown before deletion |
-| AC-40 | The confirmation dialog requires the user to type the project ID to confirm |
-| AC-41 | The default project cannot be deleted |
-| AC-42 | On successful deletion, the user is returned to the project setup page |
-| AC-43 | On cancellation, the user remains on the dashboard |
-| AC-44 | After deletion, the project no longer appears in the project list |
+| AC-41 | User can initiate deletion from the dashboard |
+| AC-42 | A confirmation dialog is shown before deletion |
+| AC-43 | The confirmation dialog displays project name, ID, created date, and stats (services, requirements, test cases, reports) |
+| AC-44 | The confirmation dialog requires the user to type the project ID to enable the Delete button |
+| AC-45 | A warning message states "This action cannot be undone." |
+| AC-46 | The default project cannot be deleted (button hidden/disabled) |
+| AC-47 | On successful deletion, the user is returned to the project setup page |
+| AC-48 | On cancellation, the user remains on the dashboard |
+| AC-49 | After deletion, the project no longer appears in the project list |
+| AC-50 | Deleting a project removes all associated data (cascade delete) |
+| AC-51 | The Delete button can be triggered via Enter key when the project ID matches |
+| AC-52 | The Cancel button can be triggered via Escape key |
+| AC-53 | The dialog is accessible (focus trap, ARIA attributes, escape to close) |
 
 ### 9.6 Project Selection
 
 | ID | Criterion |
 |----|-----------|
-| AC-45 | User can switch between projects from the project setup page |
-| AC-46 | User can switch between projects from the dashboard |
-| AC-47 | When switching projects, the active project context updates immediately |
-| AC-48 | The sidebar navigation reflects the current view context |
+| AC-54 | User can switch between projects from the project setup page |
+| AC-55 | User can switch between projects from the dashboard |
+| AC-56 | When switching projects, the active project context updates immediately |
+| AC-57 | The active project persists across page reloads (via URL hash or localStorage) |
+| AC-58 | The project selection is reflected in the URL (e.g., `#workspace?project=payments-api`) |
 
 ### 9.7 Empty States
 
 | ID | Criterion |
 |----|-----------|
-| AC-49 | When no projects exist (excluding default), an empty state is shown with guidance |
-| AC-50 | When search returns no results, a "no results" message is shown |
-| AC-51 | The empty state includes a call-to-action to create a project |
+| AC-59 | When no projects exist (excluding default), an empty state with guidance is shown |
+| AC-60 | When search returns no results, a "no results" message is shown |
+| AC-61 | The empty state includes a call-to-action to create a project |
 
 ### 9.8 Error Handling
 
 | ID | Criterion |
 |----|-----------|
-| AC-52 | Network errors during project creation show a user-friendly message |
-| AC-53 | Network errors during project listing show a retry option |
-| AC-54 | All error messages are displayed in a consistent, visible location |
-| AC-55 | Errors do not cause the application to crash or become unresponsive |
+| AC-62 | Network errors during project creation show a user-friendly message |
+| AC-63 | Network errors during project listing show a retry option |
+| AC-64 | All error messages are displayed in a consistent, visible location |
+| AC-65 | Errors do not cause the application to crash or become unresponsive |
 
 ### 9.9 Responsiveness
 
 | ID | Criterion |
 |----|-----------|
-| AC-56 | The project setup page works on screens as narrow as 360px |
-| AC-57 | The project dashboard works on screens as narrow as 360px |
-| AC-58 | On narrow screens, the create project form stacks vertically |
-| AC-59 | On narrow screens, the sidebar is hidden and accessible via a menu toggle |
+| AC-66 | The project setup page works on screens as narrow as 360px |
+| AC-67 | The project dashboard works on screens as narrow as 360px |
+| AC-68 | On narrow screens, the create project form stacks vertically |
+| AC-69 | On narrow screens, the sidebar is hidden and accessible via a menu toggle |
 
 ### 9.10 Accessibility
 
 | ID | Criterion |
 |----|-----------|
-| AC-60 | All interactive elements are keyboard-navigable |
-| AC-61 | All interactive elements have visible focus indicators |
-| AC-62 | All images and icons have appropriate `alt` text or `aria-label` |
-| AC-63 | Form fields have associated `<label>` elements |
-| AC-64 | Color is not the sole means of conveying information |
-| AC-65 | The application supports screen readers (ARIA landmarks, roles) |
+| AC-70 | All interactive elements are keyboard-navigable |
+| AC-71 | All interactive elements have visible focus indicators |
+| AC-72 | All images and icons have appropriate `alt` text or `aria-label` |
+| AC-73 | Form fields have associated `<label>` elements |
+| AC-74 | Color is not the sole means of conveying information |
+| AC-75 | The application supports screen readers (ARIA landmarks, roles) |
 
 ### 9.11 Dark/Light Mode
 
 | ID | Criterion |
 |----|-----------|
-| AC-66 | The application supports both light and dark themes |
-| AC-67 | Theme preference is persisted in `localStorage` |
-| AC-68 | Theme follows system preference by default |
-| AC-69 | Theme can be toggled via the header theme switcher |
-| AC-70 | All UI components render correctly in both themes |
+| AC-76 | The application supports both light and dark themes |
+| AC-77 | Theme preference is persisted in `localStorage` |
+| AC-78 | Theme follows system preference by default |
+| AC-79 | Theme can be toggled via the header theme switcher |
+| AC-80 | All UI components render correctly in both themes |
 
 ---
 
@@ -381,6 +409,7 @@ This sprint introduces **no new npm dependencies**. All functionality is built u
 | Project creation success rate | ≥ 99% | Backend API logs |
 | Project list load time | ≤ 500ms | Frontend performance API |
 | Dashboard load time | ≤ 500ms | Frontend performance API |
+| Project deletion success rate | ≥ 99% | Backend API logs |
 | Error rate (5xx) | 0% | Backend error logs |
 | Accessibility score | ≥ 95 | Lighthouse audit |
 | Test coverage | ≥ 80% | Vitest coverage report |
@@ -398,7 +427,53 @@ This sprint introduces **no new npm dependencies**. All functionality is built u
 | OQ-3 | Should the project list show a preview of API count? | Product | No — APIs are not in scope for this sprint |
 | OQ-4 | Should there be project templates? | Product | No — not needed for MVP |
 | OQ-5 | Should project creation be possible from the dashboard? | Product | Yes — quick create from dashboard header |
+| OQ-6 | Should deletion show a detailed breakdown of what will be deleted? | Product | Yes — show counts of services, requirements, test cases, reports |
+| OQ-7 | Should there be an undo option after deletion? | Product | No — deletion is permanent in MVP |
 
 ---
 
-*End of PRD — Sprint 01: Project Foundation*
+## 13. Deletion Business Rules
+
+### 13.1 What Gets Deleted
+
+When a project is deleted, the following data is removed:
+
+- Project record (projects table / project JSON file)
+- All services registered under the project
+- All API models/contracts
+- All project knowledge (instructions, relationships)
+- All execution plans
+- All test runs
+- All test cases
+- All reports
+- Any project-owned files in the data directory
+
+### 13.2 Deletion Validation
+
+Before deletion, the system validates:
+
+- Project ID is not `default`
+- Project exists
+- User has confirmed by typing the exact project ID
+
+### 13.3 Deletion Errors
+
+| Error | HTTP Status | User Message |
+|-------|-------------|--------------|
+| Cannot delete default project | 400 | "Cannot delete the default project" |
+| Project not found | 404 | "Project not found: {id}" |
+| Deletion failed (server error) | 500 | "Failed to delete project. Please try again." |
+
+### 13.4 Future: Archive Support
+
+The deletion design allows archive to be introduced later without redesign:
+
+- Add `is_archived` column to projects table (PostgreSQL)
+- Add `archivedAt` timestamp
+- Change `deleteProject` to set `is_archived = true` instead of hard delete
+- Hide archived projects from default list queries
+- Add "Archived Projects" view for recovery
+
+---
+
+*End of PRD — Sprint 01: Project Lifecycle Management*

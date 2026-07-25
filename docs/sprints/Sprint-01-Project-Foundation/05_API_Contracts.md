@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## API Contracts
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-This document defines the REST API contracts for Sprint 01: Project Foundation. All endpoints are relative to the backend server running at `http://localhost:4173` (or configured `PORT`).
+This document defines the REST API contracts for Sprint 01: Project Lifecycle Management. All endpoints are relative to the backend server running at `http://localhost:4173` (or configured `PORT`).
 
 ### 1.1 Base URL
 
@@ -310,7 +310,7 @@ Content-Type: application/json
 
 ### 2.5 Delete Project
 
-Deletes a project.
+Deletes a project and all associated data.
 
 **Method:** `DELETE`  
 **Path:** `/api/projects/{id}`  
@@ -357,6 +357,11 @@ Content-Type: application/json
 // 404 Not Found
 {
   "error": "Project not found: payments-api"
+}
+
+// 500 Internal Server Error
+{
+  "error": "Failed to delete project. Please try again."
 }
 ```
 
@@ -666,4 +671,4 @@ curl -X DELETE http://localhost:4173/api/projects/payments-api
 
 ---
 
-*End of API Contracts — Sprint 01: Project Foundation*
+*End of API Contracts — Sprint 01: Project Lifecycle Management*

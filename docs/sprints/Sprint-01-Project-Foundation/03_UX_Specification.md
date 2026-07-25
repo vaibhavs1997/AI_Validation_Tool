@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## UX Specification
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -395,9 +395,9 @@ All dashboard components use CSS custom properties for theming.
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  Modal Dialog (surface, border, shadow)                       │  │
 │  │  ┌───────────────────────────────────────────────────────────┐ │  │
-│  │  │  [✕] Close                                                 │ │  │
-│  │  │  Create Project                                             │ │  │
-│  │  │  "Enter a project ID and optional name to get started."     │ │  │
+│  │  │  [✕] Close                                                 │  │
+│  │  │  Create Project                                             │  │
+│  │  │  "Enter a project ID and optional name to get started."     │  │
 │  │  │                                                             │ │  │
 │  │  │  ┌───────────────────────────────────────────────────────┐ │ │  │
 │  │  │  │  Project ID *                                           │ │ │  │
@@ -411,8 +411,8 @@ All dashboard components use CSS custom properties for theming.
 │  │  │  │  "A friendly display name for your team."               │ │ │  │
 │  │  │  └───────────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                             │ │  │
-│  │  │  [Cancel] [Create Project]                                  │ │  │
-│  │  └───────────────────────────────────────────────────────────┘ │  │
+│  │  │  [Cancel] [Create Project]                                  │  │
+│  │  └───────────────────────────────────────────────────────────┘  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -490,17 +490,17 @@ Modal background uses `var(--color-bg-surface)`, border uses `var(--color-border
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  Modal Dialog                                                 │  │
 │  │  ┌───────────────────────────────────────────────────────────┐ │  │
-│  │  │  [✕] Close                                                 │ │  │
-│  │  │  Edit Project                                               │ │  │
-│  │  │  "Update your project name."                                │ │  │
+│  │  │  [✕] Close                                                 │  │
+│  │  │  Edit Project                                               │  │
+│  │  │  "Update your project name."                                │  │
 │  │  │                                                             │ │  │
 │  │  │  ┌───────────────────────────────────────────────────────┐ │ │  │
 │  │  │  │  Project Name                                           │ │ │  │
 │  │  │  │  [Payments API]                                         │ │ │  │
 │  │  │  └───────────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                             │ │  │
-│  │  │  [Cancel] [Save]                                            │ │  │
-│  │  └───────────────────────────────────────────────────────────┘ │  │
+│  │  │  [Cancel] [Save]                                            │  │
+│  │  └───────────────────────────────────────────────────────────┘  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -558,14 +558,15 @@ Same as Create Project Dialog.
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │  Modal Dialog                                                 │  │
 │  │  ┌───────────────────────────────────────────────────────────┐ │  │
-│  │  │  [✕] Close                                                 │ │  │
-│  │  │  Delete Project                                             │ │  │
-│  │  │  "This action cannot be undone."                            │ │  │
+│  │  │  [✕] Close                                                 │  │
+│  │  │  Delete Project                                             │  │
+│  │  │  "This action cannot be undone."                            │  │
 │  │  │                                                             │ │  │
 │  │  │  ┌───────────────────────────────────────────────────────┐ │ │  │
 │  │  │  │  Project Details                                        │ │ │  │
 │  │  │  │  Name: Payments API                                     │ │ │  │
 │  │  │  │  ID: payments-api                                       │ │ │  │
+│  │  │  │  Created: Jan 15, 2025                                 │ │ │  │
 │  │  │  └───────────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                             │ │  │
 │  │  │  ┌───────────────────────────────────────────────────────┐ │ │  │
@@ -573,8 +574,8 @@ Same as Create Project Dialog.
 │  │  │  │  [payments-api]                                         │ │ │  │
 │  │  │  └───────────────────────────────────────────────────────┘ │ │  │
 │  │  │                                                             │ │  │
-│  │  │  [Cancel] [Delete Project]                                  │ │  │
-│  │  └───────────────────────────────────────────────────────────┘ │  │
+│  │  │  [Cancel] [Delete Project]                                  │  │
+│  │  └───────────────────────────────────────────────────────────┘  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -843,4 +844,4 @@ Import your first API to get started.
 
 ---
 
-*End of UX Specification — Sprint 01: Project Foundation*
+*End of UX Specification — Sprint 01: Project Lifecycle Management*

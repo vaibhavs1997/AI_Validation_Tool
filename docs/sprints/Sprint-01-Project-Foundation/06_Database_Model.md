@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## Database Model
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-This document describes the database model for Sprint 01: Project Foundation. The sprint focuses on project management entities. The existing codebase supports dual persistence: file-based (default) and PostgreSQL (optional).
+This document describes the database model for Sprint 01: Project Lifecycle Management. The sprint focuses on project management entities with full CRUD operations, including safe deletion. The existing codebase supports dual persistence: file-based (default) and PostgreSQL (optional).
 
 ### 1.1 Persistence Strategy
 
@@ -28,7 +28,7 @@ Both backends implement the same repository interface, ensuring identical behavi
 
 ### 2.1 Entity Definition
 
-The `Project` entity is the central organizational boundary for all TestForge work. It groups APIs, tests, dependencies, runs, and results.
+The `Project` entity is the central organizational boundary for all TestForge work. It groups APIs, tests, dependencies, runs, and results. Projects can be created, viewed, searched, opened, edited, and deleted.
 
 ### 2.2 Attributes
 
@@ -58,6 +58,7 @@ The `Project` entity is the central organizational boundary for all TestForge wo
 │  - name is NOT NULL                                              │
 │  - createdAt is NOT NULL                                         │
 │  - updatedAt is NOT NULL                                         │
+│  - id != 'default' for deletion                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -75,6 +76,15 @@ The `Project` entity is the central organizational boundary for all TestForge wo
 
 Note: In MVP, userId is always NULL (no authentication).
 Future sprints will populate this when auth is added.
+
+CASCADE DELETE (future):
+projects (1) → (∞) services
+projects (1) → (∞) api_models
+projects (1) → (∞) project_knowledge
+projects (1) → (∞) execution_plans
+projects (1) → (∞) test_runs
+projects (1) → (∞) test_cases
+projects (1) → (∞) reports
 ```
 
 ### 2.5 Future Entities (Not in Sprint 01)
@@ -126,7 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at DESC);
 File: `src/db/002-project-enhancements.sql`
 
 ```sql
--- Sprint 01: Project Foundation — Database Enhancements
+-- Sprint 01: Project Lifecycle Management — Database Enhancements
 -- Run after 001-schema.sql
 -- Idempotent: uses IF NOT EXISTS for all CREATE statements
 
@@ -277,7 +287,7 @@ fs.writeFileSync(
 
 ```javascript
 // Delete file
-fs.unlinkSync(path.join(PROJECTS_DIR, `${safeName(id)}.json'));
+fs.unlinkSync(path.join(PROJECTS_DIR, `${safeName(id)}.json`));
 ```
 
 ### 4.5 File-Based Search
@@ -321,9 +331,85 @@ For the expected scale (≤ 500 projects), this is sufficient.
 
 ---
 
-## 6. Scalability Considerations
+## 6. Cascade Delete Design
 
-### 6.1 Current Scale
+### 6.1 Deletion Scope
+
+When a project is deleted, the following data is removed:
+
+| Data | File-Based | PostgreSQL | Notes |
+|------|------------|------------|-------|
+| Project record | Delete JSON file | `DELETE FROM projects` | Immediate |
+| Services | Delete directory `data/services/{id}/` | `DELETE FROM services WHERE project_id = $1` | Future sprint |
+| API Models | Delete directory `data/contracts/{id}/` | `DELETE FROM api_models WHERE project_id = $1` | Future sprint |
+| Project Knowledge | Delete directory `data/knowledge/{id}/` | `DELETE FROM project_knowledge WHERE project_id = $1` | Future sprint |
+| Execution Plans | Delete directory `data/runs/{id}/` | `DELETE FROM execution_plans WHERE project_id = $1` | Future sprint |
+| Test Runs | Delete directory `data/runs/{id}/` | `DELETE FROM test_runs WHERE project_id = $1` | Future sprint |
+| Test Cases | Delete directory `data/test-cases/{id}/` | `DELETE FROM test_cases WHERE project_id = $1` | Future sprint |
+| Reports | Delete directory `data/reports/{id}/` | `DELETE FROM reports WHERE project_id = $1` | Future sprint |
+
+### 6.2 Cascade Delete Implementation
+
+**File-based (current):**
+```javascript
+function deleteProject(id) {
+  if (id === 'default') {
+    throw new Error('Cannot delete the default project');
+  }
+  
+  const filePath = path.join(PROJECTS_DIR, `${safeName(id)}.json`);
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Project not found: ${id}`);
+  }
+  
+  // Delete project file
+  fs.unlinkSync(filePath);
+  
+  // Future: delete associated directories
+  // fs.rmSync(path.join(SERVICES_DIR, safeName(id)), { recursive: true });
+  // fs.rmSync(path.join(KNOWLEDGE_DIR, safeName(id)), { recursive: true });
+  // etc.
+}
+```
+
+**PostgreSQL (future):**
+```sql
+-- Current: delete only project
+DELETE FROM projects WHERE id = $1 AND id != 'default' RETURNING id;
+
+-- Future: use CASCADE or manual deletes
+DELETE FROM projects WHERE id = $1 AND id != 'default' RETURNING id;
+-- Then delete from child tables
+```
+
+### 6.3 Soft Delete Compatibility
+
+The current schema supports future soft delete:
+
+```sql
+-- Add to projects table (future migration)
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+-- Index for filtering archived projects
+CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived) WHERE is_archived = false;
+```
+
+### 6.4 Archive Strategy (Future)
+
+| Aspect | Hard Delete (MVP) | Soft Delete/Archive (Future) |
+|--------|-------------------|------------------------------|
+| Column | None | `is_archived` (boolean), `archived_at` (timestamp) |
+| Query | `DELETE FROM projects WHERE id = $1` | `UPDATE projects SET is_archived = true, archived_at = now() WHERE id = $1` |
+| List Query | `SELECT * FROM projects` | `SELECT * FROM projects WHERE is_archived = false` |
+| Recovery | None | Restore from archive |
+| UI | Confirmation dialog | Archive view + restore option |
+
+---
+
+## 7. Scalability Considerations
+
+### 7.1 Current Scale
 
 | Metric | Expected | Sufficient? |
 |--------|----------|-------------|
@@ -332,7 +418,7 @@ For the expected scale (≤ 500 projects), this is sufficient.
 | Concurrent users | 1 (single-user MVP) | Yes |
 | API requests/sec | ≤ 10 | Yes |
 
-### 6.2 Scaling Strategies
+### 7.2 Scaling Strategies
 
 | Scale Factor | Strategy |
 |-------------|----------|
@@ -341,7 +427,7 @@ For the expected scale (≤ 500 projects), this is sufficient.
 | 100+ concurrent users | Add authentication, user-scoped projects |
 | 1M+ projects | Sharding by user ID, caching layer |
 
-### 6.3 Future Database Changes
+### 7.3 Future Database Changes
 
 | Change | Sprint | Description |
 |--------|--------|-------------|
@@ -355,9 +441,9 @@ For the expected scale (≤ 500 projects), this is sufficient.
 
 ---
 
-## 7. Migration Strategy
+## 8. Migration Strategy
 
-### 7.1 Data Migration
+### 8.1 Data Migration
 
 No data migration is required for Sprint 01. The existing project data format is unchanged:
 
@@ -370,7 +456,7 @@ No data migration is required for Sprint 01. The existing project data format is
 }
 ```
 
-### 7.2 Schema Migration
+### 8.2 Schema Migration
 
 The existing `001-schema.sql` already defines the `projects` table. Sprint 01 adds:
 
@@ -380,14 +466,14 @@ The existing `001-schema.sql` already defines the `projects` table. Sprint 01 ad
 
 2. **Migration runner:** Existing `migrate.js` will be enhanced to run multiple migrations in order
 
-### 7.3 Migration Order
+### 8.3 Migration Order
 
 ```
 001-schema.sql         → Creates base tables (users, projects, etc.)
 002-project-enhancements.sql → Adds indexes and triggers (Sprint 01)
 ```
 
-### 7.4 Rollback Strategy
+### 8.4 Rollback Strategy
 
 - **File-based:** Delete the migration file (no data changes)
 - **PostgreSQL:** Drop indexes and triggers (no data changes)
@@ -396,36 +482,36 @@ No rollback is needed because Sprint 01 only adds indexes and triggers — no sc
 
 ---
 
-## 8. Backup and Recovery
+## 9. Backup and Recovery
 
-### 8.1 File-Based Backup
+### 9.1 File-Based Backup
 
 - Project data is stored as JSON files in `data/projects/`
 - Backup: Copy the `data/` directory
 - Recovery: Restore the `data/` directory
 
-### 8.2 PostgreSQL Backup
+### 9.2 PostgreSQL Backup
 
 - Use `pg_dump` for logical backups
 - Use `pg_basebackup` for physical backups
 - Recovery: Restore from backup and replay WAL logs
 
-### 8.3 No Automated Backup in MVP
+### 9.3 No Automated Backup in MVP
 
 Automated backup is not implemented in the MVP. Users are responsible for backing up their data.
 
 ---
 
-## 9. Consistency Guarantees
+## 10. Consistency Guarantees
 
-### 9.1 File-Based
+### 10.1 File-Based
 
 - **Atomicity:** Single file operations are atomic (write to temp, rename)
 - **Consistency:** JSON format is validated on read
 - **Isolation:** No concurrent access (single-user MVP)
 - **Durability:** File system provides durability
 
-### 9.2 PostgreSQL
+### 10.2 PostgreSQL
 
 - **Atomicity:** Transactions ensure atomicity
 - **Consistency:** Constraints ensure consistency
@@ -434,7 +520,7 @@ Automated backup is not implemented in the MVP. Users are responsible for backin
 
 ---
 
-## 10. Data Integrity Rules
+## 11. Data Integrity Rules
 
 | Rule | Enforcement | Error Message |
 |------|-------------|---------------|
@@ -444,7 +530,44 @@ Automated backup is not implemented in the MVP. Users are responsible for backin
 | Project name is non-empty | Domain validation | "Project identity name must be a non-empty string." |
 | Default project cannot be deleted | Repository check (delete) | "Cannot delete the default project" |
 | Project exists (update/delete) | Repository check | "Project not found: {id}" |
+| User confirms deletion by typing ID | Frontend validation | "Please type the exact project ID to confirm deletion." |
 
 ---
 
-*End of Database Model — Sprint 01: Project Foundation*
+## 12. Future: Archive Support
+
+### 12.1 Archive Schema Changes (Sprint 10)
+
+```sql
+-- Add archive support to projects table
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT false;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+-- Index for non-archived projects (most common query)
+CREATE INDEX IF NOT EXISTS idx_projects_active ON projects(is_archived) WHERE is_archived = false;
+
+-- Index for archived projects (recovery view)
+CREATE INDEX IF NOT EXISTS idx_projects_archived ON projects(is_archived, archived_at DESC) WHERE is_archived = true;
+```
+
+### 12.2 Archive Migration Path
+
+The deletion design allows archive to be introduced later without redesign:
+
+1. **Add columns:** `is_archived`, `archived_at`
+2. **Change `deleteProject`:** Set `is_archived = true` instead of hard delete
+3. **Update queries:** Filter `WHERE is_archived = false` in list queries
+4. **Add recovery UI:** "Archived Projects" view with restore option
+5. **Keep `DELETE` endpoint:** For permanent deletion if needed
+
+### 12.3 Archive vs Delete
+
+| Operation | User Action | System Behavior | Recovery |
+|-----------|-------------|-----------------|----------|
+| Delete (MVP) | Click "Delete", confirm | Hard delete — remove from DB | None |
+| Archive (Future) | Click "Archive" | Set `is_archived = true` | Restore from archive |
+| Permanent Delete (Future) | Click "Delete" in archive | Hard delete — remove from DB | None |
+
+---
+
+*End of Database Model — Sprint 01: Project Lifecycle Management*

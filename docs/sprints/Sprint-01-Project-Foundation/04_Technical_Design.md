@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## Technical Design
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-This document describes the technical architecture for Sprint 01: Project Foundation. The sprint establishes the project management layer — the organizational boundary for all subsequent API testing work in TestForge.
+This document describes the technical architecture for Sprint 01: Project Lifecycle Management. The sprint establishes the complete project management layer — the organizational boundary for all subsequent API testing work in TestForge.
 
 The architecture follows the existing codebase patterns:
 
@@ -36,15 +36,15 @@ The architecture follows the existing codebase patterns:
 │  │  └──────────────┘  └──────────────┘  └────────────────────┘ │  │
 │  │                                                               │  │
 │  │  ┌──────────────────────────────────────────────────────────┐ │  │
-│  │  │  Services Layer                                          │ │  │
-│  │  │  ProjectService.ts  ←→  /api/projects                   │ │  │
-│  │  │  (apiClient wrapper)                                      │ │  │
+│  │  │  Services Layer                                          │  │
+│  │  │  ProjectService.ts  ←→  /api/projects                   │  │
+│  │  │  (apiClient wrapper)                                      │  │
 │  │  └──────────────────────────────────────────────────────────┘ │  │
 │  │                                                               │  │
 │  │  ┌──────────────────────────────────────────────────────────┐ │  │
-│  │  │  State Management                                        │ │  │
-│  │  │  React Context (ProjectContext)                          │ │  │
-│  │  │  + useState / useEffect hooks                            │ │  │
+│  │  │  State Management                                        │  │
+│  │  │  React Context (ProjectContext)                          │  │
+│  │  │  + useState / useEffect hooks                            │  │
 │  │  └──────────────────────────────────────────────────────────┘ │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -59,9 +59,9 @@ The architecture follows the existing codebase patterns:
 │  │  └──────────────┘  └──────────────┘  └────────────────────┘ │  │
 │  │                                                               │  │
 │  │  ┌──────────────────────────────────────────────────────────┐ │  │
-│  │  │  Persistence Layer                                       │ │  │
-│  │  │  FileProjectRepository  |  PostgresProjectRepository    │ │  │
-│  │  │  (data/projects/*.json) |  (projects table)             │ │  │
+│  │  │  Persistence Layer                                       │  │
+│  │  │  FileProjectRepository  |  PostgresProjectRepository    │  │
+│  │  │  (data/projects/*.json) |  (projects table)             │  │
 │  │  └──────────────────────────────────────────────────────────┘ │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘
@@ -151,6 +151,7 @@ App
     │   ├── PageIntro
     │   ├── ProjectSetupCard
     │   │   ├── CardIntroHeader
+    │   │   ├── SearchBar
     │   │   ├── ExistingProjectsSection
     │   │   │   ├── SectionHeader
     │   │   │   ├── ProjectList
@@ -209,7 +210,7 @@ interface ProjectContextValue {
 #### 3.3.2 Local State
 
 Each feature component manages its own local state for:
-- Form inputs (project ID, name)
+- Form inputs (project ID, name, confirmation)
 - Loading states (creating, updating, deleting)
 - Error messages
 - Search query
@@ -559,6 +560,7 @@ URL pattern matching (existing pattern in `server.js`):
 |-------|------|---------------|
 | Project ID | Required, 1-100 chars, `[a-zA-Z0-9._-]+` | "Project ID must be a non-empty string containing only alphanumeric characters, hyphens, underscores, and dots." |
 | Project Name | Optional, defaults to ID, non-empty if provided | "Project name must be a non-empty string." |
+| Delete Confirmation | Must match project ID exactly | "Please type the exact project ID to confirm deletion." |
 
 ### 8.2 Validation Layers
 
@@ -615,9 +617,91 @@ export function validateProjectName(name: string): string | null {
 
 ---
 
-## 10. Performance Considerations
+## 10. Project Deletion Design
 
-### 10.1 Frontend
+### 10.1 Deletion Flow
+
+```
+User clicks "Delete Project"
+  → DeleteProjectDialog opens
+  → User types project ID to confirm
+  → User clicks "Delete"
+  → Frontend calls DELETE /api/projects/:id
+  → Backend validates:
+    - Project exists
+    - Project is not 'default'
+  → Backend performs cascade delete:
+    - Delete project record
+    - Delete all services (future: when services exist)
+    - Delete all API models (future)
+    - Delete all knowledge (future)
+    - Delete all execution plans (future)
+    - Delete all test runs (future)
+    - Delete all test cases (future)
+    - Delete all reports (future)
+  → Backend returns success
+  → Frontend redirects to setup page
+  → Context clears active project
+```
+
+### 10.2 Validation
+
+Before deletion, the system validates:
+
+1. Project ID is not `default`
+2. Project exists in storage
+3. User has confirmed by typing the exact project ID
+
+### 10.3 Repository Cleanup
+
+The `deleteProject` function in both repositories handles cleanup:
+
+**File-based:**
+```javascript
+function deleteProject(id) {
+  if (id === 'default') throw new Error('Cannot delete the default project');
+  const filePath = path.join(PROJECTS_DIR, `${safeName(id)}.json`);
+  if (!fs.existsSync(filePath)) throw new Error(`Project not found: ${id}`);
+  fs.unlinkSync(filePath);
+  // Future: delete associated directories (services/, knowledge/, runs/, etc.)
+}
+```
+
+**PostgreSQL:**
+```sql
+DELETE FROM projects WHERE id = $1 AND id != 'default' RETURNING id;
+-- Future: CASCADE DELETE to services, api_models, knowledge, runs, test_cases, reports
+```
+
+### 10.4 Error Handling
+
+| Error | HTTP Status | User Message |
+|-------|-------------|--------------|
+| Cannot delete default project | 400 | "Cannot delete the default project" |
+| Project not found | 404 | "Project not found: {id}" |
+| Deletion failed (server error) | 500 | "Failed to delete project. Please try again." |
+
+### 10.5 Recovery Strategy
+
+- **No undo:** Deletion is permanent in MVP
+- **No archive:** Deleted projects cannot be recovered
+- **Future:** Add `is_archived` column and soft delete in Sprint 10
+
+### 10.6 Future Archive Support
+
+The deletion design allows archive to be introduced later without redesign:
+
+- Add `is_archived` column to projects table (PostgreSQL)
+- Add `archivedAt` timestamp
+- Change `deleteProject` to set `is_archived = true` instead of hard delete
+- Hide archived projects from default list queries
+- Add "Archived Projects" view for recovery
+
+---
+
+## 11. Performance Considerations
+
+### 11.1 Frontend
 
 | Metric | Target | Strategy |
 |--------|--------|----------|
@@ -627,7 +711,7 @@ export function validateProjectName(name: string): string | null {
 | Bundle size | ≤ 10KB increase | Code splitting, tree-shaking |
 | Re-render | ≤ 16ms | React.memo, useCallback, useMemo |
 
-### 10.2 Backend
+### 11.2 Backend
 
 | Metric | Target | Strategy |
 |--------|--------|----------|
@@ -637,7 +721,7 @@ export function validateProjectName(name: string): string | null {
 | Project update | ≤ 100ms | Read-modify-write single file |
 | Project deletion | ≤ 50ms | Single file delete |
 
-### 10.3 Database (PostgreSQL)
+### 11.3 Database (PostgreSQL)
 
 | Metric | Target | Strategy |
 |--------|--------|----------|
@@ -646,38 +730,39 @@ export function validateProjectName(name: string): string | null {
 | Project update | ≤ 50ms | Single UPDATE |
 | Project deletion | ≤ 50ms | Single DELETE |
 
-### 10.4 Indexes (PostgreSQL)
+### 11.4 Indexes (PostgreSQL)
 
 ```sql
 -- Existing: projects.id is PRIMARY KEY (indexed automatically)
 -- New indexes for search:
 CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name);
 CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at DESC);
 ```
 
 ---
 
-## 11. Security Considerations
+## 12. Security Considerations
 
-### 11.1 Input Sanitization
+### 12.1 Input Sanitization
 
 - Project IDs are sanitized by `safeName()` in the storage layer
 - Project names are stored as-is (no HTML rendering)
 - No SQL injection risk (parameterized queries in PostgreSQL, no SQL in file storage)
 
-### 11.2 Path Traversal Prevention
+### 12.2 Path Traversal Prevention
 
 - File paths are resolved and checked against the base directory
 - `safeName()` strips all characters except `[a-zA-Z0-9._-]`
 - No user input is used directly in file paths
 
-### 11.3 CORS
+### 12.3 CORS
 
 - CORS is open (`*`) — consistent with existing configuration
 - No credentials are sent in requests
 - Acceptable for local development (no authentication in MVP)
 
-### 11.4 Data Exposure
+### 12.4 Data Exposure
 
 - Project data is stored locally (file-based) or in PostgreSQL
 - No sensitive data in project entities (just ID, name, timestamps)
@@ -685,21 +770,21 @@ CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
 
 ---
 
-## 12. Testing Strategy
+## 13. Testing Strategy
 
-### 12.1 Backend Testing
+### 13.1 Backend Testing
 
 - **Unit tests:** `test-domain-ProjectIdentity.js`, `test-project-repository.js`
 - **Integration tests:** `test-api-project-integration.js`
 - **Coverage:** All new functions in `ProjectRepository` and `ProjectIdentity`
 
-### 12.2 Frontend Testing
+### 13.2 Frontend Testing
 
 - **Unit tests:** Vitest + React Testing Library
 - **Coverage:** All new components and hooks
 - **Test files:** `*.test.tsx` alongside components
 
-### 12.3 Test Matrix
+### 13.3 Test Matrix
 
 | Layer | Tool | Coverage Target |
 |-------|------|----------------|
@@ -711,9 +796,9 @@ CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
 
 ---
 
-## 13. Deployment Considerations
+## 14. Deployment Considerations
 
-### 13.1 Build Process
+### 14.1 Build Process
 
 ```bash
 # Frontend build
@@ -725,11 +810,11 @@ cd ..
 npm start  # → serves frontend/dist/ + API
 ```
 
-### 13.2 Environment Variables
+### 14.2 Environment Variables
 
 No new environment variables required for Sprint 01.
 
-### 13.3 CI/CD
+### 14.3 CI/CD
 
 Existing GitHub Actions workflow (`.github/workflows/ci.yml`) will be extended to:
 - Run frontend typecheck
@@ -738,19 +823,19 @@ Existing GitHub Actions workflow (`.github/workflows/ci.yml`) will be extended t
 
 ---
 
-## 14. Migration Strategy
+## 15. Migration Strategy
 
-### 14.1 Data Migration
+### 15.1 Data Migration
 
 No data migration required. The existing project data format is unchanged.
 
-### 14.2 API Migration
+### 15.2 API Migration
 
 - New endpoints (`PATCH`, `DELETE`) are additive — no breaking changes
 - Enhanced `GET /api/projects` adds optional query parameters — backward compatible
 - Enhanced `POST /api/projects` adds stricter validation — may reject previously accepted invalid input (acceptable for MVP)
 
-### 14.3 Frontend Migration
+### 15.3 Frontend Migration
 
 - Existing `SetupPage` is enhanced, not replaced
 - New `ProjectDashboard` is a new component
@@ -759,9 +844,9 @@ No data migration required. The existing project data format is unchanged.
 
 ---
 
-## 15. Monitoring and Observability
+## 16. Monitoring and Observability
 
-### 15.1 Logging
+### 16.1 Logging
 
 Backend logs (existing pattern):
 ```
@@ -773,14 +858,14 @@ New log entries for:
 - Project update: `[requestId] PATCH /api/projects/:id → 200 (32ms)`
 - Project deletion: `[requestId] DELETE /api/projects/:id → 200 (12ms)`
 
-### 15.2 Metrics
+### 16.2 Metrics
 
 No new metrics infrastructure. Existing console logging is sufficient for MVP.
 
-### 15.3 Error Tracking
+### 16.3 Error Tracking
 
 No error tracking service (e.g., Sentry) in MVP. Errors are logged to console.
 
 ---
 
-*End of Technical Design — Sprint 01: Project Foundation*
+*End of Technical Design — Sprint 01: Project Lifecycle Management*

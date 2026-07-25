@@ -17,8 +17,21 @@ export interface CreateProjectRequest {
   name: string;
 }
 
+export interface UpdateProjectRequest {
+  name: string;
+}
+
+export interface DeleteProjectResponse {
+  success: boolean;
+  message: string;
+  id: string;
+}
+
 export interface ListProjectsResponse {
   projects: Project[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface GetProjectResponse {

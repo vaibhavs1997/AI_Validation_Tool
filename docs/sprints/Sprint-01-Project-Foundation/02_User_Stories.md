@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## User Stories
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -32,7 +32,7 @@ Each story includes:
 | **Priority** | P0 |
 | **Story Points** | S |
 | **Dependencies** | None |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to create a new project by entering a project ID and optional name  
@@ -70,7 +70,7 @@ Each story includes:
 | **Priority** | P0 |
 | **Story Points** | M |
 | **Dependencies** | Story 1 (Create Project) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to see a list of all my projects and select one to work with  
@@ -82,7 +82,7 @@ Each story includes:
 2. The default project (`default`) is always present in the list.
 3. Each project in the list displays: project name, project ID, and last updated timestamp.
 4. Projects are sorted alphabetically by ID by default.
-5. Clicking a project in the list navigates to its dashboard.
+5. Clicking a project in the list opens that project (navigates to dashboard).
 6. A search input is available above the project list.
 7. Typing in the search input filters projects in real-time (case-insensitive).
 8. Search matches both project ID and project name.
@@ -109,7 +109,7 @@ Each story includes:
 | **Priority** | P0 |
 | **Story Points** | M |
 | **Dependencies** | Story 2 (List Projects) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to view a project dashboard with all project details and next steps  
@@ -153,7 +153,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | S |
 | **Dependencies** | Story 3 (View Dashboard) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to edit the name of an existing project  
@@ -188,10 +188,10 @@ Each story includes:
 
 | Field | Value |
 |-------|-------|
-| **Priority** | P1 |
+| **Priority** | P0 |
 | **Story Points** | S |
 | **Dependencies** | Story 3 (View Dashboard) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to delete a project I no longer need  
@@ -200,17 +200,16 @@ Each story includes:
 ### Acceptance Criteria
 
 1. The "Delete Project" button on the dashboard opens a confirmation modal dialog.
-2. The confirmation modal has a title "Delete Project".
-3. The confirmation modal displays the project name and ID being deleted.
-4. The confirmation modal requires the user to type the project ID to enable the "Delete" button.
-5. The "Delete" button is disabled until the user types the exact project ID.
-6. The "Delete" button shows a loading spinner when the delete request is in progress.
-7. On successful deletion, the user is redirected to the project setup page.
-8. On cancel, the modal closes without deleting anything.
-9. On failure, an error message is displayed in the modal.
-10. The default project cannot be deleted — the delete button is hidden or disabled for the default project.
-11. The "Cancel" button can be triggered via Escape key.
-12. The modal is accessible (focus trap, ARIA attributes, escape to close).
+2. The confirmation modal displays the project name and ID being deleted.
+3. The confirmation modal requires the user to type the project ID to enable the "Delete" button.
+4. The "Delete" button is disabled until the user types the exact project ID.
+5. The "Delete" button shows a loading spinner when the delete request is in progress.
+6. On successful deletion, the user is redirected to the project setup page.
+7. On cancel, the modal closes without deleting anything.
+8. On failure, an error message is displayed in the modal.
+9. The default project cannot be deleted — the delete button is hidden or disabled for the default project.
+10. The "Cancel" button can be triggered via Escape key.
+11. The modal is accessible (focus trap, ARIA attributes, escape to close).
 
 ### UI States
 
@@ -229,7 +228,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | S |
 | **Dependencies** | Story 2 (List Projects) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to search and filter my projects by name or ID  
@@ -242,11 +241,11 @@ Each story includes:
 3. Search is case-insensitive.
 4. Search matches both project ID and project name.
 5. When the search input is cleared, all projects are shown.
-6. A clear button (×) is shown in the search input when there is text.
+6. A clear button (`×`) is shown in the search input when there is text.
 7. Clicking the clear button empties the search input and shows all projects.
 8. When no projects match the search, a "no results" message is shown.
 9. The search input has an accessible label.
-10. The search input supports keyboard navigation (Tab to focus, Enter to submit).
+10. `Ctrl/Cmd + K` focuses the search input.
 
 ### UI States
 
@@ -264,7 +263,7 @@ Each story includes:
 | **Priority** | P0 |
 | **Story Points** | S |
 | **Dependencies** | Story 2 (List Projects), Story 3 (View Dashboard) |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** to select and activate a project to work within its context  
@@ -281,7 +280,7 @@ Each story includes:
 7. The "Change Project" button on the dashboard returns to the project list.
 8. If the active project is deleted, the user is redirected to the project setup page.
 9. The active project persists across page reloads (via URL hash or localStorage).
-10. The project selection is reflected in the URL (e.g., `#workspace` or `#setup`).
+10. The project selection is reflected in the URL (e.g., `#workspace?project=payments-api`).
 
 ### UI States
 
@@ -299,7 +298,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | M |
 | **Dependencies** | Stories 1-7 |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** QA Engineer  
 **I want** the project management screens to work on mobile and tablet devices  
@@ -321,7 +320,7 @@ Each story includes:
 ### Breakpoints
 
 | Breakpoint | Width | Behavior |
-|-----------|-------|----------|
+|------------|-------|----------|
 | Mobile | ≤ 768px | Sidebar hidden, form stacks, buttons full-width |
 | Tablet | 769px – 1200px | Sidebar visible, form inline, buttons compact |
 | Desktop | ≥ 1201px | Full layout, form inline, buttons normal |
@@ -335,7 +334,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | S |
 | **Dependencies** | Stories 1-7 |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** power user  
 **I want** to navigate the project management screens using only my keyboard  
@@ -349,12 +348,14 @@ Each story includes:
 4. Enter key activates buttons and links.
 5. Enter key in the Project ID or Project Name input triggers the create action.
 6. Enter key in the edit project name input triggers the save action.
-7. Escape key closes modal dialogs.
-8. Escape key clears the search input.
-9. Focus is visible on all interactive elements (focus ring or outline).
-10. Focus is trapped within modal dialogs (Tab cycles within the modal).
-11. The initial focus is set to the first input in modal dialogs.
-12. Arrow keys can navigate between project list items (up/down).
+7. Enter key in the delete confirmation input triggers delete when ID matches.
+8. Escape key closes modal dialogs.
+9. Escape key clears the search input.
+10. Focus is visible on all interactive elements (focus ring or outline).
+11. Focus is trapped within modal dialogs (Tab cycles within the modal).
+12. The initial focus is set to the first input in modal dialogs.
+13. Arrow keys can navigate between project list items (up/down).
+14. `Ctrl/Cmd + K` focuses the search input.
 
 ### Keyboard Shortcuts
 
@@ -377,7 +378,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | M |
 | **Dependencies** | Stories 1-7 |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** user with disabilities  
 **I want** the project management screens to be fully accessible  
@@ -430,7 +431,7 @@ Each story includes:
 | **Priority** | P0 |
 | **Story Points** | S |
 | **Dependencies** | Stories 1-7 |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** user who prefers dark mode  
 **I want** the project management screens to support both light and dark themes  
@@ -468,7 +469,7 @@ Each story includes:
 | **Priority** | P1 |
 | **Story Points** | S |
 | **Dependencies** | Stories 1-7 |
-| **Epic** | Project Management |
+| **Epic** | Project Lifecycle |
 
 **As a** user  
 **I want** to see clear error messages and retry options when something goes wrong  
@@ -504,8 +505,8 @@ Each story includes:
 
 | Priority | Count | Stories |
 |----------|-------|---------|
-| **P0 (Must Have)** | 5 | 1, 2, 3, 7, 11 |
-| **P1 (Should Have)** | 6 | 4, 5, 6, 8, 9, 10, 12 |
+| **P0 (Must Have)** | 6 | 1, 2, 3, 5, 7, 11 |
+| **P1 (Should Have)** | 6 | 4, 6, 8, 9, 10, 12 |
 | **P2 (Nice to Have)** | 0 | — |
 
 ---
@@ -552,4 +553,20 @@ graph TD
 
 ---
 
-*End of User Stories — Sprint 01: Project Foundation*
+*End of User Stories — Sprint 01: Project Lifecycle Management*
+</parameter>
+<task_progress>
+- [x] Read all 10 Sprint 01 docs
+- [x] Update 01_PRD.md for Project Lifecycle Management
+- [ ] Update 02_User_Stories.md
+- [ ] Update 03_UX_Specification.md
+- [ ] Update 04_Technical_Design.md
+- [ ] Update 05_API_Contracts.md
+- [ ] Update 06_Database_Model.md
+- [ ] Update 07_Component_Breakdown.md
+- [ ] Update 08_Implementation_Plan.md
+- [ ] Update 09_AI_Implementation_Prompts.md
+- [ ] Update 10_Definition_of_Done.md
+- [ ] Produce changelog and readiness recommendation
+</task_progress>
+</write_to_file>

@@ -12,6 +12,9 @@ const DEFAULT_PROJECT = Object.freeze({
   updatedAt: new Date('1970-01-01T00:00:00.000Z'),
 });
 
+const PROJECT_ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
+const MAX_PROJECT_ID_LENGTH = 100;
+
 /**
  * Validate ProjectIdentity fields.
  * @param {{id:string, name:string, createdAt:Date, updatedAt:Date}} project
@@ -21,6 +24,14 @@ const DEFAULT_PROJECT = Object.freeze({
 function validateProjectIdentity(project) {
   if (typeof project.id !== 'string' || project.id.trim().length === 0) {
     throw new Error('Project identity id must be a non-empty string.');
+  }
+
+  if (project.id.length > MAX_PROJECT_ID_LENGTH) {
+    throw new Error(`Project id must be at most ${MAX_PROJECT_ID_LENGTH} characters.`);
+  }
+
+  if (!PROJECT_ID_PATTERN.test(project.id)) {
+    throw new Error('Project id must contain only alphanumeric characters, hyphens, underscores, and dots.');
   }
 
   if (typeof project.name !== 'string' || project.name.trim().length === 0) {
@@ -36,6 +47,38 @@ function validateProjectIdentity(project) {
 
   if (Number.isNaN(updatedAt.getTime())) {
     throw new Error('Project identity updatedAt must be a valid date timestamp.');
+  }
+}
+
+/**
+ * Validate project ID format.
+ * @param {string} id
+ * @returns {void}
+ * @throws {Error}
+ */
+function validateProjectId(id) {
+  if (typeof id !== 'string' || id.trim().length === 0) {
+    throw new Error('Project id must be a non-empty string.');
+  }
+
+  if (id.length > MAX_PROJECT_ID_LENGTH) {
+    throw new Error(`Project id must be at most ${MAX_PROJECT_ID_LENGTH} characters.`);
+  }
+
+  if (!PROJECT_ID_PATTERN.test(id)) {
+    throw new Error('Project id must contain only alphanumeric characters, hyphens, underscores, and dots.');
+  }
+}
+
+/**
+ * Validate project name.
+ * @param {string} name
+ * @returns {void}
+ * @throws {Error}
+ */
+function validateProjectName(name) {
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    throw new Error('Project name must be a non-empty string.');
   }
 }
 
@@ -87,7 +130,11 @@ function getDefaultProjectIdentity() {
 
 module.exports = {
   DEFAULT_PROJECT,
+  PROJECT_ID_PATTERN,
+  MAX_PROJECT_ID_LENGTH,
   createProjectIdentity,
   getDefaultProjectIdentity,
   validateProjectIdentity,
+  validateProjectId,
+  validateProjectName,
 };
