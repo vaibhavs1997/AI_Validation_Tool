@@ -78,6 +78,9 @@ export const apiClient = {
   post: <T = unknown>(endpoint: string, body: unknown): Promise<T> =>
     apiRequest<T>(endpoint, { method: "POST", body: JSON.stringify(body) }),
 
+  patch: <T = unknown>(endpoint: string, body: unknown): Promise<T> =>
+    apiRequest<T>(endpoint, { method: "PATCH", body: JSON.stringify(body) }),
+
   delete: <T = unknown>(endpoint: string): Promise<T> =>
     apiRequest<T>(endpoint, { method: "DELETE" }),
 };

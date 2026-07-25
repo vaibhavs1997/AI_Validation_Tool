@@ -85,7 +85,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   // ─── Project Load ─────────────────────────────────────────────────────────
   useEffect(() => {
     listProjects()
-      .then(setProjects)
+      .then((response) => setProjects(response.projects))
       .catch(() => {});
   }, []);
 

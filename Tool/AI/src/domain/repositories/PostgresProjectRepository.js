@@ -57,16 +57,87 @@ async function projectExists(id) {
   return result.rows.length > 0;
 }
 
-async function listProjects() {
+async function listProjects(options) {
+  const search = (options && options.search) || "";
+  const sort = (options && options.sort) || "id";
+  const order = (options && options.order) || "asc";
+  const limit = (options && options.limit) || 100;
+  const offset = (options && options.offset) || 0;
+
+  const params = [];
+  let where = "1=1";
+  if (search) {
+    params.push(`%${search}%`);
+    where += ` AND (id ILIKE $${params.length} OR name ILIKE $${params.length})`;
+  }
+
+  const orderMap = {
+    id: "id",
+    name: "name",
+    createdAt: "created_at",
+    updatedAt: "updated_at",
+  };
+  const sortColumn = orderMap[sort] || "id";
+  const sortOrder = order === "desc" ? "DESC" : "ASC";
+
   const result = await getPool().query(
     `SELECT id, name, created_at, updated_at
      FROM projects
-     ORDER BY id ASC`
+     WHERE ${where}
+     ORDER BY ${sortColumn} ${sortOrder}
+     LIMIT ${limit} OFFSET ${offset}`,
+    params
   );
   return result.rows.map((row) => ({
     id: row.id,
     name: row.name || row.id,
-    updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+async function updateProject(id, updates) {
+  const result = await getPool().query(
+    `UPDATE projects
+     SET name = $1, updated_at = now()
+     WHERE id = $2
+     RETURNING id, name, created_at, updated_at`,
+    [(updates && updates.name) || null, id]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`Project not found: ${id}`);
+  }
+  return toIdentity(result.rows[0]);
+}
+
+async function deleteProject(id) {
+  if (id === DEFAULT_PROJECT.id) {
+    throw new Error("Cannot delete the default project");
+  }
+  const result = await getPool().query(
+    `DELETE FROM projects WHERE id = $1 RETURNING id`,
+    [id]
+  );
+  if (result.rows.length === 0) {
+    throw new Error(`Project not found: ${id}`);
+  }
+}
+
+async function searchProjects(query) {
+  const safeQuery = String(query || "").trim();
+  if (!safeQuery) return listProjects();
+  const result = await getPool().query(
+    `SELECT id, name, created_at, updated_at
+     FROM projects
+     WHERE id ILIKE $1 OR name ILIKE $1
+     ORDER BY id ASC`,
+    [`%${safeQuery}%`]
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    name: row.name || row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }));
 }
 
@@ -100,6 +171,9 @@ module.exports = {
   createProject,
   getProject,
   listProjects,
+  updateProject,
+  deleteProject,
+  searchProjects,
   projectExists,
   seedDefaultProject,
   getBackendName,

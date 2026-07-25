@@ -21,8 +21,20 @@ function getProject(id) {
   return selectedRepository().getProject(id);
 }
 
-function listProjects() {
-  return selectedRepository().listProjects();
+function listProjects(options) {
+  return selectedRepository().listProjects(options);
+}
+
+function updateProject(id, updates) {
+  return selectedRepository().updateProject(id, updates);
+}
+
+function deleteProject(id) {
+  return selectedRepository().deleteProject(id);
+}
+
+function searchProjects(query) {
+  return selectedRepository().searchProjects(query);
 }
 
 function projectExists(id) {
@@ -45,6 +57,9 @@ module.exports = {
   createProject,
   getProject,
   listProjects,
+  updateProject,
+  deleteProject,
+  searchProjects,
   projectExists,
   seedDefaultProject,
   getBackendName,
