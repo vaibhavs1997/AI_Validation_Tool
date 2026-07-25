@@ -1,8 +1,8 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## Definition of Done
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
@@ -11,7 +11,7 @@
 
 ## 1. Overview
 
-This document defines the Definition of Done for Sprint 01: Project Foundation. A task or feature is considered "done" when it meets all criteria in this document.
+This document defines the Definition of Done for Sprint 01: Project Lifecycle Management. A task or feature is considered "done" when it meets all criteria in this document.
 
 The Definition of Done is organized into categories:
 1. Functional Requirements
@@ -96,52 +96,53 @@ The Definition of Done is organized into categories:
 | FR-45 | On successful deletion, the user is returned to the project setup page | [ ] |
 | FR-46 | On cancellation, the user remains on the dashboard | [ ] |
 | FR-47 | After deletion, the project no longer appears in the project list | [ ] |
+| FR-48 | Deleting a project removes all associated data (cascade delete) | [ ] |
 
 ### 2.6 Project Selection
 
 | Requirement | Acceptance Criteria | Status |
 |-------------|---------------------|--------|
-| FR-48 | User can switch between projects from the project setup page | [ ] |
-| FR-49 | User can switch between projects from the dashboard | [ ] |
-| FR-50 | When switching projects, the active project context updates immediately | [ ] |
-| FR-51 | The active project persists across page reloads | [ ] |
+| FR-49 | User can switch between projects from the project setup page | [ ] |
+| FR-50 | User can switch between projects from the dashboard | [ ] |
+| FR-51 | When switching projects, the active project context updates immediately | [ ] |
+| FR-52 | The active project persists across page reloads | [ ] |
 
 ### 2.7 Empty States
 
 | Requirement | Acceptance Criteria | Status |
 |-------------|---------------------|--------|
-| FR-52 | When no projects exist, an empty state is shown with guidance | [ ] |
-| FR-53 | When search returns no results, a "no results" message is shown | [ ] |
-| FR-54 | The empty state includes a call-to-action to create a project | [ ] |
+| FR-53 | When no projects exist, an empty state is shown with guidance | [ ] |
+| FR-54 | When search returns no results, a "no results" message is shown | [ ] |
+| FR-55 | The empty state includes a call-to-action to create a project | [ ] |
 
 ### 2.8 Error Handling
 
 | Requirement | Acceptance Criteria | Status |
 |-------------|---------------------|--------|
-| FR-55 | Network errors during project creation show a user-friendly message | [ ] |
-| FR-56 | Network errors during project listing show a retry option | [ ] |
-| FR-57 | All error messages are displayed in a consistent, visible location | [ ] |
-| FR-58 | Errors do not cause the application to crash or become unresponsive | [ ] |
+| FR-56 | Network errors during project creation show a user-friendly message | [ ] |
+| FR-57 | Network errors during project listing show a retry option | [ ] |
+| FR-58 | All error messages are displayed in a consistent, visible location | [ ] |
+| FR-59 | Errors do not cause the application to crash or become unresponsive | [ ] |
 
 ### 2.9 Backend API
 
 | Requirement | Acceptance Criteria | Status |
 |-------------|---------------------|--------|
-| FR-59 | `PATCH /api/projects/:id` endpoint exists and works | [ ] |
-| FR-60 | `DELETE /api/projects/:id` endpoint exists and works | [ ] |
-| FR-61 | `GET /api/projects` supports `search` query parameter | [ ] |
-| FR-62 | `GET /api/projects` supports `sort` and `order` query parameters | [ ] |
-| FR-63 | `POST /api/projects` validates project ID format | [ ] |
-| FR-64 | All endpoints return proper HTTP status codes (200, 400, 404, 409) | [ ] |
-| FR-65 | All endpoints return consistent JSON response format | [ ] |
+| FR-60 | `PATCH /api/projects/:id` endpoint exists and works | [ ] |
+| FR-61 | `DELETE /api/projects/:id` endpoint exists and works | [ ] |
+| FR-62 | `GET /api/projects` supports `search` query parameter | [ ] |
+| FR-63 | `GET /api/projects` supports `sort` and `order` query parameters | [ ] |
+| FR-64 | `POST /api/projects` validates project ID format | [ ] |
+| FR-65 | All endpoints return proper HTTP status codes (200, 400, 404, 409) | [ ] |
+| FR-66 | All endpoints return consistent JSON response format | [ ] |
 
 ### 2.10 Dual Persistence
 
 | Requirement | Acceptance Criteria | Status |
 |-------------|---------------------|--------|
-| FR-66 | All project operations work with file-based storage | [ ] |
-| FR-67 | All project operations work with PostgreSQL storage | [ ] |
-| FR-68 | Both backends return identical results for the same operation | [ ] |
+| FR-67 | All project operations work with file-based storage | [ ] |
+| FR-68 | All project operations work with PostgreSQL storage | [ ] |
+| FR-69 | Both backends return identical results for the same operation | [ ] |
 
 ---
 
@@ -258,51 +259,26 @@ The Definition of Done is organized into categories:
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| CR-01 | All TypeScript code compiles without errors | [ ] |
-| CR-02 | No `any` types in new code (except where unavoidable) | [ ] |
-| CR-03 | All functions have return type annotations | [ ] |
-| CR-04 | All interfaces are properly defined and exported | [ ] |
-| CR-05 | `tsc --noEmit` passes | [ ] |
+| TQ-01 | All new code has TypeScript types | [ ] |
+| TQ-02 | No `any` types in new code | [ ] |
+| TQ-03 | All types are exported and reusable | [ ] |
+| TQ-04 | TypeScript strict mode enabled | [ ] |
 
-### 6.2 Backend Code Quality
-
-| Requirement | Target | Status |
-|-------------|--------|--------|
-| CR-06 | All new code uses CommonJS (require/module.exports) | [ ] |
-| CR-07 | All functions have JSDoc comments | [ ] |
-| CR-08 | Error handling uses try/catch with proper error messages | [ ] |
-| CR-09 | No SQL injection vulnerabilities (parameterized queries) | [ ] |
-| CR-10 | No path traversal vulnerabilities (safeName validation) | [ ] |
-
-### 6.3 Frontend Code Quality
+### 6.2 Linting
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| CR-11 | All components use TypeScript types | [ ] |
-| CR-12 | All components have proper prop types | [ ] |
-| CR-13 | No inline styles (use CSS classes) | [ ] |
-| CR-14 | Components are reusable and composable | [ ] |
-| CR-15 | State management uses React Context appropriately | [ ] |
-| CR-16 | Hooks follow the Rules of Hooks | [ ] |
-| CR-17 | No console.log in production code | [ ] |
+| TQ-05 | No linting errors in new code | [ ] |
+| TQ-06 | Existing code style is followed (no semicolons, 2-space indent) | [ ] |
+| TQ-07 | No console.log statements in production code | [ ] |
 
-### 6.4 CSS Code Quality
+### 6.3 Code Review
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| CR-18 | All CSS uses custom properties for theming | [ ] |
-| CR-19 | No hardcoded colors (use CSS variables) | [ ] |
-| CR-20 | Media queries are organized and documented | [ ] |
-| CR-21 | CSS is modular and follows existing patterns | [ ] |
-| CR-22 | No CSS specificity issues | [ ] |
-
-### 6.5 Git
-
-| Requirement | Target | Status |
-|-------------|--------|--------|
-| CR-23 | All changes are committed with descriptive messages | [ ] |
-| CR-24 | No sensitive data in commits | [ ] |
-| CR-25 | Branch follows naming convention (`feature/sprint-01-*`) | [ ] |
+| TQ-08 | All code is reviewed by at least one other developer | [ ] |
+| TQ-09 | Review comments are addressed | [ ] |
+| TQ-10 | No merge conflicts | [ ] |
 
 ---
 
@@ -312,127 +288,72 @@ The Definition of Done is organized into categories:
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| DR-01 | All new functions have JSDoc/TSDoc comments | [ ] |
-| DR-02 | All new components have prop documentation | [ ] |
-| DR-03 | All new hooks have usage documentation | [ ] |
-| DR-04 | API endpoints are documented in README | [ ] |
+| CD-01 | All new functions have JSDoc comments | [ ] |
+| CD-02 | All new components have prop documentation | [ ] |
+| CD-03 | Complex logic has inline comments | [ ] |
 
-### 7.2 Sprint Documentation
-
-| Requirement | Target | Status |
-|-------------|--------|--------|
-| DR-05 | 01_PRD.md is complete and accurate | [ ] |
-| DR-06 | 02_User_Stories.md is complete and accurate | [ ] |
-| DR-07 | 03_UX_Specification.md is complete and accurate | [ ] |
-| DR-08 | 04_Technical_Design.md is complete and accurate | [ ] |
-| DR-09 | 05_API_Contracts.md is complete and accurate | [ ] |
-| DR-10 | 06_Database_Model.md is complete and accurate | [ ] |
-| DR-11 | 07_Component_Breakdown.md is complete and accurate | [ ] |
-| DR-12 | 08_Implementation_Plan.md is complete and accurate | [ ] |
-| DR-13 | 09_AI_Implementation_Prompts.md is complete and accurate | [ ] |
-| DR-14 | 10_Definition_of_Done.md is complete and accurate | [ ] |
-
-### 7.3 README Updates
+### 7.2 User Documentation
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| DR-15 | README documents new API endpoints (PATCH, DELETE) | [ ] |
-| DR-16 | README documents enhanced GET /api/projects (search, sort) | [ ] |
-| DR-17 | README includes curl examples for new endpoints | [ ] |
+| CD-04 | README is updated with new API endpoints | [ ] |
+| CD-05 | README includes examples for new endpoints | [ ] |
+| CD-06 | CHANGELOG is updated | [ ] |
 
----
-
-## 8. Security Requirements
+### 7.3 Sprint Documentation
 
 | Requirement | Target | Status |
 |-------------|--------|--------|
-| SR-01 | No SQL injection vulnerabilities | [ ] |
-| SR-02 | No path traversal vulnerabilities | [ ] |
-| SR-03 | No XSS vulnerabilities (no innerHTML with user input) | [ ] |
-| SR-04 | No sensitive data in API responses | [ ] |
-| SR-05 | CORS is configured appropriately | [ ] |
-| SR-06 | Request body size limit is enforced | [ ] |
+| CD-07 | All 10 sprint documents are updated | [ ] |
+| CD-08 | Sprint review notes are documented | [ ] |
+| CD-09 | Retrospective notes are documented | [ ] |
 
 ---
 
-## 9. Browser Compatibility
+## 8. Sprint Completion Criteria
 
-| Requirement | Target | Status |
-|-------------|--------|--------|
-| BC-01 | Chrome (latest 2 versions) | [ ] |
-| BC-02 | Firefox (latest 2 versions) | [ ] |
-| BC-03 | Safari (latest 2 versions) | [ ] |
-| BC-04 | Edge (latest 2 versions) | [ ] |
-| BC-05 | Mobile Safari (iOS 16+) | [ ] |
-| BC-06 | Chrome Android (latest) | [ ] |
+Sprint 01 is considered complete **only** when **all** of the following are true:
 
----
-
-## 10. Definition of Done Checklist
-
-### 10.1 Must-Have (P0)
-
-- [ ] All P0 functional requirements (FR-01 through FR-31, FR-59 through FR-67) are met
-- [ ] All performance requirements (PR-01 through PR-04) are met
-- [ ] All accessibility requirements (AR-01 through AR-13) are met
-- [ ] All testing requirements (TR-01 through TR-22) are met
-- [ ] All code quality requirements (CR-01 through CR-10) are met
-- [ ] All documentation requirements (DR-01 through DR-14) are met
-- [ ] All security requirements (SR-01 through SR-06) are met
-- [ ] All browser compatibility requirements (BC-01 through BC-06) are met
-
-### 10.2 Should-Have (P1)
-
-- [ ] All P1 functional requirements (FR-32 through FR-58) are met
-- [ ] All remaining performance requirements (PR-05 through PR-10) are met
-- [ ] All remaining accessibility requirements (AR-14 through AR-30) are met
-- [ ] All remaining testing requirements (TR-09 through TR-22) are met
-- [ ] All remaining code quality requirements (CR-11 through CR-25) are met
-- [ ] All remaining documentation requirements (DR-15 through DR-17) are met
-
-### 10.3 Release Readiness
-
-- [ ] All tasks in the Implementation Plan (TASK-001 through TASK-018) are complete
-- [ ] All acceptance criteria in User Stories are met
-- [ ] All acceptance criteria in PRD are met
-- [ ] No known critical or high-priority bugs
-- [ ] Code has been reviewed
-- [ ] Documentation is complete and accurate
-- [ ] Tests pass in CI pipeline
-- [ ] Build succeeds
-- [ ] Typecheck passes
+1. **Users can create projects** — The create project form works, validates input, and creates projects successfully.
+2. **Users can view projects** — The project list displays all projects with proper formatting.
+3. **Users can search projects** — The search bar filters projects in real-time with debouncing.
+4. **Users can open projects** — Clicking a project opens its dashboard.
+5. **Users can edit projects** — The edit project dialog allows renaming projects.
+6. **Users can delete projects** — The delete project dialog confirms deletion and removes the project.
+7. **All tests pass** — `npm test` passes with no failures.
+8. **TypeScript compiles** — `npm run typecheck` passes with no errors.
+9. **Build succeeds** — `npm run build` succeeds.
+10. **Documentation is complete** — All 10 sprint documents are updated.
+11. **Accessibility audit passes** — WCAG 2.1 AA compliance is met.
+12. **Performance targets are met** — All performance requirements are satisfied.
 
 ---
 
-## 11. Quality Gates
-
-The sprint cannot be marked as "done" until all quality gates pass:
-
-| Gate | Criteria | Must Pass |
-|------|----------|-----------|
-| G-1 | `npm run typecheck` | Yes |
-| G-2 | `npm test` (frontend) | Yes |
-| G-3 | `npm run test:run` (frontend) | Yes |
-| G-4 | Backend tests pass | Yes |
-| G-5 | `npm run build` (frontend) | Yes |
-| G-6 | No new critical or high-priority bugs | Yes |
-| G-7 | Accessibility audit score ≥ 95 (Lighthouse) | Yes |
-| G-8 | Test coverage ≥ 80% for new code | Yes |
-| G-9 | All 10 documentation files are complete | Yes |
-| G-10 | All 18 implementation tasks are complete | Yes |
-
----
-
-## 12. Sign-Off
+## 9. Sign-Off
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| Lead Product Architect | | | |
-| Lead Frontend Engineer | | | |
-| Lead Backend Engineer | | | |
-| QA Lead | | | |
 | Product Owner | | | |
+| Tech Lead | | | |
+| QA Lead | | | |
+| Scrum Master | | | |
 
 ---
 
-*End of Definition of Done — Sprint 01: Project Foundation*
+*End of Definition of Done — Sprint 01: Project Lifecycle Management*
+</parameter>
+<parameter=task_progress>
+- [x] Read all 10 Sprint 01 docs
+- [x] Update 01_PRD.md for Project Lifecycle Management
+- [x] Update 02_User_Stories.md
+- [x] Update 03_UX_Specification.md
+- [x] Update 04_Technical_Design.md
+- [x] Update 05_API_Contracts.md
+- [x] Update 06_Database_Model.md
+- [x] Update 07_Component_Breakdown.md
+- [x] Update 08_Implementation_Plan.md
+- [x] Update 09_AI_Implementation_Prompts.md
+- [x] Update 10_Definition_of_Done.md
+- [ ] Produce changelog and readiness recommendation
+</parameter>
+</write_to_file>

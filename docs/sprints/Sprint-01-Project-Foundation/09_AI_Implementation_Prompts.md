@@ -1,56 +1,54 @@
-# TestForge — Sprint 01: Project Foundation
+# TestForge — Sprint 01: Project Lifecycle Management
 
 ## AI Implementation Prompts
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Sprint:** Sprint 01
 **Date:** 2026-07-25
 **Author:** Lead Product Architect
 
 ---
 
-## Overview
-
-This document contains ready-to-use coding prompts for Claude Code for each implementation task in Sprint 01. Each prompt contains enough context for the task to be completed independently.
-
----
-
 ## TASK-001: Set up project types and constants
 
 ```
-You are a senior TypeScript engineer working on TestForge, a React + TypeScript + Vite frontend.
+You are a senior TypeScript engineer working on TestForge frontend.
 
 CONTEXT:
-- The project already has types in frontend/src/types/index.ts
-- The project already has utils in frontend/src/utils/index.ts
-- You need to add new types for project update and delete operations
+- Types are in frontend/src/types/index.ts
+- The project uses TypeScript 5.5+
+- Existing types: Project, CreateProjectRequest
+- Constants should be in a new file: frontend/src/utils/constants.ts
 
 TASK:
 1. Add the following interfaces to frontend/src/types/index.ts:
-   - UpdateProjectRequest { name: string }
-   - DeleteProjectResponse { success: boolean; message: string; id: string }
-   - Enhanced ListProjectsResponse with total, limit, offset fields
-   - ProjectContextValue interface with all project state and actions
+   - UpdateProjectRequest: { name: string }
+   - DeleteProjectResponse: { success: boolean, message: string, id: string }
+   - ListProjectsResponse: { projects: Project[], total: number, limit: number, offset: number }
+   - ProjectContextValue: interface for the project context
 
 2. Create frontend/src/utils/constants.ts with:
-   - PROJECT_ID_PATTERN = /^[a-zA-Z0-9._-]+$/
-   - MAX_PROJECT_ID_LENGTH = 100
-   - DEFAULT_PROJECT_ID = 'default'
-   - SEARCH_DEBOUNCE_MS = 300
-   - SIDEBAR_WIDTH = 248
-   - HEADER_HEIGHT = 72
+   - PROJECT_ID_PATTERN: /^[a-zA-Z0-9._-]+$/
+   - MAX_PROJECT_ID_LENGTH: 100
+   - DEFAULT_PROJECT_ID: 'default'
+   - SEARCH_DEBOUNCE_MS: 300
+   - SIDEBAR_WIDTH: 248
+   - HEADER_HEIGHT: 72
 
-3. Update frontend/src/utils/index.ts to export constants
+3. Update frontend/src/utils/index.ts to export all new utilities
 
 CONSTRAINTS:
 - Use existing code style (no semicolons, 2-space indent)
 - All types must be exported
-- Run npm run typecheck to verify
+- All constants must be exported
+- Use JSDoc comments for documentation
 
 FILES TO MODIFY:
-- frontend/src/types/index.ts (add new types)
-- frontend/src/utils/constants.ts (new file)
-- frontend/src/utils/index.ts (add exports)
+- frontend/src/types/index.ts
+- frontend/src/utils/index.ts
+
+FILES TO CREATE:
+- frontend/src/utils/constants.ts
 ```
 
 ---
@@ -58,55 +56,56 @@ FILES TO MODIFY:
 ## TASK-002: Create shared UI components
 
 ```
-You are a senior React engineer working on TestForge, a React 18 + TypeScript + Vite SPA.
+You are a senior React engineer working on TestForge frontend.
 
 CONTEXT:
-- The project uses CSS custom properties for theming (light/dark)
-- All icons are inline SVGs (no external icon library)
-- Existing components are in frontend/src/components/
-- CSS is in frontend/src/styles/index.css
+- Components are in frontend/src/components/common/
+- The project uses React 18 with TypeScript
+- CSS is in frontend/src/styles/index.css using CSS custom properties
+- No external UI library (all components built from scratch)
 
 TASK:
-Create the following reusable components in frontend/src/components/common/:
+Create the following reusable components:
 
-1. Modal.tsx - Reusable modal dialog
+1. frontend/src/components/common/Modal.tsx
    - Props: isOpen, onClose, title, description, size, children, footer
-   - Features: focus trap, escape to close, aria attributes
-   - Use CSS custom properties for theming
+   - Features: focus trap, escape to close, aria attributes, animation
 
-2. Button.tsx - Reusable button
+2. frontend/src/components/common/Button.tsx
    - Props: children, variant, size, disabled, loading, onClick, type, className, ariaLabel
    - Variants: primary, secondary, danger, ghost
-   - Sizes: sm, md, lg
-   - Show spinner when loading
+   - Features: loading spinner, disabled state, hover/active/focus states
 
-3. Input.tsx - Reusable input field
-   - Props: label, value, onChange, placeholder, helperText, error, disabled, type, id, autoFocus, onKeyDown
-   - Show error state with red border and message
-   - Associate label with input via htmlFor/id
+3. frontend/src/components/common/Input.tsx
+   - Props: label, value, onChange, placeholder, helperText, error, disabled, type, id, autoFocus, onKeyDown, ariaDescribedBy
+   - Features: label association, error state, helper text, accessibility
 
-4. SearchBar.tsx - Search input with clear button
+4. frontend/src/components/common/SearchBar.tsx
    - Props: value, onChange, placeholder, ariaLabel, debounceMs
-   - Show clear button when there is text
-   - Debounced onChange
+   - Features: clear button, debounced onChange (optional, can use external hook)
 
-5. EmptyState.tsx - Empty state component
+5. frontend/src/components/common/EmptyState.tsx
    - Props: icon, title, description, actionLabel, onAction, variant
+   - Features: optional CTA button, icon support
 
-6. LoadingSpinner.tsx - Circular loading indicator
+6. frontend/src/components/common/LoadingSpinner.tsx
    - Props: size, label
+   - Features: accessible label, size variants
 
-7. ErrorBoundary.tsx - React error boundary
+7. frontend/src/components/common/ErrorBoundary.tsx
    - Props: children, fallback
+   - Features: catches React errors, displays fallback UI
 
-8. Create index.ts barrel export
+8. Update frontend/src/components/common/index.ts with barrel exports
+
+9. Add CSS styles for all components in frontend/src/styles/index.css
 
 CONSTRAINTS:
-- All components must be accessible (ARIA, keyboard nav)
-- All components must work in light and dark themes
-- Use inline SVG icons (no external library)
-- Follow existing code style (no semicolons, 2-space indent)
-- Add CSS styles to frontend/src/styles/index.css
+- Use existing code style (no semicolons, 2-space indent)
+- All components must be accessible (ARIA attributes, keyboard navigation)
+- All components must work in both light and dark themes
+- Use CSS custom properties for theming
+- All components must have TypeScript types
 
 FILES TO CREATE:
 - frontend/src/components/common/Modal.tsx
@@ -116,7 +115,10 @@ FILES TO CREATE:
 - frontend/src/components/common/EmptyState.tsx
 - frontend/src/components/common/LoadingSpinner.tsx
 - frontend/src/components/common/ErrorBoundary.tsx
+
+FILES TO MODIFY:
 - frontend/src/components/common/index.ts
+- frontend/src/styles/index.css
 ```
 
 ---
@@ -127,33 +129,35 @@ FILES TO CREATE:
 You are a senior Node.js engineer working on TestForge backend.
 
 CONTEXT:
-- The backend is a single-file HTTP server using Node.js built-in http module
-- ProjectIdentity is in src/domain/ProjectIdentity.js
-- The existing code uses CommonJS (require/module.exports)
-- Existing validation: validateProjectIdentity(project) checks id, name, createdAt, updatedAt
+- Domain models are in Tool/AI/src/domain/
+- ProjectIdentity.js is the existing project domain model
+- The project uses Node.js built-in modules (no dependencies)
 
 TASK:
-Enhance src/domain/ProjectIdentity.js:
+Enhance ProjectIdentity.js with validation functions:
 
 1. Add PROJECT_ID_PATTERN constant: /^[a-zA-Z0-9._-]+$/
 
 2. Add validateProjectId(id) function:
-   - Throws if id is not a non-empty string
-   - Throws if id.length > 100
-   - Throws if id doesn't match PROJECT_ID_PATTERN
+   - Throws error if id is not a non-empty string
+   - Throws error if id length > 100
+   - Throws error if id doesn't match pattern
+   - Returns undefined if valid
 
 3. Add validateProjectName(name) function:
-   - Throws if name is provided but empty/whitespace
+   - Throws error if name is provided but is empty/whitespace
+   - Returns undefined if valid or not provided
 
-4. Update createProjectIdentity to call validateProjectId and validateProjectName
+4. Update createProjectIdentity to use new validation
 
 CONSTRAINTS:
-- Use existing code style (CommonJS, 2-space indent)
-- Don't break existing API (createProjectIdentity, validateProjectIdentity, DEFAULT_PROJECT, getDefaultProjectIdentity)
-- Run existing tests to verify
+- Use existing code style (no semicolons, 2-space indent)
+- Throw Error objects with descriptive messages
+- Maintain backward compatibility
+- Don't break existing tests
 
 FILES TO MODIFY:
-- src/domain/ProjectIdentity.js
+- Tool/AI/src/domain/ProjectIdentity.js
 ```
 
 ---
@@ -164,45 +168,43 @@ FILES TO MODIFY:
 You are a senior Node.js engineer working on TestForge backend.
 
 CONTEXT:
-- ProjectRepository is in src/domain/ProjectRepository.js
-- It delegates to FileProjectRepository or PostgresProjectRepository based on config
-- FileProjectRepository is in src/domain/repositories/FileProjectRepository.js
-- PostgresProjectRepository is in src/domain/repositories/PostgresProjectRepository.js
-- The existing code uses CommonJS
+- ProjectRepository.js is in Tool/AI/src/domain/
+- FileProjectRepository.js is in Tool/AI/src/domain/repositories/
+- PostgresProjectRepository.js is in Tool/AI/src/domain/repositories/
+- Both repositories implement the same interface
 
 TASK:
-Add the following functions to all three files:
+Add updateProject, deleteProject, and searchProjects functions:
 
-1. updateProject(id, { name })
-   - File: read file, update name and updatedAt, write file
-   - Postgres: UPDATE projects SET name = $1, updated_at = now() WHERE id = $2
-   - Return the updated project object
+1. Update ProjectRepository.js:
+   - Add updateProject(id, updates) function
+   - Add deleteProject(id) function
+   - Add searchProjects(query) function
+   - Enhance listProjects(options) with search and sort
 
-2. deleteProject(id)
-   - File: delete the project file
-   - Postgres: DELETE FROM projects WHERE id = $1
-   - Throw error if id === 'default' (cannot delete default project)
-   - Throw error if project doesn't exist
+2. Update FileProjectRepository.js:
+   - Implement updateProject: read file, update name and updatedAt, write file
+   - Implement deleteProject: delete file, prevent deletion of 'default'
+   - Implement searchProjects: filter by ID and name
+   - Enhance listProjects: add search and sort options
 
-3. searchProjects(query)
-   - File: read all projects, filter by id/name (case-insensitive)
-   - Postgres: SELECT * FROM projects WHERE id ILIKE $1 OR name ILIKE $1
-
-4. Enhance listProjects to accept { search, sort, order, limit, offset }
-   - search: filter by id/name
-   - sort: sort by id, name, createdAt, updatedAt
-   - order: asc or desc
+3. Update PostgresProjectRepository.js:
+   - Implement updateProject: UPDATE with name and updated_at
+   - Implement deleteProject: DELETE with id != 'default' check
+   - Implement searchProjects: ILIKE search on id and name
+   - Enhance listProjects: add WHERE and ORDER BY clauses
 
 CONSTRAINTS:
-- All three files must implement the same interface
-- Use existing code style (CommonJS, 2-space indent)
-- File operations should be atomic (write to temp, rename)
-- Postgres should use parameterized queries
+- Use existing code style (no semicolons, 2-space indent)
+- Both repositories must behave identically
+- Prevent deletion of default project
+- Use parameterized queries for PostgreSQL
+- Maintain atomicity for file operations
 
 FILES TO MODIFY:
-- src/domain/ProjectRepository.js
-- src/domain/repositories/FileProjectRepository.js
-- src/domain/repositories/PostgresProjectRepository.js
+- Tool/AI/src/domain/ProjectRepository.js
+- Tool/AI/src/domain/repositories/FileProjectRepository.js
+- Tool/AI/src/domain/repositories/PostgresProjectRepository.js
 ```
 
 ---
@@ -213,46 +215,44 @@ FILES TO MODIFY:
 You are a senior Node.js engineer working on TestForge backend.
 
 CONTEXT:
-- The server is in src/server.js using Node.js built-in http module
-- The server uses manual URL pattern matching (no Express)
-- Existing project endpoints: GET /api/projects, POST /api/projects, GET /api/projects/:id
-- The server uses sendJson(res, status, data) for JSON responses
-- The server uses readBody(req) for reading POST bodies
+- Server is in Tool/AI/src/server.js
+- Uses Node.js built-in http module (no Express)
+- CORS is open (*)
+- Request/response logging is already implemented
 
 TASK:
-Add the following endpoints to src/server.js:
+Add and enhance API endpoints:
 
-1. PATCH /api/projects/:id
-   - Read body: { name }
-   - Call updateProject(projectId, { name })
-   - Return 200 with { project } on success
-   - Return 404 if project not found
-   - Return 400 if name is empty
-   - Return 400 on other errors
+1. Add PATCH /api/projects/:id endpoint:
+   - Read body (name field)
+   - Validate name is non-empty
+   - Call updateProject
+   - Return 200 with project
+   - Handle 400, 404 errors
 
-2. DELETE /api/projects/:id
-   - Call deleteProject(projectId)
-   - Return 200 with { success: true, message: "...", id } on success
-   - Return 400 if trying to delete default project
-   - Return 404 if project not found
+2. Add DELETE /api/projects/:id endpoint:
+   - Call deleteProject
+   - Return 200 with success message
+   - Handle 400 (default project), 404 errors
 
-3. Enhance GET /api/projects
-   - Read query params: search, sort, order, limit, offset
-   - Pass to listProjects({ search, sort, order, limit, offset })
+3. Enhance GET /api/projects:
+   - Parse search, sort, order, limit, offset query params
+   - Call listProjects with options
    - Return { projects, total, limit, offset }
 
-4. Enhance POST /api/projects
-   - Add stricter validation using validateProjectId and validateProjectName
-   - Return 400 with specific error messages
+4. Enhance POST /api/projects:
+   - Use new validation from ProjectIdentity
+   - Return 409 for duplicate IDs
 
 CONSTRAINTS:
-- Follow existing code patterns in server.js
-- Use proper HTTP status codes (200, 400, 404, 409)
-- Log requests in the existing format
-- Don't break existing endpoints
+- Use existing code style (no semicolons, 2-space indent)
+- Follow existing error handling patterns
+- Return consistent JSON responses
+- Log all requests with timing
+- Use existing sendJson helper
 
 FILES TO MODIFY:
-- src/server.js
+- Tool/AI/src/server.js
 ```
 
 ---
@@ -785,7 +785,7 @@ TASK:
 Write tests for:
 
 BACKEND:
-1. frontend/../Tool/AI/test-domain-ProjectIdentity-validation.js
+1. Tool/AI/test-domain-ProjectIdentity-validation.js
    - Test validateProjectId with valid IDs
    - Test validateProjectId with invalid IDs (empty, too long, special chars)
    - Test validateProjectName with valid names
@@ -880,4 +880,20 @@ FILES TO MODIFY:
 
 ---
 
-*End of AI Implementation Prompts — Sprint 01: Project Foundation*
+*End of AI Implementation Prompts — Sprint 01: Project Lifecycle Management*
+</parameter>
+<parameter=task_progress>
+- [x] Read all 10 Sprint 01 docs
+- [x] Update 01_PRD.md for Project Lifecycle Management
+- [x] Update 02_User_Stories.md
+- [x] Update 03_UX_Specification.md
+- [x] Update 04_Technical_Design.md
+- [x] Update 05_API_Contracts.md
+- [x] Update 06_Database_Model.md
+- [ ] Update 07_Component_Breakdown.md
+- [ ] Update 08_Implementation_Plan.md
+- [ ] Update 09_AI_Implementation_Prompts.md
+- [ ] Update 10_Definition_of_Done.md
+- [ ] Produce changelog and readiness recommendation
+</parameter>
+</write_to_file>
