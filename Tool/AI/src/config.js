@@ -81,13 +81,9 @@ const config = {
     baseUrl: (strEnv("AI_BASE_URL") || process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, ""),
     timeoutMs: intEnv("AI_TIMEOUT_MS", 30000),
   },
-  features: {
-    pgEnabled: boolEnv("PG_ENABLED", false),
-  },
   pg: {
     enabled: boolEnv("PG_ENABLED", false),
-    databaseUrl: strEnv("PG_CONNECTION_STRING", "") || strEnv("DATABASE_URL", ""),
-    connectionString: strEnv("PG_CONNECTION_STRING", "") || strEnv("DATABASE_URL", ""),
+    connectionString: strEnv("DATABASE_URL", "") || strEnv("PG_CONNECTION_STRING", ""),
     host: strEnv("PGHOST", ""),
     port: intEnv("PGPORT", 5432),
     database: strEnv("PGDATABASE", ""),

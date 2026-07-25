@@ -3,7 +3,7 @@ const fileRepo = require("./repositories/FileRunRepository");
 const pgRepo = require("./repositories/PostgresRunRepository");
 
 function usePostgres() {
-  return Boolean(config.features && config.features.pgEnabled);
+  return Boolean(config.pg && config.pg.enabled);
 }
 
 function getRepository() {

@@ -5,15 +5,12 @@ let poolFactoryForTests = null;
 let connected = false;
 
 function isPostgresEnabled() {
-  return Boolean(
-    (config.features && config.features.pgEnabled) ||
-    (config.pg && config.pg.enabled)
-  );
+  return Boolean(config.pg && config.pg.enabled);
 }
 
 function buildPoolConfig() {
   const pg = config.pg || {};
-  const connectionString = pg.connectionString || pg.databaseUrl || "";
+  const connectionString = pg.connectionString || "";
   const base = {
     max: pg.max || 10,
     idleTimeoutMillis: pg.idleTimeoutMs || 30000,
