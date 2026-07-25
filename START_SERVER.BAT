@@ -1,9 +1,9 @@
 @echo off
-REM AI Validation Tool - Quick Start Script
+REM TestForge - Quick Start Script
 REM Run this file to start the server when it's not responding
 
 echo ======================================
-echo AI Validation Tool - Server Starter
+echo TestForge - Server Starter
 echo ======================================
 
 REM Kill any existing node processes on port 4173

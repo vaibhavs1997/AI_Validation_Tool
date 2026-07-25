@@ -1,107 +1,190 @@
-# AI API Validation Tool
+# TestForge
 
-This repository contains a local MVP for an AI-assisted API validation workflow. It helps QA and API teams turn Jira tickets and API contracts into runnable validation scenarios, execute them against a target environment, and generate reviewable reports.
+**AI-Assisted API Validation Platform**
 
-## What the project does
+TestForge is a modern, open-source API validation platform that helps QA and API teams transform Jira tickets and API contracts into runnable test scenarios, execute them against target environments, and generate comprehensive reports.
 
-The tool can:
+---
 
-- Pull Jira ticket details from Jira REST API credentials or use bundled sample data.
-- Accept Jira descriptions as plain text or JSON.
-- Parse OpenAPI/Swagger and Postman collection files.
-- Generate API test scenarios from the ticket and contract context.
-- Mutate payloads for positive, negative, boundary, auth, and business-rule cases.
-- Execute requests in dry-run or live mode.
-- Validate response status codes and basic schema expectations.
-- Create JSON and HTML reports for review and audit history.
+## Features
 
-## Main application
+- **Jira Integration** — Pull tickets from Jira Cloud with automatic acceptance criteria extraction
+- **API Contract Parsing** — Parse OpenAPI 3.x, Swagger, and Postman collections
+- **AI-Powered Test Generation** — Generate positive, negative, boundary, auth, and edge-case scenarios
+- **Dependency-Aware Execution** — Execute tests with automatic dependency resolution between API operations
+- **Multiple Auth Methods** — Bearer token, Basic Auth, API Key, and auto-token extraction
+- **Dual Persistence** — File-based storage (default) or PostgreSQL for production
+- **Dark/Light Theme** — System preference detection with manual toggle and persistence
+- **Comprehensive Reporting** — JSON evidence files and HTML reports
+- **Run History** — Ticket-based grouping for comparison and audit
 
-The runnable application is located in the project folder:
+---
 
-- [2026-07-04/i](2026-07-04/i)
+## Architecture
 
-It includes the server, UI, contract parsing logic, scenario generation, execution engine, validators, and reporting modules.
-
-## Quick start
-
-1. Open the app folder:
-   ```bash
-   cd 2026-07-04/i
-   ```
-2. Start the local server:
-   ```bash
-   npm run dev
-   ```
-3. Open the app in your browser:
-   ```text
-   http://localhost:4173
-   ```
-
-## Environment branch promotion
-
-This repository now includes a manual GitHub Actions workflow to move code from `main` to `dev` or `test`.
-
-1. Open **Actions** in GitHub.
-2. Run **Promote branch to environment**.
-3. Choose:
-   - `source_branch`: usually `main`
-   - `target_environment`: `dev`, `test`, or `both`
-   - `delivery_mode`:
-     - `pull_request` for a reviewable promotion PR
-     - `direct_sync` to update the target branch immediately
-
-Use `pull_request` when you want approval before promotion, and `direct_sync` when you want to move the branch without a separate PR.
-
-## Configuration
-
-The app can use Jira credentials and optional AI enhancement settings through environment variables. Typical settings include:
-
-```text
-JIRA_BASE_URL=https://your-company.atlassian.net
-JIRA_EMAIL=your.email@company.com
-JIRA_API_TOKEN=your_jira_api_token
+```
+┌─────────────────────────────────────────────────┐
+│                   Browser                        │
+│         React + TypeScript + Vite                │
+├─────────────────────────────────────────────────┤
+│              Node.js HTTP Server                 │
+│         REST API  ←→  Static Files               │
+├─────────────────────────────────────────────────┤
+│  Domain Layer                                    │
+│  Projects │ Services │ Knowledge │ Runs          │
+├─────────────────────────────────────────────────┤
+│  Engine Layer                                    │
+│  Test Gen │ Matching │ Execution │ Validation    │
+├─────────────────────────────────────────────────┤
+│  Persistence Layer                               │
+│  File System (default)  │  PostgreSQL (opt)      │
+└─────────────────────────────────────────────────┘
 ```
 
-Optional AI support:
+---
 
-```text
-OPENAI_API_KEY=your_key
-OPENAI_MODEL=gpt-4.1-mini
-OPENAI_BASE_URL=https://api.openai.com/v1
+## Repository Structure
+
+```
+├── .github/workflows/          # CI/CD workflows
+├── Tool/AI/
+│   ├── frontend/               # React + TypeScript + Vite
+│   │   ├── src/                # Components, features, services
+│   │   └── dist/               # Production build output
+│   ├── src/                    # Backend Node.js server
+│   │   ├── server.js           # HTTP server entry point
+│   │   ├── config.js           # Environment configuration
+│   │   ├── domain/             # Domain models & repositories
+│   │   ├── engine/             # Test generation & matching
+│   │   ├── execution/          # HTTP execution engine
+│   │   ├── contracts/          # API contract parsing
+│   │   ├── integrations/       # Jira & AI integrations
+│   │   ├── db/                 # PostgreSQL schema & migration
+│   │   └── validation/         # Response validation
+│   ├── sample-data/            # Example API contracts & tickets
+│   ├── data/                   # Runtime data (gitignored)
+│   └── package.json
+├── README.md
+└── START_SERVER.BAT
 ```
 
-## Project structure
+---
 
-```text
-2026-07-04/i/
-  src/
-    config.js
-    server.js
-    storage.js
-    integrations/
-    contracts/
-    scenarios/
-    payload/
-    execution/
-    validation/
-    reporting/
-  public/
-  data/
-  sample-data/
+## Quick Start
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/testforge.git
+cd testforge
+
+# Install backend dependencies
+cd Tool/AI
+npm install
+
+# Install and build frontend
+cd frontend
+npm install
+npm run build
+cd ../..
+
+# Start the server
+cd Tool/AI
+npm start
 ```
 
-## Output and history
+Open **http://localhost:4173** in your browser.
 
-Each run is stored locally under the data folders, including:
+### Development Mode
 
-- Run history and metadata
-- JSON evidence files
-- HTML reports
-- Ticket-based grouping for comparison and review
+```bash
+# Terminal 1: Start the backend
+cd Tool/AI
+npm start
 
-## Notes
+# Terminal 2: Start the Vite dev server (with HMR)
+cd Tool/AI/frontend
+npm run dev
+```
 
-- Dry-run mode is enabled by default for safety.
-- The generated results are intended for QA review and validation workflows.
-- Secrets are masked in reports and should not be exposed in shared output.
+The Vite dev server runs on **http://localhost:5173** and proxies API requests to the backend.
+
+---
+
+## Environment Variables
+
+Copy `.env` to `Tool/AI/.env` and configure:
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Backend server port | `4173` |
+| `JIRA_BASE_URL` | Jira Cloud instance URL | — |
+| `JIRA_EMAIL` | Jira account email | — |
+| `JIRA_API_TOKEN` | Jira API token | — |
+| `AI_PROVIDER` | AI provider (ollama, openai, groq) | `ollama` |
+| `AI_MODEL` | AI model name | `llama3.2` |
+| `AI_BASE_URL` | AI API base URL | `http://localhost:11434/v1` |
+| `PG_ENABLED` | Enable PostgreSQL persistence | `false` |
+| `DATABASE_URL` | PostgreSQL connection string | — |
+
+---
+
+## Build Commands
+
+```bash
+# Build frontend for production
+cd Tool/AI/frontend
+npm run build
+
+# TypeScript typecheck
+npm run typecheck
+
+# Run tests
+npm test
+```
+
+---
+
+## Production
+
+The production server serves the React build from `frontend/dist` through the Node.js backend:
+
+```bash
+cd Tool/AI
+npm start
+# → http://localhost:4173
+```
+
+---
+
+## Roadmap
+
+- [ ] User authentication and multi-tenant support
+- [ ] WebSocket-based real-time execution streaming
+- [ ] Test suite scheduling and notifications
+- [ ] Environment management (dev/staging/production)
+- [ ] OpenAPI specification export
+- [ ] Performance regression tracking
+- [ ] Plugin system for custom validators
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## License
+
+This project is licensed under the MIT License.
