@@ -8,6 +8,10 @@ node_modules/
 
 # Build output
 Tool/AI/frontend/dist/
+Tool/AI/frontend/tsconfig.tsbuildinfo
+
+# Temp / generated files
+Tool/AI/baseline.txt
 
 # Runtime data
 Tool/AI/data/
