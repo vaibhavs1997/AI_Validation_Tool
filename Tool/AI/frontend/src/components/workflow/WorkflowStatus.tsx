@@ -42,7 +42,7 @@ export function WorkflowStatus({ activeRequirement, testCaseCount = 0, includedC
   const steps = [
     { number: 1, label: "Requirement", status: hasRequirement ? "completed" : "current", value: reqStatus.label },
     { number: 2, label: "Review Tests", status: hasTests ? "completed" : hasRequirement ? "current" : "upcoming", value: hasTests ? `${testCaseCount} generated · ${includedCount} selected` : "Generate from requirement" },
-    { number: 3, label: "Connect APIs", status: hasConnections ? "completed" : hasTests ? "current" : "upcoming", value: hasConnections ? `${matchedCount} matched` : "Not configured" },
+    { number: 3, label: "API Mapping", status: hasConnections ? "completed" : hasTests ? "current" : "upcoming", value: hasConnections ? `${matchedCount} matched` : "Not configured" },
     { number: 4, label: "Run Tests", status: hasRun ? "completed" : hasConnections ? "current" : "upcoming", value: runSummaryValue },
     { number: 5, label: "Results", status: hasRun ? "completed" : "upcoming", value: hasRun ? "Available" : "Not available" }
   ];

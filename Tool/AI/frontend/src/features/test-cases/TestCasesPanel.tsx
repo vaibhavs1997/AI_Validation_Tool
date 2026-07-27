@@ -23,7 +23,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   security: { bg: "#fff3e0", text: "#e65100" },
 };
 
-export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue, onGenerated, onIncludedChange }: TestCasesPanelProps) {
+export function TestCasesPanel({ activeProjectId, activeRequirement, onGenerated, onIncludedChange }: TestCasesPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [response, setResponse] = useState<GenerateTestCasesResponse | null>(null);
@@ -121,12 +121,6 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
       }
       return next;
     });
-  };
-
-  const handleContinue = () => {
-    if (!response || includedCount === 0 || !onContinue) return;
-    const included = response.testCases.filter(tc => includedTestCaseIds.has(tc.id));
-    onContinue(included);
   };
 
   const renderProjectGuard = () => {
@@ -411,9 +405,8 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
 
       <div className="panel-body" style={{ padding: "18px" }}>
         {renderProjectGuard()}
-        {renderEmptyState()}
 
-        {!response && !loading && (
+        {!response && !loading && hasRequirement && (
           <div style={{ marginBottom: "18px" }}>
             <button
               type="button"
@@ -444,6 +437,38 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
             )}
           </div>
         )}
+
+        {loading && (
+          <div style={{ marginBottom: "18px" }}>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled
+              style={{
+                padding: "10px 20px",
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "#fff",
+                background: "var(--line)",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "not-allowed",
+                opacity: 0.6,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              <span className="spinner" />
+              Generating...
+            </button>
+            <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
+              {formatElapsed(elapsedSeconds)}
+            </div>
+          </div>
+        )}
+
+        {renderEmptyState()}
 
         {error && (
           <div style={{
@@ -549,33 +574,6 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onContinue,
 
         {renderContinuePlaceholder()}
 
-        {response && generatedCount > 0 && (
-          <div style={{ marginTop: "18px" }}>
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={includedCount === 0 || !onContinue}
-              style={{
-                padding: "10px 20px",
-                fontSize: "14px",
-                fontWeight: 600,
-                color: "#fff",
-                background: includedCount > 0 && onContinue ? "var(--blue)" : "var(--line)",
-                border: "none",
-                borderRadius: "6px",
-                cursor: includedCount > 0 && onContinue ? "pointer" : "not-allowed",
-                opacity: includedCount > 0 && onContinue ? 1 : 0.6
-              }}
-            >
-              Continue with Included Tests
-            </button>
-            {!onContinue && (
-              <div style={{ marginTop: "8px", fontSize: "12px", color: "var(--muted)" }}>
-                Include/Exclude controls are ready. Next step: API Matching.
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </section>
   );

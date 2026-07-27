@@ -96,6 +96,11 @@ export function ApiMatchingPanel({
     }
   };
 
+  // Allow re-running match when included test cases change
+  const handleRematch = () => {
+    handleMatch();
+  };
+
   const handleSelectCandidate = (
     testCaseId: string,
     candidate: MatchCandidate,
@@ -265,7 +270,7 @@ export function ApiMatchingPanel({
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <span className="step-indicator collection">3</span>
           <div>
-            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Connect APIs</h2>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>API Mapping</h2>
             {includedTestCases.length > 0 && (
               <div style={{ fontSize: "12px", color: "var(--muted)" }}>
                 {includedTestCases.length} test{includedTestCases.length !== 1 ? "s" : ""} selected
@@ -283,11 +288,11 @@ export function ApiMatchingPanel({
       <div className="panel-body" style={{ padding: "18px" }}>
         {renderEmptyState()}
 
-        {!matchResponse && includedTestCases.length > 0 && (
+        {includedTestCases.length > 0 && (
           <div style={{ marginBottom: "18px" }}>
             <button
               type="button"
-              onClick={handleMatch}
+              onClick={handleRematch}
               disabled={!canMatch || status === "MATCHING"}
               style={{
                 padding: "10px 20px",

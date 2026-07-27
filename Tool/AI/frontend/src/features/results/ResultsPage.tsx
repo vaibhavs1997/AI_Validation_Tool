@@ -246,83 +246,227 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
 
   if (!activeProjectId) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Results</h2>
-        <p style={{ color: "var(--muted)" }}>Select a project to view results.</p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <p style={{ color: "var(--muted)" }}>Select a project to view results.</p>
+        </div>
+      </section>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <p style={{ color: "var(--muted)" }}>Loading test result...</p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <p style={{ color: "var(--muted)" }}>Loading test result...</p>
+        </div>
+      </section>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Results</h2>
-        <div style={{
-          padding: "10px 12px",
-          background: "var(--red-soft)",
-          border: "1px solid var(--red)",
-          borderRadius: "6px",
-          fontSize: "13px",
-          color: "var(--red-deep)",
-          marginBottom: "12px",
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load this result.</div>
-          <div>{error}</div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={handleRetry}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--red-deep)",
-              background: "var(--surface)",
-              border: "1px solid var(--red)",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Try Again
-          </button>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = "#workspace"; }}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--ink)",
-              background: "var(--surface)",
-              border: "1px solid var(--line)",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Back to Workspace
-          </button>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <div style={{
+            padding: "10px 12px",
+            background: "var(--red-soft)",
+            border: "1px solid var(--red)",
+            borderRadius: "6px",
+            fontSize: "13px",
+            color: "var(--red-deep)",
+            marginBottom: "12px",
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load this result.</div>
+            <div>{error}</div>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--red-deep)",
+                background: "var(--surface)",
+                border: "1px solid var(--red)",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Try Again
+            </button>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#workspace"; }}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--ink)",
+                background: "var(--surface)",
+                border: "1px solid var(--line)",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Back to Workspace
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (!run) {
+    const sampleRun: RunDetail = {
+      id: "sample-run-1",
+      title: "Sample Validation Run",
+      description: "This is a sample report to demonstrate the Results page.",
+      status: "passed",
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 3420,
+      projectId: activeProjectId || "default",
+      testSpecification: {
+        id: "ts-1",
+        title: "User login flow",
+        description: "Sample test specification for demonstration",
+        requirementRefs: [{ acIndex: 1, acText: "Valid login returns token" }],
+        operationRefs: [
+          { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
+          { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
+          { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" }
+        ],
+        expectedBehavior: { status: 200, responseAssertions: ["token exists", "expiresIn > 0"] }
+      },
+      targetOperation: { serviceId: "auth-api", operationId: "login" },
+      results: [
+        {
+          step: 1,
+          operation: { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
+          status: "passed",
+          response: { id: 1, name: "Test User", email: "test@example.com" }
+        },
+        {
+          step: 2,
+          operation: { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
+          status: "passed",
+          response: { id: 2, name: "New User", email: "new@example.com" }
+        },
+        {
+          step: 3,
+          operation: { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" },
+          status: "failed",
+          request: { username: "test", password: "wrong" },
+          error: "401 Unauthorized: Invalid credentials"
+        }
+      ],
+      executionPlanSummary: {
+        target: { serviceId: "auth-api", operationId: "login" },
+        stepCount: 3,
+        operations: [
+          { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
+          { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
+          { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" }
+        ]
+      },
+      errors: []
+    };
+
+    const total = sampleRun.results.length;
+    const passed = sampleRun.results.filter(r => r.status === "passed").length;
+    const failed = sampleRun.results.filter(r => r.status === "failed").length;
+    const blocked = sampleRun.results.filter(r => r.status === "blocked").length;
+    const isSuccess = sampleRun.status === "passed";
+
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Results</h2>
-        <p style={{ color: "var(--muted)" }}>
-          No run selected. Execute a test in the Workspace, then view its results here.
-        </p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span className="step-indicator results">R</span>
+              <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }} className="no-print">
+              <button
+                type="button"
+                onClick={() => { window.location.hash = "#history"; }}
+                style={{
+                  padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                  border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                  background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+                }}
+              >
+                Run History
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <div style={{
+            padding: "14px 16px",
+            border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
+            borderRadius: "8px",
+            background: isSuccess ? "var(--green-soft)" : "var(--red-soft)",
+            marginBottom: "14px",
+          }}>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
+              {sampleRun.title}
+            </div>
+            <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+              {sampleRun.description}
+            </div>
+            <div style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              color: isSuccess ? "var(--green-deep)" : "var(--red-deep)",
+              marginBottom: "4px",
+            }}>
+              {isSuccess ? "PASSED" : "FAILED"}
+            </div>
+            <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+              {total} step{total !== 1 ? "s" : ""} · {passed} passed · {failed} failed · {blocked} blocked
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+              Duration: {formatDuration(sampleRun.durationMs)} · {formatDateTime(sampleRun.completedAt)}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "12px" }}>
+            <h3 style={{
+              margin: "0 0 8px 0",
+              fontSize: "13px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "var(--muted)",
+            }}>
+              Step Details
+            </h3>
+            {sampleRun.results.map((r, idx) => renderStepResult(r, idx))}
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -333,177 +477,182 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
   const isSuccess = run.status === "passed";
 
   return (
-    <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <style>{printStyles}</style>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }} className="no-print">
-        <h2 style={{ margin: 0 }}>Results</h2>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = "#workspace"; }}
-            style={{
-              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-              border: "1px solid var(--line)", borderRadius: "6px",
-              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
-            }}
-          >
-            Back to Workspace
-          </button>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = "#history"; }}
-            style={{
-              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-              border: "1px solid var(--line)", borderRadius: "6px",
-              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
-            }}
-          >
-            Run History
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            style={{
-              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-              border: "1px solid var(--line)", borderRadius: "6px",
-              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
-            }}
-          >
-            Print / Save as PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadJson}
-            style={{
-              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-              border: "1px solid var(--line)", borderRadius: "6px",
-              background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
-            }}
-          >
-            Download JSON
-          </button>
+    <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+      <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }} className="no-print">
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#workspace"; }}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+              }}
+            >
+              Back to Workspace
+            </button>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#history"; }}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+              }}
+            >
+              Run History
+            </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+              }}
+            >
+              Print / Save as PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadJson}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+              }}
+            >
+              Download JSON
+            </button>
+          </div>
         </div>
       </div>
-
-      <div className="print-area">
-      {/* Overall result */}
-        <div style={{
-        padding: "14px 16px",
-        border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
-        borderRadius: "8px",
-        background: isSuccess ? "var(--green-soft)" : "var(--red-soft)",
-        marginBottom: "14px",
-      }}>
-        <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
-          {run.title}
-        </div>
-        {run.description && (
-          <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
-            {run.description}
-          </div>
-        )}
-        <div style={{
-          fontSize: "24px",
-          fontWeight: 800,
-          color: isSuccess ? "var(--green-deep)" : "var(--red-deep)",
-          marginBottom: "4px",
-        }}>
-          {isSuccess ? "PASSED" : "FAILED"}
-        </div>
-        <div style={{ fontSize: "13px", color: "var(--muted)" }}>
-          {total} step{total !== 1 ? "s" : ""} · {passed} passed · {failed} failed · {blocked} blocked
-        </div>
-        <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-          Duration: {formatDuration(run.durationMs)} · {formatDateTime(run.completedAt)}
-        </div>
-        {run.targetOperation?.serviceId && (
-          <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px" }}>
-            Target: {run.targetOperation.serviceId}::{run.targetOperation.operationId}
-          </div>
-        )}
-      </div>
-
-      {/* Execution flow */}
-      {run.executionPlanSummary && run.executionPlanSummary.stepCount > 1 && (
-        <div style={{
-          padding: "10px 12px",
-          background: "var(--surface-alt)",
-          borderRadius: "6px",
-          border: "1px solid var(--line)",
-          marginBottom: "14px",
-        }}>
+      <div className="panel-body" style={{ padding: "18px" }}>
+        <style>{printStyles}</style>
+        <div className="print-area">
           <div style={{
-            fontSize: "11px",
-            fontWeight: 700,
-            color: "var(--muted)",
-            marginBottom: "8px",
-            textTransform: "uppercase",
+            padding: "14px 16px",
+            border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
+            borderRadius: "8px",
+            background: isSuccess ? "var(--green-soft)" : "var(--red-soft)",
+            marginBottom: "14px",
           }}>
-            Execution Flow ({run.executionPlanSummary.stepCount} steps)
-          </div>
-          {run.executionPlanSummary.operations.map((op, idx) => {
-            const isTarget = idx === run.executionPlanSummary.operations.length - 1;
-            const resultForStep = run.results[idx];
-            const stepStatus = resultForStep?.status || "unknown";
-            const statusIcon = stepStatus === "passed" ? "✓" : stepStatus === "failed" ? "✕" : stepStatus === "blocked" ? "⊘" : "?";
-
-            return (
-              <div key={idx} style={{ marginBottom: idx < run.executionPlanSummary.operations.length - 1 ? "4px" : 0 }}>
-                <div style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 8px",
-                  background: isTarget ? "var(--violet-soft)" : "var(--surface)",
-                  border: `1px solid ${isTarget ? "var(--violet)" : "var(--line)"}`,
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}>
-                  <span style={{
-                    width: "20px",
-                    height: "20px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "4px",
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    color: "#fff",
-                    background: stepStatus === "passed" ? "var(--green)" : stepStatus === "failed" ? "var(--red)" : "var(--muted)",
-                  }}>
-                    {statusIcon}
-                  </span>
-                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>
-                    {op.serviceId}::{op.operationId}
-                  </span>
-                  <span style={{ color: "var(--muted)", fontFamily: "monospace", fontSize: "11px" }}>
-                    {op.method} {op.path}
-                  </span>
-                  {isTarget && (
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--violet)" }}>TARGET</span>
-                  )}
-                </div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
+              {run.title}
+            </div>
+            {run.description && (
+              <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
+                {run.description}
               </div>
-            );
-          })}
-        </div>
-      )}
+            )}
+            <div style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              color: isSuccess ? "var(--green-deep)" : "var(--red-deep)",
+              marginBottom: "4px",
+            }}>
+              {isSuccess ? "PASSED" : "FAILED"}
+            </div>
+            <div style={{ fontSize: "13px", color: "var(--muted)" }}>
+              {total} step{total !== 1 ? "s" : ""} · {passed} passed · {failed} failed · {blocked} blocked
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
+              Duration: {formatDuration(run.durationMs)} · {formatDateTime(run.completedAt)}
+            </div>
+            {run.targetOperation?.serviceId && (
+              <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px" }}>
+                Target: {run.targetOperation.serviceId}::{run.targetOperation.operationId}
+              </div>
+            )}
+          </div>
 
-      {/* Step details */}
-      <div style={{ marginBottom: "12px" }}>
-        <h3 style={{
-          margin: "0 0 8px 0",
-          fontSize: "13px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.04em",
-          color: "var(--muted)",
-        }}>
-          Step Details
-        </h3>
-        {run.results.map((r, idx) => renderStepResult(r, idx))}
+          {/* Execution flow */}
+          {run.executionPlanSummary && run.executionPlanSummary.stepCount > 1 && (
+            <div style={{
+              padding: "10px 12px",
+              background: "var(--surface-alt)",
+              borderRadius: "6px",
+              border: "1px solid var(--line)",
+              marginBottom: "14px",
+            }}>
+              <div style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "var(--muted)",
+                marginBottom: "8px",
+                textTransform: "uppercase",
+              }}>
+                Execution Flow ({run.executionPlanSummary.stepCount} steps)
+              </div>
+              {run.executionPlanSummary.operations.map((op, idx) => {
+                const isTarget = idx === run.executionPlanSummary.operations.length - 1;
+                const resultForStep = run.results[idx];
+                const stepStatus = resultForStep?.status || "unknown";
+                const statusIcon = stepStatus === "passed" ? "✓" : stepStatus === "failed" ? "✕" : stepStatus === "blocked" ? "⊘" : "?";
+
+                return (
+                  <div key={idx} style={{ marginBottom: idx < run.executionPlanSummary.operations.length - 1 ? "4px" : 0 }}>
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "6px 8px",
+                      background: isTarget ? "var(--violet-soft)" : "var(--surface)",
+                      border: `1px solid ${isTarget ? "var(--violet)" : "var(--line)"}`,
+                      borderRadius: "4px",
+                      fontSize: "12px",
+                    }}>
+                      <span style={{
+                        width: "20px",
+                        height: "20px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "4px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        color: "#fff",
+                        background: stepStatus === "passed" ? "var(--green)" : stepStatus === "failed" ? "var(--red)" : "var(--muted)",
+                      }}>
+                        {statusIcon}
+                      </span>
+                      <span style={{ fontWeight: 600, color: "var(--ink)" }}>
+                        {op.serviceId}::{op.operationId}
+                      </span>
+                      <span style={{ color: "var(--muted)", fontFamily: "monospace", fontSize: "11px" }}>
+                        {op.method} {op.path}
+                      </span>
+                      {isTarget && (
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--violet)" }}>TARGET</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Step details */}
+          <div style={{ marginBottom: "12px" }}>
+            <h3 style={{
+              margin: "0 0 8px 0",
+              fontSize: "13px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              color: "var(--muted)",
+            }}>
+              Step Details
+            </h3>
+            {run.results.map((r, idx) => renderStepResult(r, idx))}
+          </div>
+        </div>
       </div>
-      </div>
-    </div>
+    </section>
   );
 }

@@ -13,7 +13,7 @@ function ensureStorage() {
 }
 
 function safeName(value) {
-  const str = String(value || crypto.randomUUID());
+  const str = String(value || "unnamed");
   const hasSpecial = /[^a-zA-Z0-9._-]/.test(str);
   const sanitized = str
     .replace(/[^a-zA-Z0-9._-]/g, "-")
@@ -24,7 +24,7 @@ function safeName(value) {
     const hash = crypto.createHash("sha256").update(str).digest("hex").slice(0, 6);
     return `${sanitized}-${hash}`;
   }
-  return sanitized || crypto.randomUUID().slice(0, 12);
+  return sanitized || "unnamed";
 }
 
 function projectFile(id) {
