@@ -2,15 +2,24 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "./components/layout/Sidebar";
 import { Header } from "./components/layout/Header";
 import { SetupPage } from "./features/project-setup/SetupPage";
+import { SettingsPage } from "./features/settings/SettingsPage";
 import { WorkspacePage } from "./features/workspace/WorkspacePage";
 import { ResultsPage } from "./features/results/ResultsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
+import { ApiCatalogPage } from "./features/api-collection/ApiCatalogPage";
 
-type View = "setup" | "workspace" | "results" | "history";
+type View = "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>("setup");
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    try {
+      const saved = sessionStorage.getItem("testforge:activeProjectId");
+      return saved || null;
+    } catch {
+      return null;
+    }
+  });
 
   // Apply theme from localStorage or system preference
   useEffect(() => {
@@ -28,8 +37,16 @@ export default function App() {
         setCurrentView("results");
       } else if (hash.startsWith("#history")) {
         setCurrentView("history");
-      } else if (hash.startsWith("#workspace") || hash.startsWith("#setup")) {
-        setCurrentView(hash.startsWith("#workspace") ? "workspace" : "setup");
+      } else if (hash.startsWith("#catalog")) {
+        setCurrentView("catalog");
+      } else if (hash.startsWith("#workspace") || hash.startsWith("#setup") || hash.startsWith("#settings")) {
+        if (hash.startsWith("#workspace")) {
+          setCurrentView("workspace");
+        } else if (hash.startsWith("#settings")) {
+          setCurrentView("settings");
+        } else {
+          setCurrentView("setup");
+        }
       }
     };
 
@@ -37,28 +54,34 @@ export default function App() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  // Default to "default" project if none selected
+  // When no project is selected, default to setup view (but not when on settings)
   useEffect(() => {
-    if (!activeProjectId) {
-      // If no project is selected, go to setup view
+    if (!activeProjectId && currentView !== "settings") {
       setCurrentView("setup");
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, currentView]);
 
-  const handleActiveProjectChange = (projectId: string | null) => {
-    setActiveProjectId(projectId);
-    if (projectId) {
-      // Navigate to workspace when project is selected
-      setCurrentView("workspace");
+  const handleActiveProjectChange = async (projectId: string | null) => {
+    const normalized = projectId && String(projectId).trim() ? String(projectId).trim() : null;
+    setActiveProjectId(normalized);
+    if (normalized) {
+      try {
+        sessionStorage.setItem("testforge:activeProjectId", normalized);
+      } catch {}
+      setCurrentView("setup");
+    } else {
+      try {
+        sessionStorage.removeItem("testforge:activeProjectId");
+      } catch {}
     }
   };
 
   return (
     <div id="testforge-app" className="app-shell">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar currentView={currentView} onViewChange={setCurrentView} activeProjectId={activeProjectId} />
       <div className="main-shell">
         <Header
-          view={currentView === "setup" ? "workspace" : currentView}
+          view={currentView as "setup" | "workspace" | "results" | "history" | "catalog" | "settings"}
           projectName={activeProjectId || undefined}
         />
         <main id="testforge-content" className="app-content">
@@ -68,11 +91,15 @@ export default function App() {
               onActiveProjectChange={handleActiveProjectChange}
             />
           )}
+          {currentView === "settings" && (
+            <SettingsPage activeProjectId={activeProjectId} />
+          )}
           {currentView === "workspace" && (
             <WorkspacePage activeProjectId={activeProjectId} />
           )}
           {currentView === "results" && <ResultsPage activeProjectId={activeProjectId} />}
           {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
+          {currentView === "catalog" && <ApiCatalogPage activeProjectId={activeProjectId} />}
         </main>
       </div>
     </div>

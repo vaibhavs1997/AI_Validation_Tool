@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { ApiContract } from "./ApiCollectionTypes";
 import { parseApiContract } from "./ApiCollectionService";
 import type { ApiError } from "../../services";
@@ -34,6 +34,78 @@ function detectDisplayType(type: string): string {
   }
 }
 
+export function EndpointPreview({ contract }: { contract: ApiContract }) {
+  return (
+    <div style={{ marginTop: "12px" }}>
+      <p style={{ margin: 0, fontWeight: 700, fontSize: "12px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        Endpoints
+      </p>
+      {contract.endpoints.length === 0 ? (
+        <p style={{ margin: "8px 0 0 0", fontSize: "13px", color: "var(--muted)", fontStyle: "italic" }}>
+          No endpoints detected in this collection.
+        </p>
+      ) : (
+        <div style={{
+          marginTop: "8px",
+          maxHeight: "240px",
+          overflowY: "auto",
+          border: "1px solid var(--line)",
+          borderRadius: "6px",
+          background: "var(--surface)"
+        }}>
+          {contract.endpoints.map((ep) => {
+            const mc = getMethodColor(ep.method);
+            return (
+              <div key={ep.id} style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                padding: "7px 12px",
+                borderBottom: "1px solid var(--line)",
+                fontSize: "13px",
+                lineHeight: 1.4
+              }}>
+                <span style={{
+                  display: "inline-block",
+                  minWidth: "60px",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontWeight: 700,
+                  fontSize: "11px",
+                  textAlign: "center",
+                  textTransform: "uppercase",
+                  fontFamily: "monospace",
+                  background: mc.bg,
+                  color: mc.text
+                }}>
+                  {ep.method}
+                </span>
+                <span style={{
+                  fontFamily: "monospace",
+                  fontSize: "12px",
+                  color: "var(--ink)",
+                  flexShrink: 0
+                }}>
+                  {ep.path}
+                </span>
+                <span style={{
+                  color: "var(--muted)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  minWidth: 0
+                }}>
+                  {ep.summary || ep.operationId || ep.path}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ContractUploaderProps {
   onContractParsed: (contract: ApiContract | null) => void;
   activeContract: ApiContract | null;
@@ -52,6 +124,15 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
   // Whether the current active contract came from upload
   const isUploadActive = activeContract && uploadContract && activeContract.importedAt === uploadContract.importedAt;
 
+  // Sync local upload state when the parent activeContract changes
+  useEffect(() => {
+    if (activeContract) {
+      setUploadContract(activeContract);
+      setSelectedFile((prev) => prev || null);
+      setUploadError("");
+    }
+  }, [activeContract]);
+
   const formatTypeLabel = (type: string, version: string): string => {
     const upperType = type === "openapi" || type === "swagger" ? "OpenAPI" : 
                      type === "postman" ? "Postman" : "HAR";
@@ -62,6 +143,13 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
   };
 
   const processSelectedFile = useCallback(async (file: File) => {
+    // Validate file size (max 5 MB)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError(`File is too large (${formatFileSize(file.size)}). Maximum size is 5 MB.`);
+      return;
+    }
+
     // Clear previous state
     setUploadError("");
     setUploadContract(null);
@@ -221,6 +309,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
         accept=".json,.har"
         hidden
         onChange={handleFileChange}
+        disabled={uploadLoading}
       />
 
       {/* Loading indicator */}
@@ -270,6 +359,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleReplace(); }}
+                disabled={uploadLoading}
                 style={{
                   padding: "4px 10px",
                   border: "1px solid var(--line-strong)",
@@ -277,8 +367,9 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
                   color: "var(--ink)",
                   borderRadius: "4px",
                   fontSize: "12px",
-                  cursor: "pointer",
-                  fontWeight: 600
+                  cursor: uploadLoading ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                  opacity: uploadLoading ? 0.6 : 1
                 }}
               >
                 Replace
@@ -286,6 +377,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+                disabled={uploadLoading}
                 style={{
                   padding: "4px 10px",
                   border: "1px solid var(--red)",
@@ -293,8 +385,9 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
                   color: "var(--red)",
                   borderRadius: "4px",
                   fontSize: "12px",
-                  cursor: "pointer",
-                  fontWeight: 600
+                  cursor: uploadLoading ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                  opacity: uploadLoading ? 0.6 : 1
                 }}
               >
                 Remove
@@ -327,74 +420,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
             )}
           </div>
 
-          {/* Endpoint preview */}
-          <div style={{ marginTop: "12px" }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: "12px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Endpoints
-            </p>
-            {displayContract.endpoints.length === 0 ? (
-              <p style={{ margin: "8px 0 0 0", fontSize: "13px", color: "var(--muted)", fontStyle: "italic" }}>
-                No endpoints detected in this collection.
-              </p>
-            ) : (
-              <div style={{
-                marginTop: "8px",
-                maxHeight: "240px",
-                overflowY: "auto",
-                border: "1px solid var(--line)",
-                borderRadius: "6px",
-                background: "var(--surface)"
-              }}>
-                {displayContract.endpoints.map((ep) => {
-                  const mc = getMethodColor(ep.method);
-                  return (
-                    <div key={ep.id} style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      padding: "7px 12px",
-                      borderBottom: "1px solid var(--line)",
-                      fontSize: "13px",
-                      lineHeight: 1.4
-                    }}>
-                      <span style={{
-                        display: "inline-block",
-                        minWidth: "60px",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        fontWeight: 700,
-                        fontSize: "11px",
-                        textAlign: "center",
-                        textTransform: "uppercase",
-                        fontFamily: "monospace",
-                        background: mc.bg,
-                        color: mc.text
-                      }}>
-                        {ep.method}
-                      </span>
-                      <span style={{
-                        fontFamily: "monospace",
-                        fontSize: "12px",
-                        color: "var(--ink)",
-                        flexShrink: 0
-                      }}>
-                        {ep.path}
-                      </span>
-                      <span style={{
-                        color: "var(--muted)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        minWidth: 0
-                      }}>
-                        {ep.summary || ep.operationId || ep.path}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <EndpointPreview contract={displayContract} />
         </>
       )}
     </div>

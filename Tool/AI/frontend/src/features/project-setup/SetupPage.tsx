@@ -3,21 +3,14 @@
  *
  * Sections:
  * 1. Project selector + create (when no active project)
- * 2. APIs / Services (reuses existing contract parsing)
- * 3. Project Knowledge (instructions)
- * 4. Relationships (proposed/confirmed/rejected)
+ * 2. Project Knowledge (instructions) - when project is active
+ * 3. Relationships (proposed/confirmed/rejected)
  */
 
 import { useState, useEffect, useCallback } from "react";
-import type { Project, ServiceDefinition, ProjectKnowledge, KnowledgeRelationship } from "../../types";
-import { listProjects, createProject } from "./ProjectService";
-import { registerService, listServices } from "./ServiceRegistrationService";
+import type { Project, KnowledgeRelationship } from "../../types";
+import { listProjects, createProject, deleteProject } from "./ProjectService";
 import { getProjectKnowledge, updateInstructions, confirmRelationship, rejectRelationship } from "./KnowledgeService";
-import { parseApiContract } from "../api-collection/ApiCollectionService";
-import { ContractPaster } from "../api-collection/ContractPaster";
-import { ContractUploader } from "../api-collection/ContractUploader";
-import type { ApiContract } from "../api-collection/ApiCollectionTypes";
-import type { ApiError } from "../../services";
 
 // SVG Icon Components
 const IconFolder = () => (
@@ -38,17 +31,17 @@ const IconChevronRight = () => (
   </svg>
 );
 
-const IconFolderPlus = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-    <path d="M12 11v6M9 14h6" />
-  </svg>
-);
-
 const IconInfo = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <path d="M12 16v-4M12 8h.01" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
   </svg>
 );
 
@@ -64,19 +57,14 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   const [newProjectName, setNewProjectName] = useState("");
   const [projectError, setProjectError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteAllLoading, setDeleteAllLoading] = useState(false);
 
-  // ─── Services Section ─────────────────────────────────────────────────────
-  const [services, setServices] = useState<ServiceDefinition[]>([]);
-  const [contractInputMode, setContractInputMode] = useState<"upload" | "paste">("upload");
-  const [pastedJsonDraft, setPastedJsonDraft] = useState("");
-  const [parseLoading, setParseLoading] = useState(false);
-  const [parseError, setParseError] = useState("");
-  const [parsedContract, setParsedContract] = useState<ApiContract | null>(null);
-  const [registerLoading, setRegisterLoading] = useState(false);
-  const [registerSuccess, setRegisterSuccess] = useState("");
+  // ─── Delete Confirmation Modal ─────────────────────────────────────────────
+  const [confirmDelete, setConfirmDelete] = useState<{ type: "single"; projectId: string } | { type: "all" } | null>(null);
 
   // ─── Knowledge Section ────────────────────────────────────────────────────
-  const [knowledge, setKnowledge] = useState<ProjectKnowledge | null>(null);
+  const [knowledge, setKnowledge] = useState<any>(null);
   const [instructions, setInstructions] = useState("");
   const [instructionsDirty, setInstructionsDirty] = useState(false);
   const [instructionsLoading, setInstructionsLoading] = useState(false);
@@ -91,11 +79,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
 
   const loadProjectData = useCallback(async (projectId: string) => {
     try {
-      const [svcs, kn] = await Promise.all([
-        listServices(projectId),
-        getProjectKnowledge(projectId).catch(() => null),
-      ]);
-      setServices(svcs);
+      const kn = await getProjectKnowledge(projectId).catch(() => null);
       setKnowledge(kn);
       if (kn) {
         setInstructions(kn.instructions || "");
@@ -103,7 +87,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
         setInstructions("");
       }
     } catch {
-      setServices([]);
       setKnowledge(null);
     }
   }, []);
@@ -113,6 +96,64 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       loadProjectData(activeProjectId);
     }
   }, [activeProjectId, loadProjectData]);
+
+  // ─── Delete Handlers ─────────────────────────────────────────────────────
+  const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmDelete({ type: "single", projectId });
+  };
+
+  const handleDeleteAllProjects = async () => {
+    if (projects.length === 0) return;
+    setConfirmDelete({ type: "all" });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+
+    if (confirmDelete.type === "single") {
+      const projectId = confirmDelete.projectId;
+      setDeleting(projectId);
+      setConfirmDelete(null);
+      try {
+        await deleteProject(projectId);
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+        if (activeProjectId === projectId) {
+          onActiveProjectChange("");
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to delete project.";
+        setProjectError(message);
+      } finally {
+        setDeleting(null);
+      }
+    } else {
+      setDeleteAllLoading(true);
+      setConfirmDelete(null);
+      const projectIds = projects.filter((p) => p.id !== "default");
+      const errors: string[] = [];
+      for (const p of projectIds) {
+        try {
+          await deleteProject(p.id);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          errors.push(`${p.id}: ${msg}`);
+        }
+      }
+      if (errors.length === 0) {
+        setProjects((prev) => prev.filter((p) => p.id === "default"));
+        onActiveProjectChange("");
+      } else {
+        setProjectError(`Failed to delete ${errors.length} project(s): ${errors.join("; ")}`);
+        setProjects((prev) => prev.filter((p) => p.id === "default" || errors.some((e) => e.startsWith(p.id))));
+      }
+      setDeleteAllLoading(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setConfirmDelete(null);
+  };
 
   // ─── Project Handlers ────────────────────────────────────────────────────
   const handleCreateProject = async () => {
@@ -146,52 +187,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
     if (e.key === "Enter") {
       e.preventDefault();
       handleCreateProject();
-    }
-  };
-
-  // ─── Contract/Service Handlers ────────────────────────────────────────────
-  const handleParse = async () => {
-    const trimmed = pastedJsonDraft.trim();
-    if (!trimmed) {
-      setParseError("Enter or paste an API collection before parsing.");
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch {
-      setParseError("Invalid JSON. Check the collection syntax and try again.");
-      return;
-    }
-    setParseLoading(true);
-    setParseError("");
-    setRegisterSuccess("");
-    try {
-      const contract = await parseApiContract(parsed, "pasted-contract");
-      setParsedContract(contract);
-    } catch (err) {
-      const apiErr = err as ApiError;
-      setParseError(apiErr.message || "Unable to parse API collection.");
-    } finally {
-      setParseLoading(false);
-    }
-  };
-
-  const handleRegisterService = async () => {
-    if (!activeProjectId || !parsedContract) return;
-    setRegisterLoading(true);
-    setParseError("");
-    setRegisterSuccess("");
-    try {
-      const result = await registerService(activeProjectId, parsedContract);
-      setServices((prev) => [...prev, result.service]);
-      setRegisterSuccess(`Service "${result.service.name}" registered successfully.`);
-      setParsedContract(null);
-      setPastedJsonDraft("");
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Failed to register service.");
-    } finally {
-      setRegisterLoading(false);
     }
   };
 
@@ -257,57 +252,29 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
         <div className="project-setup-container">
           {/* Page Introduction */}
           <div className="project-page-intro">
-            <h2 id="project-setup-title">Project Setup</h2>
-            <p>Create or select a project to start testing your APIs.</p>
+            <h2 id="project-setup-title">Create or select a project</h2>
+            <p>Projects organize your APIs, tests, dependencies, runs, and results.</p>
           </div>
+
+          {/* ─── Welcome Banner (empty state) ──────────────────────────────── */}
+          {projects.length === 0 && (
+            <div className="welcome-banner">
+              <div className="welcome-logo">TF</div>
+              <h2 className="welcome-title">Welcome to TestForge</h2>
+              <p className="welcome-subtitle">Create your first project.</p>
+              <button
+                type="button"
+                className="welcome-cta"
+                onClick={() => document.getElementById("project-id-input")?.focus()}
+              >
+                <IconPlus />
+                Create Project
+              </button>
+            </div>
+          )}
 
           {/* Main Project Setup Card */}
           <div id="project-setup-card" className="project-setup-card">
-            {/* Card Intro Header */}
-            <div className="project-card-header">
-              <div className="project-card-icon"><IconFolder /></div>
-              <div>
-                <h3>Choose your project</h3>
-                <p>Projects organize your APIs, tests, dependencies, runs, and results.</p>
-              </div>
-            </div>
-
-            {/* Existing Projects Section */}
-            <div id="existing-projects-section">
-              <div className="existing-projects-header">Existing Projects</div>
-              {projects.length > 0 ? (
-                projects.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="project-option"
-                    data-project-id={p.id}
-                    onClick={() => handleSelectProject(p.id)}
-                  >
-                    <div className="project-option-icon"><IconFolder /></div>
-                    <div className="project-option-content">
-                      <div className="project-option-name">{p.name || p.id}</div>
-                      <div className="project-option-meta">
-                        Project ID: <span className="project-id-badge">{p.id}</span>
-                      </div>
-                    </div>
-                    <div className="project-option-action"><IconChevronRight /></div>
-                  </button>
-                ))
-              ) : (
-                <div id="projects-empty-state" className="projects-empty-state">
-                  <div className="projects-empty-state-icon"><IconFolderPlus /></div>
-                  <div>
-                    <strong>No projects yet</strong>
-                    <span>Create your first project below to start testing APIs.</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div className="project-section-divider" />
-
             {/* Create New Project Section */}
             <div id="create-project-section">
               <div className="create-project-heading">
@@ -350,21 +317,77 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                   <div className="form-helper">A friendly display name for your team.</div>
                 </div>
 
-                <button
-                  id="create-project-button"
-                  type="button"
-                  onClick={handleCreateProject}
-                  disabled={creating}
-                >
-                  <IconPlus />
-                  Create Project
-                </button>
+                <div className="form-field form-field-button">
+                  <label className="form-label">&nbsp;</label>
+                  <button
+                    id="create-project-button"
+                    type="button"
+                    onClick={handleCreateProject}
+                    disabled={creating}
+                  >
+                    <IconPlus />
+                    Create Project
+                  </button>
+                  <div className="form-helper">&nbsp;</div>
+                </div>
               </div>
 
               {projectError && (
                 <div className="project-error">{projectError}</div>
               )}
             </div>
+
+            {/* Divider — only show when there are existing projects */}
+            {projects.length > 0 && <div className="project-section-divider" />}
+
+            {/* Existing Projects Section — only when there are projects */}
+            {projects.length > 0 && (
+              <div id="existing-projects-section">
+                <div className="existing-projects-header">
+                  <span>Existing Projects</span>
+                  <button
+                    type="button"
+                    className="delete-all-btn"
+                    onClick={handleDeleteAllProjects}
+                    disabled={deleteAllLoading}
+                  >
+                    <IconTrash />
+                    {deleteAllLoading ? "Deleting..." : "Delete All"}
+                  </button>
+                </div>
+                {projects.map((p) => (
+                  <div
+                    key={p.id}
+                    className="project-option-wrapper"
+                  >
+                    <button
+                      type="button"
+                      className="project-option"
+                      data-project-id={p.id}
+                      onClick={() => handleSelectProject(p.id)}
+                    >
+                      <div className="project-option-icon"><IconFolder /></div>
+                      <div className="project-option-content">
+                        <div className="project-option-name">{p.name || p.id}</div>
+                        <div className="project-option-meta">
+                          Project ID: <span className="project-id-badge">{p.id}</span>
+                        </div>
+                      </div>
+                      <div className="project-option-action"><IconChevronRight /></div>
+                    </button>
+                    <button
+                      type="button"
+                      className="project-delete-btn"
+                      onClick={(e) => handleDeleteProject(p.id, e)}
+                      disabled={deleting === p.id}
+                      title={`Delete ${p.name || p.id}`}
+                    >
+                      {deleting === p.id ? "..." : <IconTrash />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Information Callout */}
@@ -376,17 +399,55 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
             </div>
           </div>
         </div>
+
+        {/* ─── Delete Confirmation Modal ──────────────────────────────────── */}
+        {confirmDelete && (
+          <div className="modal-overlay" onClick={handleCancelDelete}>
+            <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-icon"><IconTrash /></div>
+                <h3 className="modal-title">
+                  {confirmDelete.type === "single"
+                    ? `Delete "${confirmDelete.projectId}"?`
+                    : `Delete all ${projects.length} projects?`}
+                </h3>
+              </div>
+              <p className="modal-body">
+                {confirmDelete.type === "single"
+                  ? `This will permanently delete project "${confirmDelete.projectId}" and all associated data. This action cannot be undone.`
+                  : `This will permanently delete all ${projects.length} projects and all associated data. This action cannot be undone.`}
+              </p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-btn modal-btn-cancel"
+                  onClick={handleCancelDelete}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="modal-btn modal-btn-delete"
+                  onClick={handleConfirmDelete}
+                >
+                  <IconTrash />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
     );
   }
 
   /* ───────────────────────────────────────────────────────────────────
-     ACTIVE PROJECT — Project detail view (services, knowledge, etc.)
+     ACTIVE PROJECT — Project Knowledge page
      ─────────────────────────────────────────────────────────────────── */
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
-    <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
+    <div style={{ padding: "22px", maxWidth: "1520px", margin: "0 auto" }}>
       {/* Project header */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -416,141 +477,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
         </button>
       </div>
 
-      {/* ─── Section: APIs / Services ─────────────────────────────────────── */}
-      <section style={{
-        marginBottom: "24px",
-        border: "1px solid var(--color-border)", borderRadius: "8px",
-        background: "var(--color-bg-surface)", overflow: "hidden"
-      }}>
-        <div style={{
-          padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
-          background: "var(--blue-soft)"
-        }}>
-          <span style={{
-            width: "30px", height: "30px", display: "inline-flex",
-            alignItems: "center", justifyContent: "center",
-            borderRadius: "8px", fontWeight: 800,
-            background: "var(--blue)", color: "#fff", marginRight: "10px"
-          }}>
-            [1]
-          </span>
-          <h3 style={{ margin: 0, display: "inline", fontSize: "17px", color: "var(--blue-deep)" }}>
-            APIs / Services
-          </h3>
-        </div>
-        <div style={{ padding: "18px" }}>
-          {/* Registered services list */}
-          {services.length > 0 && (
-            <div style={{ marginBottom: "16px" }}>
-              <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
-                Registered Services ({services.length})
-              </span>
-              <div style={{ marginTop: "8px", display: "grid", gap: "6px" }}>
-                {services.map((s) => (
-                  <div key={s.id} style={{
-                    padding: "8px 12px", border: "1px solid var(--color-border)",
-                    borderRadius: "6px", background: "var(--color-bg-subtle)",
-                    fontSize: "13px"
-                  }}>
-                    <strong>{s.name}</strong>
-                    <span style={{ color: "var(--color-text-muted)", marginLeft: "8px" }}>{s.id}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Source selector (reuse existing tab pattern) */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px"
-          }}>
-            <label style={{ fontSize: "12px", fontWeight: 800, color: "var(--color-text-muted)", textTransform: "uppercase" }}>
-              Source
-            </label>
-            <div style={{
-              display: "flex", gap: "4px", border: "1px solid var(--color-border)",
-              borderRadius: "6px", overflow: "hidden"
-            }}>
-              <span
-                onClick={() => setContractInputMode("upload")}
-                style={{
-                  padding: "6px 14px", fontSize: "13px", fontWeight: 700,
-                  cursor: "pointer",
-                  color: contractInputMode === "upload" ? "#fff" : "var(--color-text-muted)",
-                  background: contractInputMode === "upload" ? "var(--blue)" : "var(--color-bg-surface)"
-                }}
-              >
-                Upload File
-              </span>
-              <span
-                onClick={() => setContractInputMode("paste")}
-                style={{
-                  padding: "6px 14px", fontSize: "13px", fontWeight: 700,
-                  cursor: "pointer",
-                  color: contractInputMode === "paste" ? "#fff" : "var(--color-text-muted)",
-                  background: contractInputMode === "paste" ? "var(--blue)" : "var(--color-bg-surface)"
-                }}
-              >
-                Paste JSON
-              </span>
-            </div>
-          </div>
-
-          {/* Contract upload/paste - reuse existing components */}
-          {contractInputMode === "upload" ? (
-            <ContractUploader
-              onContractParsed={(contract) => {
-                setParsedContract(contract);
-                if (contract && activeProjectId) {
-                  registerService(activeProjectId, contract)
-                    .then((result) => {
-                      setServices((prev) => [...prev, result.service]);
-                      setRegisterSuccess(`Service "${result.service.name}" registered.`);
-                    })
-                    .catch((err) => setParseError(err.message));
-                }
-              }}
-              activeContract={parsedContract}
-            />
-          ) : (
-            <ContractPaster
-              jsonText={pastedJsonDraft}
-              onDraftChange={setPastedJsonDraft}
-              onParse={handleParse}
-              onSample={() => {}}
-              loading={parseLoading}
-              error={parseError}
-              parsedContract={parsedContract}
-            />
-          )}
-
-          {/* Register button for paste mode */}
-          {contractInputMode === "paste" && parsedContract && (
-            <div style={{ marginTop: "12px" }}>
-              <button
-                type="button"
-                onClick={handleRegisterService}
-                disabled={registerLoading}
-                style={{
-                  padding: "8px 16px", fontSize: "14px", fontWeight: 600,
-                  color: "#fff", background: registerLoading ? "var(--color-border)" : "var(--blue)",
-                  border: "none", borderRadius: "6px",
-                  cursor: registerLoading ? "not-allowed" : "pointer"
-                }}
-              >
-                {registerLoading ? "Registering..." : "Register Service"}
-              </button>
-            </div>
-          )}
-
-          {registerSuccess && (
-            <p style={{ color: "var(--color-success)", fontSize: "13px", marginTop: "8px" }}>
-              ✓ {registerSuccess}
-            </p>
-          )}
-        </div>
-      </section>
-
       {/* ─── Section: Project Knowledge ───────────────────────────────────── */}
       <section style={{
         marginBottom: "24px",
@@ -561,14 +487,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
           background: "var(--violet-soft)"
         }}>
-          <span style={{
-            width: "30px", height: "30px", display: "inline-flex",
-            alignItems: "center", justifyContent: "center",
-            borderRadius: "8px", fontWeight: 800,
-            background: "var(--violet)", color: "#fff", marginRight: "10px"
-          }}>
-            [2]
-          </span>
           <h3 style={{ margin: 0, display: "inline", fontSize: "17px", color: "var(--violet)" }}>
             Project Knowledge
           </h3>
@@ -626,7 +544,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       </section>
 
       {/* ─── Section: Relationships ────────────────────────────────────────── */}
-      {knowledge && knowledge.relationships.length > 0 && (
+      {knowledge && knowledge.relationships && knowledge.relationships.length > 0 && (
         <section style={{
           border: "1px solid var(--color-border)", borderRadius: "8px",
           background: "var(--color-bg-surface)", overflow: "hidden"
@@ -649,15 +567,15 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
           </div>
           <div style={{ padding: "18px" }}>
             <div style={{ fontSize: "13px", color: "var(--color-text-primary)", marginBottom: "12px" }}>
-              {knowledge.relationships.filter((r) => r.status === "confirmed").length} dependency configured
-              {knowledge.relationships.filter((r) => r.status === "proposed").length > 0 && (
-                <span style={{ color: "var(--color-text-muted)" }}> · {knowledge.relationships.filter((r) => r.status === "proposed").length} pending review</span>
+              {knowledge.relationships.filter((r: any) => r.status === "confirmed").length} dependency configured
+              {knowledge.relationships.filter((r: any) => r.status === "proposed").length > 0 && (
+                <span style={{ color: "var(--color-text-muted)" }}> · {knowledge.relationships.filter((r: any) => r.status === "proposed").length} pending review</span>
               )}
             </div>
             <details style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
               <summary style={{ cursor: "pointer", fontWeight: 600 }}>Advanced Relationships</summary>
               {(["proposed", "confirmed", "rejected"] as const).map((status) => {
-                const filtered = knowledge.relationships.filter((r) => r.status === status);
+                const filtered = knowledge.relationships.filter((r: any) => r.status === status);
                 if (filtered.length === 0) return null;
                 const colors = getStatusColor(status);
                 return (
@@ -670,7 +588,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                       {status} ({filtered.length})
                     </span>
                     <div style={{ display: "grid", gap: "6px" }}>
-                      {filtered.map((rel, idx) => (
+                      {filtered.map((rel: KnowledgeRelationship, idx: number) => (
                         <div key={idx} style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "8px 12px", border: "1px solid var(--color-border)",

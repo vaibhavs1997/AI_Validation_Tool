@@ -14,7 +14,7 @@ const IconMoon = () => (
 );
 
 interface HeaderProps {
-  view: "workspace" | "results" | "history";
+  view: "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
   projectName?: string;
   environment?: string;
 }
@@ -34,9 +34,12 @@ export function Header({ view, projectName, environment }: HeaderProps) {
   };
 
   const viewConfig = {
-    workspace: { eyebrow: "API TESTING", title: "Test Workspace" },
+    setup: { eyebrow: "API TESTING", title: "Project Knowledge" },
+    workspace: { eyebrow: "API TESTING", title: "Test Builder" },
     results: { eyebrow: "API TESTING", title: "Results" },
-    history: { eyebrow: "API TESTING", title: "History" }
+    history: { eyebrow: "API TESTING", title: "History" },
+    catalog: { eyebrow: "API CATALOG", title: "API Catalog" },
+    settings: { eyebrow: "SYSTEM", title: "Settings" }
   };
 
   const config = viewConfig[view];

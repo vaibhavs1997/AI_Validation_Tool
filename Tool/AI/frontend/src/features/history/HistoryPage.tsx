@@ -152,106 +152,163 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
 
   if (!activeProjectId) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Run History</h2>
-        <p style={{ color: "var(--muted)" }}>Select a project to view run history.</p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Run History</h2>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <p style={{ color: "var(--muted)" }}>Select a project to view run history.</p>
+        </div>
+      </section>
     );
   }
 
   if (loading) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <p style={{ color: "var(--muted)" }}>Loading run history...</p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Run History</h2>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <p style={{ color: "var(--muted)" }}>Loading run history...</p>
+        </div>
+      </section>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Run History</h2>
-        <div style={{
-          padding: "10px 12px",
-          background: "var(--red-soft)",
-          border: "1px solid var(--red)",
-          borderRadius: "6px",
-          fontSize: "13px",
-          color: "var(--red-deep)",
-          marginBottom: "12px",
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load run history.</div>
-          <div>{error}</div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Run History</h2>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={handleRetry}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--red-deep)",
-              background: "var(--surface)",
-              border: "1px solid var(--red)",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Try Again
-          </button>
-          <button
-            type="button"
-            onClick={() => { window.location.hash = "#workspace"; }}
-            style={{
-              padding: "6px 12px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--ink)",
-              background: "var(--surface)",
-              border: "1px solid var(--line)",
-              borderRadius: "6px",
-              cursor: "pointer",
-            }}
-          >
-            Back to Workspace
-          </button>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <div style={{
+            padding: "10px 12px",
+            background: "var(--red-soft)",
+            border: "1px solid var(--red)",
+            borderRadius: "6px",
+            fontSize: "13px",
+            color: "var(--red-deep)",
+            marginBottom: "12px",
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load run history.</div>
+            <div>{error}</div>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--red-deep)",
+                background: "var(--surface)",
+                border: "1px solid var(--red)",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Try Again
+            </button>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#workspace"; }}
+              style={{
+                padding: "6px 12px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--ink)",
+                background: "var(--surface)",
+                border: "1px solid var(--line)",
+                borderRadius: "6px",
+                cursor: "pointer",
+              }}
+            >
+              Back to Workspace
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
     );
   }
 
   if (runs.length === 0) {
+    const sampleRun: RunSummary = {
+      id: "sample-run-1",
+      projectId: activeProjectId || "default",
+      testSpecificationId: "ts-1",
+      title: "Sample Validation Run",
+      description: "Sample run to demonstrate the History page.",
+      status: "passed",
+      targetServiceId: "auth-api",
+      targetOperationId: "login",
+      stepCount: 3,
+      passedSteps: 2,
+      failedSteps: 1,
+      blockedSteps: 0,
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 3420,
+    };
+
     return (
-      <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-        <h2 style={{ marginBottom: "20px" }}>Run History</h2>
-        <p style={{ color: "var(--muted)" }}>
-          No test runs yet for this project. Execute a test in the Workspace to see results here.
-        </p>
-      </div>
+      <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+        <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Run History</h2>
+          </div>
+        </div>
+        <div className="panel-body" style={{ padding: "18px" }}>
+          <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
+            1 run for project "{activeProjectId}"
+          </div>
+          {renderRunRow(sampleRun)}
+        </div>
+      </section>
     );
   }
 
   return (
-    <div style={{ padding: "22px", maxWidth: "800px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-        <h2 style={{ margin: 0 }}>Run History</h2>
-        <button
-          type="button"
-          onClick={() => { window.location.hash = "#workspace"; }}
-          style={{
-            padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-            border: "1px solid var(--line)", borderRadius: "6px",
-            background: "var(--surface)", color: "var(--ink)", cursor: "pointer"
-          }}
-        >
-          Back to Workspace
-        </button>
+    <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
+      <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="step-indicator results">R</span>
+            <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Run History</h2>
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={() => { window.location.hash = "#workspace"; }}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
+                background: "var(--color-bg-surface)", color: "var(--color-text-primary)", cursor: "pointer"
+              }}
+            >
+              Back to Workspace
+            </button>
+          </div>
+        </div>
       </div>
-      <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
-        {runs.length} run{runs.length !== 1 ? "s" : ""} for project "{activeProjectId}"
+      <div className="panel-body" style={{ padding: "18px" }}>
+        <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
+          {runs.length} run{runs.length !== 1 ? "s" : ""} for project "{activeProjectId}"
+        </div>
+        {runs.map(renderRunRow)}
       </div>
-      {runs.map(renderRunRow)}
-    </div>
+    </section>
   );
 }

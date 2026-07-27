@@ -165,6 +165,14 @@ function serviceExists(projectId, serviceId) {
 }
 
 function registerServiceWithApiModel(projectId, serviceInput, apiModelInput) {
+  // If a service with the same ID already exists, delete it first (replace mode)
+  const existingService = getService(projectId, serviceInput.id);
+  if (existingService) {
+    const serviceFile = path.join(SERVICES_DIR, safeName(projectId), `${safeName(serviceInput.id)}.json`);
+    if (fs.existsSync(serviceFile)) fs.unlinkSync(serviceFile);
+    const apiModelFile = path.join(API_MODELS_DIR, safeName(projectId), `${safeName(serviceInput.id)}.json`);
+    if (fs.existsSync(apiModelFile)) fs.unlinkSync(apiModelFile);
+  }
   const service = createService(projectId, serviceInput);
   const apiModel = saveApiModel(projectId, service.id, apiModelInput);
   return { service, apiModel };

@@ -93,19 +93,6 @@ export function ApiCollectionPanel({ activeContract, onContractConfirmed }: ApiC
         cursor: "pointer"
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span className="step" style={{
-            width: "30px",
-            height: "30px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "8px",
-            fontWeight: 800,
-            background: "var(--blue)",
-            color: "#fff"
-          }}>
-            [2]
-          </span>
           <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>
             API Collection
           </h2>

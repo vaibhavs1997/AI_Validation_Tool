@@ -21,15 +21,6 @@ const IconServer = () => (
   </svg>
 );
 
-const IconGitBranch = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 3v12" />
-    <circle cx="18" cy="6" r="3" />
-    <circle cx="6" cy="18" r="3" />
-    <path d="M18 9a9 9 0 01-9 9" />
-  </svg>
-);
-
 const IconBarChart = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 20V10" />
@@ -53,50 +44,70 @@ const IconSettings = () => (
 );
 
 interface SidebarProps {
-  currentView: "setup" | "workspace" | "results" | "history";
-  onViewChange: (view: "setup" | "workspace" | "results" | "history") => void;
+  currentView: "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
+  onViewChange: (view: "setup" | "workspace" | "results" | "history" | "catalog" | "settings") => void;
+  activeProjectId?: string | null;
 }
 
-export function Sidebar({ currentView, onViewChange }: SidebarProps) {
-  const navItems = [
-    {
-      group: "Platform",
-      items: [
-        { id: "setup" as const, label: "Overview", icon: IconHome },
-      ],
-    },
-    {
-      group: "Testing",
-      items: [
-        { id: "workspace" as const, label: "Test Workspace", icon: IconFlask },
-      ],
-    },
-    {
-      group: "APIs",
-      items: [
-        { id: "workspace" as const, label: "API Services", icon: IconServer },
-        { id: "workspace" as const, label: "Dependencies", icon: IconGitBranch },
-      ],
-    },
-    {
-      group: "Results",
-      items: [
-        { id: "results" as const, label: "Results", icon: IconBarChart },
-        { id: "history" as const, label: "History", icon: IconClock },
-      ],
-    },
-    {
-      group: "System",
-      items: [
-        { id: "workspace" as const, label: "Settings", icon: IconSettings },
-      ],
-    },
-  ];
+export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarProps) {
+  // Show compact navigation (only Project Setup + Settings) only when no project is active
+  // and we're on the setup or settings page. When a project is active, show full workflow nav.
+  const showCompactNav = !activeProjectId && (currentView === "setup" || currentView === "settings");
+
+  const setupLabel = activeProjectId ? "Project Knowledge" : "Project Setup";
+
+  const navItems = showCompactNav
+    ? [
+        {
+          group: "Main",
+          items: [
+            { id: "setup" as const, label: setupLabel, icon: IconHome },
+          ],
+        },
+        {
+          group: "System",
+          items: [
+            { id: "settings" as const, label: "Settings", icon: IconSettings },
+          ],
+        },
+      ]
+    : [
+        {
+          group: "Workflow",
+          items: [
+            { id: "setup" as const, label: setupLabel, icon: IconHome },
+            { id: "catalog" as const, label: "API Catalog", icon: IconServer },
+            { id: "workspace" as const, label: "Test Builder", icon: IconFlask },
+          ],
+        },
+        {
+          group: "Results",
+          items: [
+            { id: "results" as const, label: "Results", icon: IconBarChart },
+            { id: "history" as const, label: "History", icon: IconClock },
+          ],
+        },
+        {
+          group: "System",
+          items: [
+            { id: "settings" as const, label: "Settings", icon: IconSettings },
+          ],
+        },
+      ];
 
   return (
     <aside id="testforge-sidebar" className="app-sidebar">
       {/* Brand */}
-      <div id="testforge-brand" className="sidebar-brand">
+      <div
+        id="testforge-brand"
+        className="sidebar-brand"
+        onClick={() => {
+          try { sessionStorage.removeItem("testforge:activeProjectId"); } catch {}
+          window.location.hash = "#setup";
+          window.location.reload();
+        }}
+        style={{ cursor: "pointer" }}
+      >
         <div className="testforge-logo">TF</div>
         <div className="brand-copy">
           <div className="brand-name">TestForge</div>

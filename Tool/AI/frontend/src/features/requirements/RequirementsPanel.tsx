@@ -11,7 +11,7 @@ interface RequirementsPanelProps {
 
 export function RequirementsPanel({ activeRequirement, onActiveRequirementChange }: RequirementsPanelProps) {
   const [source, setSource] = useState<"jira" | "manual">("jira");
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const handleJiraRequirementConfirmed = (requirement: JiraRequirement) => {
     onActiveRequirementChange({ source: "jira", requirement });

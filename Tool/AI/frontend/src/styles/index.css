@@ -173,7 +173,7 @@ button {
 
 #testforge-brand,
 .sidebar-brand {
-  padding: 24px 20px 20px;
+  padding: 16px 20px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -382,6 +382,223 @@ button {
 }
 
 /* ============================================
+   WORKSPACE PANELS & GRID
+   ============================================ */
+
+.workspace {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.span-12 {
+  grid-column: span 12 / span 12;
+  min-width: 0;
+}
+
+.panel {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.panel-body {
+  padding: 18px;
+}
+
+/* ============================================
+   STEP INDICATORS & BADGES
+   ============================================ */
+
+.step-indicator {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.step-indicator.requirements {
+  background: var(--violet);
+}
+
+.step-indicator.scenarios {
+  background: var(--green);
+}
+
+.step-indicator.collection {
+  background: var(--blue);
+}
+
+.step-indicator.execution {
+  background: var(--amber);
+}
+
+.step-indicator.results {
+  background: var(--blue);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-badge.loaded {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.expand-toggle {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg-surface);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ============================================
+   WORKFLOW STATUS
+   ============================================ */
+
+.workflow-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.wf-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wf-step-marker {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.wf-step.completed .wf-step-marker {
+  background: #16a34a;
+}
+
+.wf-step.current .wf-step-marker {
+  background: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.wf-step.upcoming .wf-step-marker {
+  background: #94a3b8;
+}
+
+.wf-step-check {
+  position: absolute;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.wf-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wf-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wf-step-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.wf-step-status {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.status-completed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.status-current {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-upcoming {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.wf-step-description {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-sep {
+  color: #cbd5e1;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ============================================
    PROJECT SETUP PAGE
    ============================================ */
 
@@ -473,43 +690,122 @@ button {
 /* ─── Existing Projects Section ───────────── */
 
 #existing-projects-section {
-  padding: 28px 32px;
+  padding: 20px 32px;
 }
 
 .existing-projects-header {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-secondary);
-  margin-bottom: 14px;
-}
-
-/* Project Option Row */
-.project-option {
-  width: 100%;
-  min-height: 68px;
-  padding: 14px 16px;
+  margin-bottom: 10px;
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-content: space-between;
+}
+
+.delete-all-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--red);
+  background: var(--red-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.delete-all-btn:hover {
+  background: #fce4e2;
+}
+
+.delete-all-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.delete-all-btn svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2;
+}
+
+.project-option-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.project-option-wrapper:last-child {
+  margin-bottom: 0;
+}
+
+.project-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 44px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.project-delete-btn:hover {
+  color: var(--red);
+  background: var(--red-soft);
+  border-color: var(--red);
+}
+
+.project-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.project-delete-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+/* Project Option Row - compact */
+.project-option {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   text-align: left;
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
   font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 .project-option:hover {
   border-color: var(--color-primary-border);
   background: var(--color-primary-soft);
-  transform: translateY(-1px);
 }
 
 .project-option-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   background: var(--color-primary-soft);
   color: var(--color-primary);
   display: flex;
@@ -519,25 +815,28 @@ button {
 }
 
 .project-option-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   stroke-width: 1.75;
 }
 
 .project-option-content {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .project-option-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text-primary);
-  margin-bottom: 4px;
+  white-space: nowrap;
 }
 
 .project-option-meta {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-secondary);
   display: flex;
   align-items: center;
@@ -545,8 +844,8 @@ button {
 }
 
 .project-id-badge {
-  font-size: 11px;
-  padding: 2px 7px;
+  font-size: 10px;
+  padding: 1px 6px;
   border-radius: 999px;
   background: var(--color-bg-muted);
   color: var(--color-text-secondary);
@@ -560,8 +859,8 @@ button {
 }
 
 .project-option-action svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   stroke-width: 2;
 }
 
@@ -768,6 +1067,187 @@ button {
   font-size: 13px;
   color: #DC2626;
   margin-top: 8px;
+}
+
+/* ─── Welcome Banner ──────────────────── */
+
+.welcome-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px 36px;
+  margin-bottom: 28px;
+}
+
+.welcome-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #7C6CFF 0%, #635BEB 100%);
+  color: #FFFFFF;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  letter-spacing: -0.02em;
+}
+
+.welcome-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+  letter-spacing: -0.025em;
+}
+
+.welcome-subtitle {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin-bottom: 22px;
+}
+
+.welcome-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 28px;
+  border: none;
+  border-radius: 10px;
+  background: var(--color-primary);
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.welcome-cta svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.welcome-cta:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(109, 93, 251, 0.25);
+}
+
+/* ============================================
+   DELETE CONFIRMATION MODAL
+   ============================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.modal-dialog {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 22px 24px 0;
+}
+
+.modal-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--red-soft);
+  color: var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modal-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.modal-body {
+  padding: 12px 24px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 20px 24px 22px;
+}
+
+.modal-btn {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.modal-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2;
+}
+
+.modal-btn-cancel {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.modal-btn-cancel:hover {
+  background: var(--color-bg-muted);
+}
+
+.modal-btn-delete {
+  background: var(--red);
+  border: none;
+  color: #fff;
+}
+
+.modal-btn-delete:hover {
+  background: #b91c1c;
 }
 
 /* ─── Information Callout ─────────────────── */
