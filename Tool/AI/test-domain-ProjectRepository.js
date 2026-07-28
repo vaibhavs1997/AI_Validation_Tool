@@ -16,6 +16,7 @@ function clearProjectModules() {
   clearModule("./src/domain/ProjectRepository");
   clearModule("./src/domain/repositories/FileProjectRepository");
   clearModule("./src/domain/repositories/PostgresProjectRepository");
+  clearModule("./src/repositories/repositorySelector");
 }
 
 function createMockProjectPool() {

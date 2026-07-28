@@ -365,3 +365,66 @@ export interface PrepareResponse {
   };
   warnings: string[];
 }
+
+// ─── Run / History (STEP 5.8) ─────────────────────────────────────────────────
+
+export interface RunSummary {
+  id: string;
+  projectId: string;
+  testSpecificationId: string;
+  title: string;
+  description: string;
+  status: "passed" | "failed" | "unknown";
+  targetServiceId: string;
+  targetOperationId: string;
+  stepCount: number;
+  passedSteps: number;
+  failedSteps: number;
+  blockedSteps: number;
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+}
+
+export interface RunDetail {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  status: "passed" | "failed" | "unknown";
+  testSpecification: {
+    id: string;
+    title: string;
+    description: string;
+    requirementRefs: Array<{ acIndex: number; acText?: string }>;
+    operationRefs: Array<{ serviceId?: string; operationId?: string; method?: string; path?: string }>;
+    expectedBehavior: { status: number; responseAssertions: string[] };
+  };
+  executionPlanSummary: {
+    target: { serviceId?: string; operationId?: string };
+    stepCount: number;
+    operations: Array<{ serviceId: string; operationId: string; method?: string; path?: string }>;
+  };
+  targetOperation: { serviceId?: string; operationId?: string };
+  results: Array<{
+    step: number;
+    operation: { serviceId: string; operationId: string; method?: string; path?: string };
+    status: "passed" | "failed" | "blocked";
+    request?: unknown;
+    response?: unknown;
+    validation?: unknown;
+    error?: string;
+  }>;
+  errors: string[];
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+}
+
+export interface ListRunsResponse {
+  runs: RunSummary[];
+}
+
+export interface GetRunResponse {
+  run: RunDetail;
+}

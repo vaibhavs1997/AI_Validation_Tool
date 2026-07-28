@@ -255,7 +255,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
     <div className="input-section">
       <div className="section-label">Upload API Collection</div>
 
-      {/* File input area - show when no file selected */}
+      {/* File input area - show when no file selected and no active contract */}
       {!selectedFile && !displayContract && (
         <div
           className="upload-area"
@@ -298,6 +298,41 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
             <span style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
               OpenAPI · Swagger · Postman · HAR
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Cached contract clear option when contract restored from sessionStorage without original file */}
+      {!selectedFile && activeContract && (
+        <div style={{ marginTop: "12px", padding: "12px", border: "1px solid var(--line)", borderRadius: "6px", background: "var(--surface)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px" }}>📄</span>
+              <div>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 700 }}>
+                  {activeContract.title}
+                </p>
+                <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "var(--muted)" }}>
+                  Previously imported · {activeContract.endpoints.length} endpoints
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleRemove()}
+              style={{
+                padding: "4px 10px",
+                border: "1px solid var(--red)",
+                background: "transparent",
+                color: "var(--red)",
+                borderRadius: "4px",
+                fontSize: "12px",
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              Remove
+            </button>
           </div>
         </div>
       )}

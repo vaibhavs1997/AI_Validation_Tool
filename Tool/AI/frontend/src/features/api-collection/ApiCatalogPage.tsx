@@ -8,8 +8,39 @@ interface ApiCatalogPageProps {
   activeProjectId: string | null;
 }
 
+/**
+ * Preserve the active contract across component re-mounts by caching it
+ * in sessionStorage. This prevents blank API Catalog when navigating away
+ * and back to the page.
+ */
+const STORAGE_KEY_PREFIX = "testforge:catalogContract:";
+
+function getCachedContract(projectId: string): ApiContract | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + projectId);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheContract(projectId: string, contract: ApiContract | null) {
+  try {
+    if (contract) {
+      sessionStorage.setItem(STORAGE_KEY_PREFIX + projectId, JSON.stringify(contract));
+    } else {
+      sessionStorage.removeItem(STORAGE_KEY_PREFIX + projectId);
+    }
+  } catch {
+    // sessionStorage not available
+  }
+}
+
 export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
-  const [activeContract, setActiveContract] = useState<ApiContract | null>(null);
+  // Restore contract from cache when component mounts (navigating back)
+  const [activeContract, setActiveContract] = useState<ApiContract | null>(
+    activeProjectId ? getCachedContract(activeProjectId) : null
+  );
   const [persistedEndpoints, setPersistedEndpoints] = useState<ApiEndpoint[]>([]);
   const [loadingEndpoints, setLoadingEndpoints] = useState(false);
 
@@ -43,30 +74,43 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
                   responseSchemas: op.responseSchemas || {},
                 });
               });
+            } else {
+              console.warn(`[ApiCatalog] No API model found for service: ${svc.id}`);
             }
-          } catch {
-            // Skip services without api models
+          } catch (err) {
+            console.warn(`[ApiCatalog] Failed to load service ${svc.id}:`, err);
           }
         }
         setPersistedEndpoints(allEndpoints);
-        if (allEndpoints.length > 0 && !activeContract) {
-          // Restore contract representation from persisted data
-          setActiveContract({
+        // Restore contract representation from persisted data when no cached contract exists
+        const cached = getCachedContract(activeProjectId);
+        if (allEndpoints.length > 0 && !cached) {
+          const restored: ApiContract = {
             type: "openapi",
             title: services[0]?.name || "Imported API",
             version: "1.0.0",
             baseUrl: "",
             endpoints: allEndpoints,
             importedAt: new Date().toISOString(),
-          });
+          };
+          setActiveContract(restored);
+          cacheContract(activeProjectId, restored);
+        } else if (cached) {
+          // Bring back cached contract so UI shows endpoints
+          setActiveContract(cached);
         }
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.error("[ApiCatalog] Failed to list services:", err);
+      })
       .finally(() => setLoadingEndpoints(false));
   }, [activeProjectId]);
 
   const handleContractConfirmed = (contract: ApiContract | null) => {
     setActiveContract(contract);
+    if (activeProjectId) {
+      cacheContract(activeProjectId, contract);
+    }
     // Persist to backend
     if (contract && activeProjectId) {
       registerService(activeProjectId, contract)
@@ -74,7 +118,7 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
           // Refresh endpoints from persisted data
           setPersistedEndpoints(contract.endpoints || []);
         })
-        .catch((err: unknown) => console.error("Failed to persist API contract:", err));
+        .catch((err: unknown) => console.error("[ApiCatalog] Failed to persist API contract:", err));
     }
   };
 
@@ -93,61 +137,6 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(12, minmax(0, 1fr))", gap: "18px", padding: "22px", maxWidth: "1520px", margin: "0 auto" }}>
-      {/* ─── Endpoints List (when data is persisted) ─────────────────────── */}
-      {persistedEndpoints.length > 0 && (
-        <div style={{
-          gridColumn: "span 12",
-          padding: "16px 24px",
-          marginBottom: "0",
-          border: "1px solid var(--color-border)",
-          borderRadius: "var(--radius-lg)",
-          background: "var(--color-bg-surface)",
-          overflow: "hidden"
-        }}>
-          <h3 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "var(--color-text-primary)" }}>
-            API Endpoints ({persistedEndpoints.length})
-          </h3>
-          <div style={{ display: "grid", gap: "6px" }}>
-            {persistedEndpoints.map((ep, idx) => (
-              <div key={ep.id || idx} style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                padding: "8px 12px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "6px",
-                background: "var(--color-bg-subtle)",
-                fontSize: "13px"
-              }}>
-                <span style={{
-                  fontWeight: 700,
-                  color: ep.method === "GET" ? "var(--green)" :
-                         ep.method === "POST" ? "var(--blue)" :
-                         ep.method === "PUT" || ep.method === "PATCH" ? "var(--orange)" :
-                         ep.method === "DELETE" ? "var(--red)" : "var(--muted)",
-                  fontFamily: "monospace",
-                  fontSize: "11px",
-                  minWidth: "50px"
-                }}>
-                  {ep.method}
-                </span>
-                <code style={{
-                  fontFamily: "monospace",
-                  fontSize: "12px",
-                  color: "var(--color-text-primary)",
-                  flex: 1
-                }}>
-                  {ep.path}
-                </code>
-                <span style={{ color: "var(--color-text-secondary)", fontSize: "12px" }}>
-                  {ep.summary || ep.operationId || ""}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ─── First-Time Onboarding Message ───────────────────────────────── */}
       {!hasConfiguredContract && !loadingEndpoints && (
         <div style={{

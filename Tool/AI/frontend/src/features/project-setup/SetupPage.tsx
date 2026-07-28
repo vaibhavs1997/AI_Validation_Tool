@@ -9,25 +9,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import type { Project, KnowledgeRelationship } from "../../types";
-import { listProjects, createProject, deleteProject } from "./ProjectService";
+import { listProjects, createProject, updateProject, deleteProject } from "./ProjectService";
 import { getProjectKnowledge, updateInstructions, confirmRelationship, rejectRelationship } from "./KnowledgeService";
+import { ProjectCard } from "./ProjectCard";
+import { SortDropdown, SORT_OPTIONS } from "./SortDropdown";
+import type { ProjectCardData } from "./ProjectCard";
+import { useDebounce } from "../../hooks/useDebounce";
+import { useLocalStorage } from "../../hooks/useLocalStorage";
 
 // SVG Icon Components
-const IconFolder = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
-  </svg>
-);
-
 const IconPlus = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-
-const IconChevronRight = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
@@ -59,6 +52,150 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteAllLoading, setDeleteAllLoading] = useState(false);
+
+  // ─── Last Used Project ─────────────────────────────────────────────────────
+  const [lastUsedProjectId, setLastUsedProjectId] = useLocalStorage<string>("testforge:last-used-project", "");
+
+  // ─── Search & Sort ────────────────────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useLocalStorage<string>("testforge:project-sort", "recently-updated");
+  const [showClearSearch, setShowClearSearch] = useState(false);
+
+  // Defensive: ensure no legacy 1970 timestamps leak through
+  const sanitizedProjects = projects.map((p) => ({
+    ...p,
+    createdAt: p.createdAt && new Date(p.createdAt).getFullYear() > 1970 ? p.createdAt : new Date().toISOString(),
+    updatedAt: p.updatedAt && new Date(p.updatedAt).getFullYear() > 1970 ? p.updatedAt : new Date().toISOString(),
+  }));
+
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setShowClearSearch(value.length > 0);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      setShowClearSearch(false);
+      e.currentTarget.blur();
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowClearSearch(false);
+  };
+
+  // Filter and sort projects
+  const filteredProjects = sanitizedProjects
+    .filter((project) => {
+      if (!debouncedSearchQuery.trim()) return true;
+      const query = debouncedSearchQuery.trim().toLowerCase();
+      return (
+        project.name.toLowerCase().includes(query) ||
+        project.id.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "name-asc":
+          return (a.name || a.id).localeCompare(b.name || b.id);
+        case "name-desc":
+          return (b.name || b.id).localeCompare(a.name || a.id);
+        case "newest-created":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "oldest-created":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "recently-updated":
+        default:
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }
+    });
+
+  // Derive last used project from the projects list
+  const lastUsedProject = projects.find((p) => p.id === lastUsedProjectId);
+
+  // Exclude last used from the main grid
+  const otherProjects = filteredProjects.filter((p) => p.id !== lastUsedProjectId);
+
+  // ─── Validation ────────────────────────────────────────────────────────────
+  const validateProjectName = (name: string, currentProjectId?: string): string | null => {
+    const trimmed = name.trim();
+    if (!trimmed) return "Project name cannot be empty.";
+    if (trimmed !== name) return "Project name cannot have leading or trailing spaces.";
+    if (projects.some((p) => p.name.toLowerCase() === trimmed.toLowerCase() && p.id !== currentProjectId)) {
+      return "A project with this name already exists.";
+    }
+    return null;
+  };
+
+  // ─── Rename ────────────────────────────────────────────────────────────────
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameProjectId, setRenameProjectId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState("");
+  const [renameError, setRenameError] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [lastFocusedElement, setLastFocusedElement] = useState<HTMLElement | null>(null);
+
+  const openRenameModal = (projectId: string) => {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+    setRenameProjectId(projectId);
+    setRenameName(project.name || project.id);
+    setRenameError("");
+    setLastFocusedElement(document.activeElement as HTMLElement);
+    setRenameModalOpen(true);
+  };
+
+  const closeRenameModal = () => {
+    setRenameModalOpen(false);
+    setRenameProjectId(null);
+    setRenameName("");
+    setRenameError("");
+    lastFocusedElement?.focus();
+  };
+
+  const handleRenameSave = async () => {
+    if (!renameProjectId) return;
+    const validationError = validateProjectName(renameName, renameProjectId);
+    if (validationError) {
+      setRenameError(validationError);
+      return;
+    }
+    setRenaming(true);
+    try {
+      const updated = await updateProject?.(renameProjectId, { name: renameName.trim() });
+      if (updated) {
+        setProjects((prev) => prev.map((p) => (p.id === renameProjectId ? updated : p)));
+        closeRenameModal();
+      }
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : "Failed to rename project.");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleRenameSave();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeRenameModal();
+    }
+  };
+
+  // ─── Toast Notifications ───────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // ─── Delete Confirmation Modal ─────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState<{ type: "single"; projectId: string } | { type: "all" } | null>(null);
@@ -98,11 +235,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   }, [activeProjectId, loadProjectData]);
 
   // ─── Delete Handlers ─────────────────────────────────────────────────────
-  const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete({ type: "single", projectId });
-  };
-
   const handleDeleteAllProjects = async () => {
     if (projects.length === 0) return;
     setConfirmDelete({ type: "all" });
@@ -117,10 +249,12 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       setConfirmDelete(null);
       try {
         await deleteProject(projectId);
+        const nextProject = projects.find((p) => p.id !== projectId);
         setProjects((prev) => prev.filter((p) => p.id !== projectId));
         if (activeProjectId === projectId) {
-          onActiveProjectChange("");
+          onActiveProjectChange(nextProject?.id || "");
         }
+        showToast("Project deleted successfully.");
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to delete project.";
         setProjectError(message);
@@ -143,6 +277,7 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       if (errors.length === 0) {
         setProjects((prev) => prev.filter((p) => p.id === "default"));
         onActiveProjectChange("");
+        showToast("All projects deleted successfully.");
       } else {
         setProjectError(`Failed to delete ${errors.length} project(s): ${errors.join("; ")}`);
         setProjects((prev) => prev.filter((p) => p.id === "default" || errors.some((e) => e.startsWith(p.id))));
@@ -163,14 +298,21 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
       setProjectError("Project ID is required.");
       return;
     }
+    const validationError = validateProjectName(trimmedName);
+    if (validationError) {
+      setProjectError(validationError);
+      return;
+    }
     setProjectError("");
     setCreating(true);
     try {
       const project = await createProject({ id: trimmedId, name: trimmedName });
       setProjects((prev) => [...prev, project]);
+      setLastUsedProjectId(project.id);
       onActiveProjectChange(project.id);
       setNewProjectId("");
       setNewProjectName("");
+      showToast("Project created successfully.");
     } catch (err) {
       const message = (err as { message?: string })?.message || (err as { error?: string })?.error || "Failed to create project.";
       setProjectError(message);
@@ -179,7 +321,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
     }
   };
 
-  const handleSelectProject = (projectId: string) => {
+  const handleSelectProject = async (projectId: string) => {
+    setLastUsedProjectId(projectId);
     onActiveProjectChange(projectId);
   };
 
@@ -340,11 +483,44 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
             {/* Divider — only show when there are existing projects */}
             {projects.length > 0 && <div className="project-section-divider" />}
 
-            {/* Existing Projects Section — only when there are projects */}
+            {/* Existing Projects Section — card grid */}
             {projects.length > 0 && (
               <div id="existing-projects-section">
+                {/* ─── Last Used Project ─────────────────────────────────────── */}
+                {lastUsedProject && (
+                  <div className="last-used-project-section">
+                    <div className="last-used-project-label">Last Used Project</div>
+                    <div className="last-used-project-grid">
+                      {(() => {
+                        const cardData: ProjectCardData = {
+                          id: lastUsedProject.id,
+                          name: lastUsedProject.name || lastUsedProject.id,
+                          createdAt: lastUsedProject.createdAt,
+                          updatedAt: lastUsedProject.updatedAt,
+                          isDefault: lastUsedProject.id === "default",
+                          apiCount: null,
+                          requirementCount: null,
+                          testCaseCount: null,
+                        };
+                        return (
+                          <ProjectCard
+                            project={cardData}
+                            isSelected={activeProjectId === lastUsedProject.id}
+                            onSelect={handleSelectProject}
+                            onDelete={(id) => {
+                              setConfirmDelete({ type: "single", projectId: id });
+                            }}
+                            onRename={openRenameModal}
+                            deleting={deleting === lastUsedProject.id}
+                          />
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+
                 <div className="existing-projects-header">
-                  <span>Existing Projects</span>
+                  <span>All Projects</span>
                   <button
                     type="button"
                     className="delete-all-btn"
@@ -355,37 +531,72 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                     {deleteAllLoading ? "Deleting..." : "Delete All"}
                   </button>
                 </div>
-                {projects.map((p) => (
-                  <div
-                    key={p.id}
-                    className="project-option-wrapper"
-                  >
-                    <button
-                      type="button"
-                      className="project-option"
-                      data-project-id={p.id}
-                      onClick={() => handleSelectProject(p.id)}
-                    >
-                      <div className="project-option-icon"><IconFolder /></div>
-                      <div className="project-option-content">
-                        <div className="project-option-name">{p.name || p.id}</div>
-                        <div className="project-option-meta">
-                          Project ID: <span className="project-id-badge">{p.id}</span>
-                        </div>
-                      </div>
-                      <div className="project-option-action"><IconChevronRight /></div>
-                    </button>
-                    <button
-                      type="button"
-                      className="project-delete-btn"
-                      onClick={(e) => handleDeleteProject(p.id, e)}
-                      disabled={deleting === p.id}
-                      title={`Delete ${p.name || p.id}`}
-                    >
-                      {deleting === p.id ? "..." : <IconTrash />}
-                    </button>
+
+                {/* Search and Sort Controls */}
+                <div className="project-toolbar">
+                  <div className="project-search-wrapper">
+                    <input
+                      type="text"
+                      placeholder="Search projects by name or ID..."
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      onKeyDown={handleSearchKeyDown}
+                      aria-label="Search projects"
+                      className="project-search-input"
+                    />
+                    {showClearSearch && (
+                      <button
+                        type="button"
+                        onClick={clearSearch}
+                        aria-label="Clear search"
+                        className="project-search-clear"
+                      >
+                        ×
+                      </button>
+                    )}
                   </div>
-                ))}
+                  <SortDropdown
+                    value={sortBy}
+                    onChange={setSortBy}
+                    options={SORT_OPTIONS}
+                    aria-label="Sort projects"
+                  />
+                </div>
+
+                {/* Filtered and Sorted Projects */}
+                {otherProjects.length === 0 ? (
+                  <div className="projects-empty-state" style={{ justifyContent: "center" }}>
+                    <span>No matching projects found.</span>
+                  </div>
+                ) : (
+                  <div className="project-grid">
+                    {otherProjects.map((p) => {
+                      const cardData: ProjectCardData = {
+                        id: p.id,
+                        name: p.name || p.id,
+                        createdAt: p.createdAt,
+                        updatedAt: p.updatedAt,
+                        isDefault: p.id === "default",
+                        apiCount: null,
+                        requirementCount: null,
+                        testCaseCount: null,
+                      };
+                      return (
+                        <ProjectCard
+                          key={p.id}
+                          project={cardData}
+                          isSelected={activeProjectId === p.id}
+                          onSelect={handleSelectProject}
+                          onDelete={(id) => {
+                            setConfirmDelete({ type: "single", projectId: id });
+                          }}
+                          onRename={openRenameModal}
+                          deleting={deleting === p.id}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -432,6 +643,130 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
                 >
                   <IconTrash />
                   Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ─── Toast Notification ─────────────────────────────────────────── */}
+        {toast && (
+          <div style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            padding: "12px 20px",
+            borderRadius: "8px",
+            background: "var(--color-success-soft)",
+            border: "1px solid var(--color-success)",
+            color: "var(--green-deep)",
+            fontSize: "14px",
+            fontWeight: 500,
+            boxShadow: "var(--shadow-card)",
+            zIndex: 1200,
+            animation: "slideIn 0.2s ease-out",
+          }}>
+            {toast.message}
+          </div>
+        )}
+
+        {/* ─── Rename Modal ───────────────────────────────────────────────── */}
+        {renameModalOpen && (
+          <div className="modal-overlay" onClick={closeRenameModal}>
+            <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <div className="modal-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </div>
+                <h3 className="modal-title">Rename Project</h3>
+              </div>
+              <div className="modal-body">
+                <div className="form-field">
+                  <label htmlFor="rename-project-name" className="form-label">Project Name</label>
+                  <input
+                    id="rename-project-name"
+                    type="text"
+                    value={renameName}
+                    onChange={(e) => {
+                      setRenameName(e.target.value);
+                      setRenameError("");
+                    }}
+                    onKeyDown={handleRenameKeyDown}
+                    placeholder="Enter project name"
+                    autoFocus
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      fontSize: "14px",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "6px",
+                      background: "var(--color-bg-surface)",
+                      color: "var(--color-text-primary)",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <div style={{
+                    fontSize: "12px",
+                    color: "var(--color-text-muted)",
+                    marginTop: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}>
+                    <span style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      background: "var(--color-bg-muted)",
+                      padding: "3px 8px",
+                      borderRadius: "4px",
+                      fontFamily: "monospace",
+                      fontSize: "11px",
+                      color: "var(--color-text-secondary)",
+                      border: "1px dashed var(--color-border-strong)",
+                    }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0110 0v4" />
+                      </svg>
+                      {renameProjectId}
+                    </span>
+                    <span style={{ fontSize: "11px", opacity: 0.8 }}>Read-only</span>
+                  </div>
+                  {renameError && (
+                    <div style={{
+                      color: "var(--red)",
+                      fontSize: "12px",
+                      marginTop: "6px",
+                    }}>
+                      {renameError}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="modal-btn modal-btn-cancel"
+                  onClick={closeRenameModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="modal-btn modal-btn-delete"
+                  onClick={handleRenameSave}
+                  disabled={renaming}
+                  style={{
+                    background: "var(--color-primary)",
+                    border: "none",
+                    color: "#fff",
+                  }}
+                >
+                  {renaming ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>

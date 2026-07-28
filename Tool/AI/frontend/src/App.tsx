@@ -7,8 +7,9 @@ import { WorkspacePage } from "./features/workspace/WorkspacePage";
 import { ResultsPage } from "./features/results/ResultsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { ApiCatalogPage } from "./features/api-collection/ApiCatalogPage";
+import { ProjectKnowledgePage } from "./features/knowledge/ProjectKnowledgePage";
 
-type View = "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
+type View = "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>("setup");
@@ -25,7 +26,7 @@ export default function App() {
   useEffect(() => {
     const savedTheme = localStorage.getItem("testforge-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = savedTheme || (prefersDark ? "dark" : "light");
+    const theme = savedTheme || (prefersDark ? "slate" : "mist");
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
@@ -39,6 +40,8 @@ export default function App() {
         setCurrentView("history");
       } else if (hash.startsWith("#catalog")) {
         setCurrentView("catalog");
+      } else if (hash.startsWith("#knowledge")) {
+        setCurrentView("knowledge");
       } else if (hash.startsWith("#workspace") || hash.startsWith("#setup") || hash.startsWith("#settings")) {
         if (hash.startsWith("#workspace")) {
           setCurrentView("workspace");
@@ -68,7 +71,7 @@ export default function App() {
       try {
         sessionStorage.setItem("testforge:activeProjectId", normalized);
       } catch {}
-      setCurrentView("setup");
+      setCurrentView("knowledge");
     } else {
       try {
         sessionStorage.removeItem("testforge:activeProjectId");
@@ -81,7 +84,7 @@ export default function App() {
       <Sidebar currentView={currentView} onViewChange={setCurrentView} activeProjectId={activeProjectId} />
       <div className="main-shell">
         <Header
-          view={currentView as "setup" | "workspace" | "results" | "history" | "catalog" | "settings"}
+          view={currentView}
           projectName={activeProjectId || undefined}
         />
         <main id="testforge-content" className="app-content">
@@ -100,6 +103,7 @@ export default function App() {
           {currentView === "results" && <ResultsPage activeProjectId={activeProjectId} />}
           {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
           {currentView === "catalog" && <ApiCatalogPage activeProjectId={activeProjectId} />}
+          {currentView === "knowledge" && <ProjectKnowledgePage activeProjectId={activeProjectId} />}
         </main>
       </div>
     </div>

@@ -39,13 +39,13 @@ const IconClock = () => (
 const IconSettings = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06.06a1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
   </svg>
 );
 
 interface SidebarProps {
-  currentView: "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
-  onViewChange: (view: "setup" | "workspace" | "results" | "history" | "catalog" | "settings") => void;
+  currentView: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
+  onViewChange: (view: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings") => void;
   activeProjectId?: string | null;
 }
 
@@ -54,14 +54,12 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
   // and we're on the setup or settings page. When a project is active, show full workflow nav.
   const showCompactNav = !activeProjectId && (currentView === "setup" || currentView === "settings");
 
-  const setupLabel = activeProjectId ? "Project Knowledge" : "Project Setup";
-
   const navItems = showCompactNav
     ? [
         {
           group: "Main",
           items: [
-            { id: "setup" as const, label: setupLabel, icon: IconHome },
+            { id: "setup" as const, label: "Project Setup", icon: IconHome },
           ],
         },
         {
@@ -75,15 +73,23 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
         {
           group: "Workflow",
           items: [
-            { id: "setup" as const, label: setupLabel, icon: IconHome },
+            { id: "setup" as const, label: "Project Setup", icon: IconHome },
+            { id: "knowledge" as const, label: "Knowledge", icon: IconFlask },
             { id: "catalog" as const, label: "API Catalog", icon: IconServer },
-            { id: "workspace" as const, label: "Test Builder", icon: IconFlask },
+            { id: "workspace" as const, label: "Requirements", icon: IconFlask },
           ],
         },
         {
-          group: "Results",
+          group: "Execution",
           items: [
-            { id: "results" as const, label: "Results", icon: IconBarChart },
+            { id: "workspace" as const, label: "Test Cases", icon: IconFlask },
+            { id: "workspace" as const, label: "Execution", icon: IconFlask },
+          ],
+        },
+        {
+          group: "Reports",
+          items: [
+            { id: "results" as const, label: "Reports", icon: IconBarChart },
             { id: "history" as const, label: "History", icon: IconClock },
           ],
         },
@@ -106,7 +112,6 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
           window.location.hash = "#setup";
           window.location.reload();
         }}
-        style={{ cursor: "pointer" }}
       >
         <div className="testforge-logo">TF</div>
         <div className="brand-copy">

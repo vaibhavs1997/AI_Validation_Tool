@@ -14,31 +14,34 @@ const IconMoon = () => (
 );
 
 interface HeaderProps {
-  view: "setup" | "workspace" | "results" | "history" | "catalog" | "settings";
+  view: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
   projectName?: string;
   environment?: string;
 }
 
 export function Header({ view, projectName, environment }: HeaderProps) {
-  const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
+  const [currentTheme, setCurrentTheme] = useState<"slate" | "mist">("slate");
 
   useEffect(() => {
-    const theme = document.documentElement.getAttribute("data-theme") as "light" | "dark" || "light";
+    const theme = document.documentElement.getAttribute("data-theme") as "slate" | "mist" || "slate";
     setCurrentTheme(theme);
   }, []);
 
-  const setTheme = (theme: "light" | "dark") => {
+  const setTheme = (theme: "slate" | "mist") => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("testforge-theme", theme);
     setCurrentTheme(theme);
   };
 
-  const viewConfig = {
-    setup: { eyebrow: "API TESTING", title: "Project Knowledge" },
-    workspace: { eyebrow: "API TESTING", title: "Test Builder" },
-    results: { eyebrow: "API TESTING", title: "Results" },
-    history: { eyebrow: "API TESTING", title: "History" },
+  const viewConfig: {
+    [key in typeof view]: { eyebrow: string; title: string }
+  } = {
+    setup: { eyebrow: "API TESTING", title: "Project Setup" },
+    knowledge: { eyebrow: "KNOWLEDGE", title: "Knowledge" },
     catalog: { eyebrow: "API CATALOG", title: "API Catalog" },
+    workspace: { eyebrow: "API TESTING", title: "Test Builder" },
+    results: { eyebrow: "API TESTING", title: "Reports" },
+    history: { eyebrow: "API TESTING", title: "History" },
     settings: { eyebrow: "SYSTEM", title: "Settings" }
   };
 
@@ -51,19 +54,19 @@ export function Header({ view, projectName, environment }: HeaderProps) {
         <h1 className="header-title">{config.title}</h1>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", flexShrink: 0 }}>
+      <div className="header-context">
         {(projectName || environment) && (
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="header-meta">
             {projectName && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
-                <span style={{ color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Project:</span>
-                <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{projectName}</span>
+              <div className="header-meta-item">
+                <span className="header-meta-label">Project:</span>
+                <span className="header-meta-value">{projectName}</span>
               </div>
             )}
             {environment && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px" }}>
-                <span style={{ color: "var(--color-text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Environment:</span>
-                <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>{environment}</span>
+              <div className="header-meta-item">
+                <span className="header-meta-label">Environment:</span>
+                <span className="header-meta-value">{environment}</span>
               </div>
             )}
           </div>
@@ -72,21 +75,21 @@ export function Header({ view, projectName, environment }: HeaderProps) {
         <div id="theme-switcher" className="theme-switcher">
           <button
             type="button"
-            className={`theme-option ${currentTheme === "light" ? "active" : ""}`}
-            aria-pressed={currentTheme === "light"}
-            onClick={() => setTheme("light")}
+            className={`theme-option ${currentTheme === "slate" ? "active" : ""}`}
+            aria-pressed={currentTheme === "slate"}
+            onClick={() => setTheme("slate")}
           >
-            <span className="theme-icon"><IconSun /></span>
-            Light
+            <span className="theme-icon"><IconMoon /></span>
+            Slate
           </button>
           <button
             type="button"
-            className={`theme-option ${currentTheme === "dark" ? "active" : ""}`}
-            aria-pressed={currentTheme === "dark"}
-            onClick={() => setTheme("dark")}
+            className={`theme-option ${currentTheme === "mist" ? "active" : ""}`}
+            aria-pressed={currentTheme === "mist"}
+            onClick={() => setTheme("mist")}
           >
-            <span className="theme-icon"><IconMoon /></span>
-            Dark
+            <span className="theme-icon"><IconSun /></span>
+            Mist
           </button>
         </div>
       </div>
