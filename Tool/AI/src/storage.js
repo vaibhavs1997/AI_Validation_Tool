@@ -8,6 +8,7 @@ const buckets = {
   contracts: path.join(config.dataDir, "contracts"),
   runs: path.join(config.dataDir, "runs"),
   reports: path.join(config.dataDir, "reports"),
+  generations: path.join(config.dataDir, "generations"),
 };
 
 function ensureStorage() {

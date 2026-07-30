@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { JiraRequirement, ManualRequirement, ActiveRequirement } from "./RequirementTypes";
+import type { JiraRequirement, ManualRequirement, ActiveRequirement, RequirementSource } from "./RequirementTypes";
 import { RequirementSourceTabs } from "./RequirementSourceTabs";
 import { JiraRequirementForm } from "./JiraRequirementForm";
 import { ManualRequirementForm } from "./ManualRequirementForm";
@@ -10,23 +10,44 @@ interface RequirementsPanelProps {
 }
 
 export function RequirementsPanel({ activeRequirement, onActiveRequirementChange }: RequirementsPanelProps) {
-  const [source, setSource] = useState<"jira" | "manual">("jira");
+  const [source, setSource] = useState<RequirementSource>("jira");
   const [isExpanded, setIsExpanded] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   const handleJiraRequirementConfirmed = (requirement: JiraRequirement) => {
     onActiveRequirementChange({ source: "jira", requirement });
+    setIsEditing(false);
     setIsExpanded(false);
   };
 
   const handleManualRequirementConfirmed = (requirement: ManualRequirement) => {
     onActiveRequirementChange({ source: "manual", requirement });
+    setIsEditing(false);
     setIsExpanded(false);
   };
 
+  const handleEditClick = () => {
+    // Switch the source tab to match the current requirement's source
+    if (activeRequirement?.source) {
+      setSource(activeRequirement.source);
+    }
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+  };
+
   const isConfigured = Boolean(activeRequirement && activeRequirement.requirement);
+  // Show the input forms when there is no requirement yet, or when the user is editing
+  const showForms = !isConfigured || isEditing;
 
   const requirement = activeRequirement?.requirement;
   const acCount = Array.isArray(requirement?.acceptanceCriteria) ? requirement.acceptanceCriteria.length : 0;
+
+  // Key used to force the forms to remount when entering edit mode so they
+  // pick up the initialRequirement pre-fill values.
+  const formKey = isEditing ? `edit-${requirement?.key ?? "new"}` : "new";
 
   return (
     <section className="panel span-12 panel-requirements" data-view-section="workspace">
@@ -82,22 +103,51 @@ export function RequirementsPanel({ activeRequirement, onActiveRequirementChange
       </div>
       {isExpanded && (
         <div className="panel-body">
-          {!isConfigured ? (
+          {showForms ? (
             <>
               <RequirementSourceTabs source={source} onSourceChange={setSource} />
               <div style={{ marginTop: "12px", display: source === "jira" ? "block" : "none" }}>
-                <JiraRequirementForm onRequirementConfirmed={handleJiraRequirementConfirmed} />
+                <JiraRequirementForm
+                  key={`jira-${formKey}`}
+                  initialRequirement={isEditing && activeRequirement?.source === "jira" ? (activeRequirement.requirement as JiraRequirement) : undefined}
+                  onRequirementConfirmed={handleJiraRequirementConfirmed}
+                />
               </div>
               <div style={{ marginTop: "12px", display: source === "manual" ? "block" : "none" }}>
-                <ManualRequirementForm onRequirementConfirmed={handleManualRequirementConfirmed} />
+                <ManualRequirementForm
+                  key={`manual-${formKey}`}
+                  initialRequirement={isEditing && activeRequirement?.source === "manual" ? (activeRequirement.requirement as ManualRequirement) : undefined}
+                  onRequirementConfirmed={handleManualRequirementConfirmed}
+                />
               </div>
+              {isEditing && (
+                <div style={{ marginTop: "12px" }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={handleCancelEdit}
+                    style={{
+                      minHeight: "34px",
+                      border: "1px solid var(--line-strong)",
+                      background: "var(--surface)",
+                      color: "var(--ink)",
+                      borderRadius: "6px",
+                      padding: "7px 12px",
+                      cursor: "pointer",
+                      fontWeight: 700
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={() => setIsExpanded(true)}
+                onClick={handleEditClick}
               >
                 Edit Requirement
               </button>

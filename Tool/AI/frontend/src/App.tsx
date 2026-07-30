@@ -8,8 +8,13 @@ import { ResultsPage } from "./features/results/ResultsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { ApiCatalogPage } from "./features/api-collection/ApiCatalogPage";
 import { ProjectKnowledgePage } from "./features/knowledge/ProjectKnowledgePage";
+import { RequirementPage } from "./features/requirements/RequirementPage";
+import { ImplementationMappingsPage } from "./features/implementation-mappings/ImplementationMappingsPage";
+import { ExecutableTestsPage } from "./features/executable-tests/ExecutableTestsPage";
+import { ExecutionWorkspacePage } from "./features/execution-workspace/ExecutionWorkspacePage";
+import { TestCasesPage } from "./features/test-cases/TestCasesPage";
 
-type View = "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
+type View = "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>("setup");
@@ -30,39 +35,51 @@ export default function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, []);
 
-  // Synchronize view with URL hash
+  // Synchronize view with URL path on mount and change
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash.startsWith("#results")) {
+    const applyPath = () => {
+      const path = window.location.pathname;
+      if (path.startsWith("/results")) {
         setCurrentView("results");
-      } else if (hash.startsWith("#history")) {
+      } else if (path.startsWith("/history")) {
         setCurrentView("history");
-      } else if (hash.startsWith("#catalog")) {
+      } else if (path.startsWith("/catalog")) {
         setCurrentView("catalog");
-      } else if (hash.startsWith("#knowledge")) {
+      } else if (path.startsWith("/knowledge")) {
         setCurrentView("knowledge");
-      } else if (hash.startsWith("#workspace") || hash.startsWith("#setup") || hash.startsWith("#settings")) {
-        if (hash.startsWith("#workspace")) {
-          setCurrentView("workspace");
-        } else if (hash.startsWith("#settings")) {
-          setCurrentView("settings");
-        } else {
-          setCurrentView("setup");
-        }
+      } else if (path.startsWith("/requirements")) {
+        setCurrentView("requirements");
+      } else if (path.startsWith("/test-cases")) {
+        setCurrentView("test-cases");
+      } else if (path.startsWith("/implementation-mappings")) {
+        setCurrentView("implementation-mappings");
+      } else if (path.startsWith("/executable-tests")) {
+        setCurrentView("executable-tests");
+      } else if (path.startsWith("/execution-workspace")) {
+        setCurrentView("execution-workspace");
+      } else if (path.startsWith("/workspace")) {
+        setCurrentView("workspace");
+      } else if (path.startsWith("/settings")) {
+        setCurrentView("settings");
+      } else {
+        setCurrentView("setup");
       }
     };
 
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    applyPath();
+    window.addEventListener("popstate", applyPath);
+    return () => window.removeEventListener("popstate", applyPath);
   }, []);
 
-  // When no project is selected, default to setup view (but not when on settings)
-  useEffect(() => {
-    if (!activeProjectId && currentView !== "settings") {
-      setCurrentView("setup");
+  const navigate = (view: View) => {
+    const path = view === "setup" ? "/setup" : `/${view}`;
+    window.history.pushState({}, "", path);
+    setCurrentView(view);
+    if (view === "setup") {
+      setActiveProjectId(null);
+      try { sessionStorage.removeItem("testforge:activeProjectId"); } catch {}
     }
-  }, [activeProjectId, currentView]);
+  };
 
   const handleActiveProjectChange = async (projectId: string | null) => {
     const normalized = projectId && String(projectId).trim() ? String(projectId).trim() : null;
@@ -71,21 +88,23 @@ export default function App() {
       try {
         sessionStorage.setItem("testforge:activeProjectId", normalized);
       } catch {}
-      setCurrentView("knowledge");
+      navigate("knowledge");
     } else {
       try {
         sessionStorage.removeItem("testforge:activeProjectId");
       } catch {}
+      navigate("setup");
     }
   };
 
   return (
     <div id="testforge-app" className="app-shell">
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} activeProjectId={activeProjectId} />
+      <Sidebar currentView={currentView} onViewChange={navigate} activeProjectId={activeProjectId} />
       <div className="main-shell">
         <Header
           view={currentView}
           projectName={activeProjectId || undefined}
+          onNavigateToProjects={() => handleActiveProjectChange(null)}
         />
         <main id="testforge-content" className="app-content">
           {currentView === "setup" && (
@@ -104,6 +123,11 @@ export default function App() {
           {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
           {currentView === "catalog" && <ApiCatalogPage activeProjectId={activeProjectId} />}
           {currentView === "knowledge" && <ProjectKnowledgePage activeProjectId={activeProjectId} />}
+          {currentView === "requirements" && <RequirementPage activeProjectId={activeProjectId} />}
+          {currentView === "test-cases" && <TestCasesPage activeProjectId={activeProjectId} />}
+          {currentView === "implementation-mappings" && <ImplementationMappingsPage activeProjectId={activeProjectId} />}
+          {currentView === "executable-tests" && <ExecutableTestsPage activeProjectId={activeProjectId} />}
+          {currentView === "execution-workspace" && <ExecutionWorkspacePage activeProjectId={activeProjectId} />}
         </main>
       </div>
     </div>

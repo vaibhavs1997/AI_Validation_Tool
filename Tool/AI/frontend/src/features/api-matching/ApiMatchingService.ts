@@ -17,11 +17,13 @@ import type { MatchTestCasesRequest, MatchTestCasesResponse } from "../../types"
  */
 export async function matchTestCases(
   projectId: string,
-  testCases: MatchTestCasesRequest["testCases"]
+  testCases: MatchTestCasesRequest["testCases"],
+  recentServiceIds?: string[]
 ): Promise<MatchTestCasesResponse> {
   const response = await apiClient.post<MatchTestCasesResponse>("/api/test-cases/match", {
     projectId,
     testCases,
+    recentServiceIds,
   });
   return response;
 }

@@ -4,13 +4,15 @@ import type { JiraRequirement } from "./RequirementTypes";
 
 interface JiraRequirementFormProps {
   onRequirementConfirmed?: (requirement: JiraRequirement) => void;
+  /** Optional pre-filled requirement used when editing an existing one. */
+  initialRequirement?: JiraRequirement;
 }
 
-export function JiraRequirementForm({ onRequirementConfirmed }: JiraRequirementFormProps) {
-  const [ticketKey, setTicketKey] = useState("");
+export function JiraRequirementForm({ onRequirementConfirmed, initialRequirement }: JiraRequirementFormProps) {
+  const [ticketKey, setTicketKey] = useState(initialRequirement?.key ?? "");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<"success" | "error" | null>(null);
-  const [fetchedRequirement, setFetchedRequirement] = useState<JiraRequirement | null>(null);
+  const [status, setStatus] = useState<"success" | "error" | null>(initialRequirement ? "success" : null);
+  const [fetchedRequirement, setFetchedRequirement] = useState<JiraRequirement | null>(initialRequirement ?? null);
   const [failedTicketKey, setFailedTicketKey] = useState<string>("");
 
   const handleFetch = async () => {

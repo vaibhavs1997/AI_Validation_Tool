@@ -152,6 +152,7 @@ function convertCandidate(candidate, endpointMap) {
  * @param {Object} options
  * @param {string} options.projectId
  * @param {Array} options.testCases — canonical TestCase objects
+ * @param {Array<string>} [options.recentServiceIds] — prefer these services
  * @returns {Object} { projectId, matches, diagnostics, warnings }
  */
 function isPromise(value) {
@@ -252,20 +253,37 @@ function buildMatchResponse(projectId, testCases, services, apiModels) {
   };
 }
 
-function matchTestCasesToApis({ projectId, testCases }) {
+function filterServicesAndModels(services, apiModels, recentServiceIds) {
+  const useFilter = recentServiceIds && recentServiceIds.length > 0;
+  const filtered = useFilter
+    ? services.filter((s) => recentServiceIds.includes(s.id))
+    : services;
+  const filteredModels = filtered
+    .map((s) => apiModels.find((m) => (m.serviceId || m.service?.id) === s.id))
+    .filter(Boolean);
+  return {
+    services: filtered.length > 0 ? filtered : services,
+    apiModels: filteredModels.length > 0 ? filteredModels : apiModels,
+  };
+}
+
+function matchTestCasesToApis({ projectId, testCases, recentServiceIds }) {
   const servicesMaybe = listServices(projectId);
   if (isPromise(servicesMaybe)) {
     return servicesMaybe
       .then((services) =>
-        Promise.all(services.map((s) => getApiModel(projectId, s.id))).then((apiModels) =>
-          buildMatchResponse(projectId, testCases, services, apiModels.filter(Boolean))
-        )
+        Promise.all(services.map((s) => getApiModel(projectId, s.id))).then((apiModels) => {
+          const allModels = apiModels.filter(Boolean);
+          const { services: svc, apiModels: models } = filterServicesAndModels(services, allModels, recentServiceIds);
+          return buildMatchResponse(projectId, testCases, svc, models);
+        })
       );
   }
 
   const services = servicesMaybe;
   const apiModels = services.map((s) => getApiModel(projectId, s.id)).filter(Boolean);
-  return buildMatchResponse(projectId, testCases, services, apiModels);
+  const { services: svc, apiModels: models } = filterServicesAndModels(services, apiModels, recentServiceIds);
+  return buildMatchResponse(projectId, testCases, svc, models);
 }
 
 module.exports = {

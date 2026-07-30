@@ -1,64 +1,136 @@
 /**
  * ExecutionPlan
  *
- * Deterministic execution plan combining dependency ordering and runtime data mappings.
+ * Domain model for an execution plan.
+ * Contains ordered steps, dependencies, and execution metadata.
  */
 
-const { resolveDependencies } = require('./DependencyResolver');
+const VALID_EXECUTION_ORDERS = Object.freeze(['sequential', 'parallel']);
+const { createExecutionStep } = require('./ExecutionStep');
 
-const STEP_STATUS = Object.freeze(['pending', 'ready', 'completed', 'failed']);
+/**
+ * @param {{
+ *   id?: string,
+ *   runId?: string,
+ *   steps?: Array<object>,
+ *   executionOrder?: string,
+ *   warnings?: string[],
+ *   variables?: Record<string, object>,
+ *   authentication?: object,
+ *   environment?: object,
+ *   estimatedDuration?: number,
+ * }} input
+ * @returns {{
+ *   id: string,
+ *   runId: string|null,
+ *   steps: Array<object>,
+ *   totalSteps: number,
+ *   executionOrder: string,
+ *   warnings: string[],
+ *   variables: Record<string, object>,
+ *   authentication: object,
+ *   environment: object,
+ *   estimatedDuration: number,
+ *   createdAt: Date,
+ *   updatedAt: Date,
+ * }}
+ */
+function createExecutionPlan(input = {}) {
+  if (!input || typeof input.steps !== 'undefined' && !Array.isArray(input.steps)) {
+    throw new Error('ExecutionPlan steps must be an array if provided.');
+  }
 
-function buildExecutionPlan({ targetServiceId, targetOperationId, services = [], apiModels = [], relationships = [] }) {
-  const dependencyResult = resolveDependencies({ targetServiceId, targetOperationId, services, apiModels, relationships });
+  const id = input.id || `plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const now = new Date();
 
-  const errors = [...dependencyResult.errors];
+  const executionOrder = String(input.executionOrder || 'sequential').toLowerCase();
+  if (!VALID_EXECUTION_ORDERS.includes(executionOrder)) {
+    throw new Error(`ExecutionPlan executionOrder must be one of: ${VALID_EXECUTION_ORDERS.join(', ')}`);
+  }
 
-  const steps = dependencyResult.sequence.map((op, index) => {
-    const key = `${op.serviceId}::${op.operationId}`;
-    const incomingMappings = dependencyResult.mappings.filter((m) => `${m.to.serviceId}::${m.to.operationId}` === key);
+  const steps = Array.isArray(input.steps) ? input.steps.map(createExecutionStep) : [];
+  const totalSteps = steps.length;
 
-    const prereqs = incomingMappings.map((m) => ({
-      serviceId: m.from.serviceId,
-      operationId: m.from.operationId,
-    }));
-
-    return {
-      order: index,
-      operation: op,
-      prerequisites: prereqs,
-      bindings: incomingMappings.map((m) => ({
-        type: m.relationship.type,
-        source: m.from.location,
-        target: m.to.location,
-        transform: m.relationship.transform,
-      })),
-      status: STEP_STATUS[0],
-    };
-  });
-
-  const firstStep = steps.find((s) => !s.prerequisites.length);
-  if (firstStep) firstStep.status = STEP_STATUS[1]; // ready
+  // Calculate estimated duration based on step estimates
+  let estimatedDuration = typeof input.estimatedDuration === 'number' ? input.estimatedDuration : 0;
+  if (estimatedDuration === 0 && steps.length > 0) {
+    estimatedDuration = steps.reduce((acc, step) => {
+      return acc + (typeof step.estimatedDuration === 'number' ? step.estimatedDuration : 0);
+    }, 0);
+  }
 
   return {
-    target: dependencyResult.target,
+    id,
+    runId: input.runId || null,
     steps,
-    errors,
-    isValid: errors.length === 0,
+    totalSteps,
+    executionOrder,
+    warnings: Array.isArray(input.warnings) ? input.warnings.map(String) : [],
+    variables: input.variables && typeof input.variables === 'object' ? { ...input.variables } : {},
+    authentication: input.authentication && typeof input.authentication === 'object' ? { ...input.authentication } : {},
+    environment: input.environment && typeof input.environment === 'object' ? { ...input.environment } : {},
+    estimatedDuration,
+    createdAt: input.createdAt instanceof Date ? new Date(input.createdAt) : now,
+    updatedAt: input.updatedAt instanceof Date ? new Date(input.updatedAt) : now,
   };
 }
 
-function validatePlan(plan) {
-  if (!plan || !Array.isArray(plan.steps) || plan.steps.length === 0) return false;
-  for (const step of plan.steps) {
-    if (!step.operation || !step.operation.serviceId || !step.operation.operationId) {
-      return false;
-    }
+/**
+ * Validate that a plan has all required fields for execution.
+ * @param {object} plan
+ * @returns {{ valid: boolean, checks: Array<{ field: string, passed: boolean, message: string }> }}
+ */
+function validatePlanReadiness(plan) {
+  if (!plan) {
+    return {
+      valid: false,
+      checks: [
+        { field: 'steps', passed: false, message: 'Plan must have at least one step.' },
+        { field: 'executionOrder', passed: false, message: 'Execution order must be specified.' },
+      ],
+    };
   }
-  return true;
+
+  const checks = [
+    {
+      field: 'steps',
+      passed: Array.isArray(plan.steps) && plan.steps.length > 0,
+      message: 'Plan must have at least one step.',
+    },
+    {
+      field: 'executionOrder',
+      passed: VALID_EXECUTION_ORDERS.includes(plan.executionOrder),
+      message: 'Execution order must be sequential or parallel.',
+    },
+    {
+      field: 'variables',
+      passed: typeof plan.variables === 'object' && plan.variables !== null,
+      message: 'Variables must be an object.',
+    },
+    {
+      field: 'environment',
+      passed: typeof plan.environment === 'object' && plan.environment !== null,
+      message: 'Environment must be an object.',
+    },
+    {
+      field: 'totalSteps',
+      passed: typeof plan.totalSteps === 'number' && plan.totalSteps > 0,
+      message: 'Total steps must be a positive number.',
+    },
+  ];
+
+  const allPassed = checks.every((c) => c.passed);
+  const somePassed = checks.some((c) => c.passed);
+
+  return {
+    valid: allPassed,
+    checks,
+    overall: allPassed ? 'ready' : somePassed ? 'ready-with-warnings' : 'not-ready',
+  };
 }
 
 module.exports = {
-  buildExecutionPlan,
-  validatePlan,
-  STEP_STATUS,
+  createExecutionPlan,
+  validatePlanReadiness,
+  VALID_EXECUTION_ORDERS,
 };

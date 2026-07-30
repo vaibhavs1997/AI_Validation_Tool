@@ -292,6 +292,8 @@ export interface GenerateTestCasesResponse {
     generated: number;
   };
   warnings: string[];
+  generationId?: string;
+  status?: string;
 }
 
 // ─── API Matching (STEP 5.5D) ────────────────────────────────────────────────
@@ -322,6 +324,7 @@ export interface MatchDiagnostics {
 export interface MatchTestCasesRequest {
   projectId?: string;
   testCases: TestCase[];
+  recentServiceIds?: string[];
 }
 
 export interface MatchTestCasesResponse {
