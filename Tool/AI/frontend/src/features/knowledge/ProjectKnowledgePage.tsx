@@ -17,9 +17,8 @@
  *   - ServiceDefinition (via /api/services)
  */
 
-import { useState, useEffect, useCallback } from "react";
-import type { Project, ProjectKnowledge, ServiceDefinition } from "../../types";
-import { getProject } from "../project-setup/ProjectService";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { ProjectKnowledge, ServiceDefinition } from "../../types";
 import { getProjectKnowledge, updateInstructions } from "./KnowledgeService";
 import { listServices } from "../project-setup/ServiceRegistrationService";
 
@@ -175,20 +174,6 @@ function getReadinessBadgeBg(status: ReadinessStatus): string {
   }
 }
 
-/**
- * Computes a brief readiness summary (count of complete categories).
- */
-function computeReadinessSummary(
-  hasCatalog: boolean,
-  hasInstructions: boolean
-): { complete: number; total: number } {
-  const categories = ["api-catalog", "project-notes", "architecture", "business-rules", "authentication"];
-  const complete = categories.filter((cat) =>
-    getReadinessStatus(cat, hasCatalog, hasInstructions) === "complete"
-  ).length;
-  return { complete, total: categories.length };
-}
-
 // ─── Knowledge Source Card Definitions ──────────────────────────────────────
 
 interface KnowledgeSourceCard {
@@ -204,7 +189,6 @@ interface KnowledgeSourceCard {
 
 export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePageProps) {
   // ─── State ───────────────────────────────────────────────────────────────
-  const [project, setProject] = useState<Project | null>(null);
   const [knowledge, setKnowledge] = useState<ProjectKnowledge | null>(null);
   const [services, setServices] = useState<ServiceDefinition[]>([]);
   const [instructions, setInstructions] = useState("");
@@ -214,11 +198,20 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
   const [instructionsSaved, setInstructionsSaved] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{ name: string; size: number; type: string; uploadedAt: string }>>(() => {
+    try {
+      if (!activeProjectId) return [];
+      const saved = sessionStorage.getItem(`testforge:knowledge:uploads:${activeProjectId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Derived Data ────────────────────────────────────────────────────────
   const hasCatalog = services.length > 0;
   const hasInstructions = instructions.trim().length > 0;
-  const readinessSummary = computeReadinessSummary(hasCatalog, hasInstructions);
 
   // ─── Load Data ───────────────────────────────────────────────────────────
   const loadAll = useCallback(async (projectId: string) => {
@@ -226,9 +219,6 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
     setError("");
 
     try {
-      const proj = await getProject(projectId).catch(() => null);
-      setProject(proj);
-
       const kn = await getProjectKnowledge(projectId).catch(() => null);
       setKnowledge(kn);
       if (kn) {
@@ -250,7 +240,6 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
     if (activeProjectId) {
       loadAll(activeProjectId);
     } else {
-      setProject(null);
       setKnowledge(null);
       setServices([]);
       setInstructions("");
@@ -282,23 +271,57 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
     }
   };
 
+  // ─── File Upload Handler ─────────────────────────────────────────────────
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files).map((f) => ({
+      name: f.name,
+      size: f.size,
+      type: f.type || "unknown",
+      uploadedAt: new Date().toISOString(),
+    }));
+    const updated = [...uploadedFiles, ...newFiles];
+    setUploadedFiles(updated);
+    if (activeProjectId) {
+      try {
+        sessionStorage.setItem(`testforge:knowledge:uploads:${activeProjectId}`, JSON.stringify(updated));
+      } catch {
+        // sessionStorage not available
+      }
+    }
+    // Reset input so the same file can be uploaded again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getFileIcon = (type: string): string => {
+    if (type.includes("pdf")) return "PDF";
+    if (type.includes("document") || type.includes("word")) return "DOC";
+    if (type.includes("markdown") || type.includes("text")) return "MD";
+    if (type.includes("image")) return "IMG";
+    if (type.includes("json")) return "JSON";
+    return "FILE";
+  };
+
   // ─── Knowledge Source Cards ──────────────────────────────────────────────
   const sourceCards: KnowledgeSourceCard[] = [
     {
       id: "upload-documents",
       icon: IconFileText,
       title: "Upload Documents",
-      description: "Upload PDF, DOCX, or Markdown files with project documentation.",
+      description: "Upload PDF, DOCX, Markdown, architecture diagrams, or system design documents.",
       actionLabel: "Upload Files",
-      onClick: () => { /* UI-only — backend support not yet available */ },
-    },
-    {
-      id: "import-api-catalog",
-      icon: IconServer,
-      title: "Import API Catalog",
-      description: "Import OpenAPI, Postman Collection, or HAR files to register your APIs.",
-      actionLabel: "Import Catalog",
-      onClick: () => { window.location.hash = "#catalog"; },
+      onClick: () => {
+        fileInputRef.current?.click();
+      },
     },
     {
       id: "project-notes",
@@ -313,14 +336,6 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
           instructionsEl.focus();
         }
       },
-    },
-    {
-      id: "architecture-docs",
-      icon: IconLayers,
-      title: "Architecture Documents",
-      description: "Upload architecture diagrams and system design documents.",
-      actionLabel: "Upload Docs",
-      onClick: () => { /* UI-only — backend support not yet available */ },
     },
   ];
 
@@ -391,7 +406,7 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
   return (
     <div style={{ padding: "22px", maxWidth: "1520px", margin: "0 auto" }}>
       {/* ═══════════════════════════════════════════════════════════════════
-         SECTION 1: Project Overview (compact, merged with readiness summary)
+         SECTION 1: Knowledge Status
          ═══════════════════════════════════════════════════════════════════ */}
       <section style={{
         marginBottom: "24px",
@@ -399,116 +414,68 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
         background: "var(--color-bg-surface)", overflow: "hidden"
       }}>
         <div style={{
-          padding: "16px 20px",
-          display: "flex", alignItems: "center", justifyContent: "space-between"
+          padding: "16px 20px", borderBottom: "1px solid var(--color-border)"
         }}>
           <h3 style={{ margin: 0, fontSize: "15px", color: "var(--color-text-primary)" }}>
-            Project Overview
+            Knowledge Status
           </h3>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            style={{
-              padding: "6px 12px", fontSize: "13px", fontWeight: 600,
-              border: "1px solid var(--color-border)", borderRadius: "4px",
-              background: "var(--color-bg-surface)", cursor: "pointer",
-              color: "var(--color-text-primary)",
-              display: "inline-flex", alignItems: "center", gap: "6px"
-            }}
-          >
-            <IconRefresh /> Refresh
-          </button>
+          <p style={{
+            margin: "4px 0 0 0", fontSize: "12px", color: "var(--color-text-secondary)"
+          }}>
+            No AI analysis yet. These reflect what you have provided.
+          </p>
         </div>
         <div style={{ padding: "16px" }}>
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "16px"
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "12px"
           }}>
-            {/* Project Name */}
-            <div>
-              <div style={{
-                fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                color: "var(--color-text-muted)", marginBottom: "4px"
-              }}>
-                Project Name
-              </div>
-              <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                {project?.name || activeProjectId}
-              </div>
-            </div>
-
-            {/* Project ID */}
-            <div>
-              <div style={{
-                fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                color: "var(--color-text-muted)", marginBottom: "4px"
-              }}>
-                Project ID
-              </div>
-              <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                {activeProjectId}
-              </div>
-            </div>
-
-            {/* Created Date */}
-            <div>
-              <div style={{
-                fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                color: "var(--color-text-muted)", marginBottom: "4px"
-              }}>
-                Created
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                {project?.createdAt ? formatDateTime(project.createdAt) : "—"}
-              </div>
-            </div>
-
-            {/* Last Updated */}
-            <div>
-              <div style={{
-                fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                color: "var(--color-text-muted)", marginBottom: "4px"
-              }}>
-                Last Updated
-              </div>
-              <div style={{ fontSize: "14px", color: "var(--color-text-secondary)" }}>
-                {knowledge?.updatedAt
-                  ? formatDateTime(knowledge.updatedAt)
-                  : project?.updatedAt
-                    ? formatDateTime(project.updatedAt)
-                    : "—"}
-              </div>
-            </div>
-
-            {/* Knowledge Readiness Summary (no percentage) */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: "12px",
-              padding: "12px", borderRadius: "var(--radius-md)",
-              border: "1px solid var(--color-border)",
-              background: "var(--color-bg-subtle)"
-            }}>
-              <div style={{
-                width: "40px", height: "40px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                borderRadius: "50%",
-                background: "var(--color-primary-soft)",
-                color: "var(--color-primary)",
-                fontSize: "14px", fontWeight: 700
-              }}>
-                {readinessSummary.complete}
-              </div>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                  Knowledge Readiness
+            {statusCategories.map((category) => {
+              const status = getReadinessStatus(
+                category.id, hasCatalog, hasInstructions
+              );
+              const label = getReadinessLabel(status);
+              return (
+                <div
+                  key={category.id}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "10px 12px", borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--color-border)",
+                    background: getReadinessBg(status)
+                  }}
+                >
+                  <span style={{
+                    width: "24px", height: "24px",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: "50%",
+                    background: getReadinessColor(status),
+                    color: "#fff", fontSize: "12px", fontWeight: 700,
+                    flexShrink: 0
+                  }}>
+                    {status === "complete" ? "✓" : "—"}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
+                      {category.label}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>
+                      {label}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+                    padding: "2px 6px", borderRadius: "4px",
+                    background: getReadinessBadgeBg(status),
+                    color: getReadinessColor(status),
+                    flexShrink: 0
+                  }}>
+                    {label}
+                  </span>
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                  {readinessSummary.complete === 0
-                    ? "No project knowledge available."
-                    : `${readinessSummary.complete} of ${readinessSummary.total} categories complete.`}
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -605,35 +572,148 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
         background: "var(--color-bg-surface)", overflow: "hidden"
       }}>
         <div style={{
-          padding: "16px 20px", borderBottom: "1px solid var(--color-border)"
+          padding: "16px 20px", borderBottom: "1px solid var(--color-border)",
+          display: "flex", alignItems: "center", justifyContent: "space-between"
         }}>
-          <h3 style={{ margin: 0, fontSize: "15px", color: "var(--color-text-primary)" }}>
-            Uploaded Knowledge
-          </h3>
-        </div>
-        <div style={{ padding: "16px" }}>
-          {/* Empty state — no uploaded knowledge items yet */}
-          <div style={{
-            padding: "24px",
-            border: "1px dashed var(--color-border-strong)",
-            borderRadius: "var(--radius-md)",
-            background: "var(--color-bg-subtle)",
-            textAlign: "center"
-          }}>
-            <div style={{
-              width: "40px", height: "40px",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              borderRadius: "8px",
-              background: "var(--color-primary-soft)",
-              color: "var(--color-primary)",
-              margin: "0 auto 12px"
-            }}>
-              <IconUpload />
-            </div>
-            <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", margin: 0 }}>
-              No knowledge has been uploaded.
+          <div>
+            <h3 style={{ margin: 0, fontSize: "15px", color: "var(--color-text-primary)" }}>
+              Uploaded Knowledge
+            </h3>
+            <p style={{ margin: "4px 0 0 0", fontSize: "12px", color: "var(--color-text-secondary)" }}>
+              {uploadedFiles.length > 0
+                ? `${uploadedFiles.length} file${uploadedFiles.length === 1 ? "" : "s"} uploaded`
+                : "Documents and architecture files you upload will appear here."}
             </p>
           </div>
+          {uploadedFiles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                padding: "6px 12px", fontSize: "13px", fontWeight: 600,
+                color: "#fff", background: "var(--color-primary)",
+                border: "none", borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: "6px"
+              }}
+            >
+              <IconUpload /> Upload More
+            </button>
+          )}
+        </div>
+        <div style={{ padding: "16px" }}>
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.docx,.md,.txt,.json,.png,.jpg,.jpeg,.svg,.xml,.yaml,.yml"
+            onChange={handleFileUpload}
+            style={{ display: "none" }}
+          />
+
+          {uploadedFiles.length === 0 ? (
+            /* Empty state */
+            <div style={{
+              padding: "24px",
+              border: "1px dashed var(--color-border-strong)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-bg-subtle)",
+              textAlign: "center"
+            }}>
+              <div style={{
+                width: "40px", height: "40px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                borderRadius: "8px",
+                background: "var(--color-primary-soft)",
+                color: "var(--color-primary)",
+                margin: "0 auto 12px"
+              }}>
+                <IconUpload />
+              </div>
+              <p style={{ fontSize: "13px", color: "var(--color-text-secondary)", margin: 0 }}>
+                No knowledge has been uploaded.
+              </p>
+            </div>
+          ) : (
+            /* File list */
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {uploadedFiles.map((file, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    padding: "12px 16px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-md)",
+                    background: "var(--color-bg-surface)"
+                  }}
+                >
+                  {/* File type badge */}
+                  <span style={{
+                    width: "40px", height: "40px",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: "8px",
+                    background: "var(--color-primary-soft)",
+                    color: "var(--color-primary)",
+                    fontSize: "10px", fontWeight: 700,
+                    flexShrink: 0
+                  }}>
+                    {getFileIcon(file.type)}
+                  </span>
+
+                  {/* File info */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "13px", fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+                    }}>
+                      {file.name}
+                    </div>
+                    <div style={{
+                      fontSize: "11px", color: "var(--color-text-muted)",
+                      display: "flex", gap: "8px", flexWrap: "wrap"
+                    }}>
+                      <span>{formatFileSize(file.size)}</span>
+                      <span>•</span>
+                      <span>{file.type || "Unknown type"}</span>
+                      <span>•</span>
+                      <span>Uploaded {formatDateTime(file.uploadedAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = uploadedFiles.filter((_, i) => i !== idx);
+                      setUploadedFiles(updated);
+                      if (activeProjectId) {
+                        try {
+                          sessionStorage.setItem(`testforge:knowledge:uploads:${activeProjectId}`, JSON.stringify(updated));
+                        } catch {
+                          // sessionStorage not available
+                        }
+                      }
+                    }}
+                    style={{
+                      padding: "4px 8px", fontSize: "11px", fontWeight: 600,
+                      color: "var(--color-error)",
+                      background: "transparent",
+                      border: "1px solid var(--color-error)",
+                      borderRadius: "var(--radius-sm)",
+                      cursor: "pointer",
+                      flexShrink: 0
+                    }}
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -727,81 +807,6 @@ export function ProjectKnowledgePage({ activeProjectId }: ProjectKnowledgePagePr
               {instructionsError}
             </p>
           )}
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-         SECTION 5: Knowledge Status
-         ═══════════════════════════════════════════════════════════════════ */}
-      <section style={{
-        marginBottom: "24px",
-        border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)",
-        background: "var(--color-bg-surface)", overflow: "hidden"
-      }}>
-        <div style={{
-          padding: "16px 20px", borderBottom: "1px solid var(--color-border)"
-        }}>
-          <h3 style={{ margin: 0, fontSize: "15px", color: "var(--color-text-primary)" }}>
-            Knowledge Status
-          </h3>
-          <p style={{
-            margin: "4px 0 0 0", fontSize: "12px", color: "var(--color-text-secondary)"
-          }}>
-            No AI analysis yet. These reflect what you have provided.
-          </p>
-        </div>
-        <div style={{ padding: "16px" }}>
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "12px"
-          }}>
-            {statusCategories.map((category) => {
-              const status = getReadinessStatus(
-                category.id, hasCatalog, hasInstructions
-              );
-              const label = getReadinessLabel(status);
-              return (
-                <div
-                  key={category.id}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "10px",
-                    padding: "10px 12px", borderRadius: "var(--radius-sm)",
-                    border: "1px solid var(--color-border)",
-                    background: getReadinessBg(status)
-                  }}
-                >
-                  <span style={{
-                    width: "24px", height: "24px",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    borderRadius: "50%",
-                    background: getReadinessColor(status),
-                    color: "#fff", fontSize: "12px", fontWeight: 700,
-                    flexShrink: 0
-                  }}>
-                    {status === "complete" ? "✓" : "—"}
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                      {category.label}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--color-text-secondary)" }}>
-                      {label}
-                    </div>
-                  </div>
-                  <span style={{
-                    fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                    padding: "2px 6px", borderRadius: "4px",
-                    background: getReadinessBadgeBg(status),
-                    color: getReadinessColor(status),
-                    flexShrink: 0
-                  }}>
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </section>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { ActiveRequirement } from "../requirements/RequirementTypes";
 import type { TestCase, GenerateTestCasesResponse } from "../../types";
-import { generateTestCases } from "./TestCaseService";
+import { generateTestCases, getGenerationStatus } from "./TestCaseService";
 
 interface TestCasesPanelProps {
   activeProjectId: string | null;
@@ -31,6 +31,30 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onGenerated
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [timerStarted, setTimerStarted] = useState(false);
+  const [generationId, setGenerationId] = useState<string | null>(null);
+
+  // Persist generationId so we can resume polling after navigation
+  useEffect(() => {
+    if (!activeProjectId || !generationId) return;
+    try {
+      sessionStorage.setItem("testforge:generationId", generationId);
+      sessionStorage.setItem("testforge:generationProjectId", activeProjectId);
+    } catch {}
+  }, [generationId, activeProjectId]);
+
+  // Restore generationId from sessionStorage on mount
+  useEffect(() => {
+    try {
+      const savedGenId = sessionStorage.getItem("testforge:generationId");
+      const savedProjectId = sessionStorage.getItem("testforge:generationProjectId");
+      if (savedGenId && savedProjectId && savedProjectId === activeProjectId) {
+        setGenerationId(savedGenId);
+        // Show generating state until we poll and get results
+        setLoading(true);
+        setTimerStarted(true);
+      }
+    } catch {}
+  }, [activeProjectId]);
 
   const hasProject = Boolean(activeProjectId);
   const hasRequirement = Boolean(activeRequirement && activeRequirement.requirement !== null);
@@ -53,6 +77,60 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onGenerated
     }
   }, [includedTestCaseIds, response, onIncludedChange]);
 
+  // Resume polling when we have a generationId but no response yet
+  useEffect(() => {
+    if (!generationId || !activeProjectId) return;
+    if (response && response.testCases.length > 0) return;
+
+    let cancelled = false;
+    let pollTimer: any;
+    const poll = async () => {
+      try {
+        const status = await getGenerationStatus(activeProjectId!, generationId);
+        if (cancelled) return;
+        if (status.testCases && status.testCases.length > 0) {
+          setResponse(status);
+          setLoading(false);
+          setTimerStarted(false);
+          setGenerationId(null);
+          try { sessionStorage.removeItem("testforge:generationId"); } catch {}
+          try { sessionStorage.removeItem("testforge:generationProjectId"); } catch {}
+          setIncludedTestCaseIds(new Set(status.testCases.map(tc => tc.id)));
+        } else if (status.status === "completed" && (!status.testCases || status.testCases.length === 0)) {
+          // Completed with no results
+          setResponse(status);
+          setLoading(false);
+          setTimerStarted(false);
+          setGenerationId(null);
+          try { sessionStorage.removeItem("testforge:generationId"); } catch {}
+          try { sessionStorage.removeItem("testforge:generationProjectId"); } catch {}
+        } else {
+          pollTimer = setTimeout(poll, 1000);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        // If generation not found, it may have expired
+        const status = (err as any)?.status;
+        if (status === 404) {
+          setLoading(false);
+          setTimerStarted(false);
+          setGenerationId(null);
+          try { sessionStorage.removeItem("testforge:generationId"); } catch {}
+          try { sessionStorage.removeItem("testforge:generationProjectId"); } catch {}
+        } else {
+          pollTimer = setTimeout(poll, 1000);
+        }
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [generationId, activeProjectId, response]);
+
   const handleGenerate = async () => {
     if (!activeProjectId || !activeRequirement || !activeRequirement.requirement) return;
 
@@ -63,15 +141,28 @@ export function TestCasesPanel({ activeProjectId, activeRequirement, onGenerated
     setExpandedIds(new Set());
     setElapsedSeconds(0);
     setTimerStarted(true);
+    setGenerationId(null);
 
     try {
       const result = await generateTestCases(activeProjectId, activeRequirement);
-      setResponse(result);
-      const allIds = new Set(result.testCases.map(tc => tc.id));
-      setIncludedTestCaseIds(allIds);
+      const genId = (result as any).generationId as string | undefined;
+      if (genId) {
+        setGenerationId(genId);
+        // Keep loading true so UI shows generating state; polling effect will update when ready
+      } else if (result.testCases.length > 0) {
+        // Synchronous completion
+        setResponse(result);
+        const allIds = new Set(result.testCases.map(tc => tc.id));
+        setIncludedTestCaseIds(allIds);
+        setLoading(false);
+        setTimerStarted(false);
+      } else {
+        // No results, no async job
+        setLoading(false);
+        setTimerStarted(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to generate test cases.");
-    } finally {
       setLoading(false);
       setTimerStarted(false);
     }

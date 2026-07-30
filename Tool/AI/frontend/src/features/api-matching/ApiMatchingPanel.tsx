@@ -4,7 +4,7 @@
  * STEP 5.5D — TestCase → API Endpoint Matching stage.
  *
  * Flow:
- *   Included TestCases → Match Test Cases button → Match Results
+ *   Included TestCases → Auto-match against registered APIs → Match Results
  *   → User reviews/adjusts mappings → Confirm API Mappings
  *
  * Architecture:
@@ -12,9 +12,11 @@
  *   - Mapping state is maintained separately in a Map<string, TestCaseApiMapping>.
  *   - Automatic matches come from the backend matching engine.
  *   - User can override any match or manually map unmatched test cases.
+ *   - Matching auto-triggers when test cases are included and APIs are registered,
+ *     regardless of whether the API was uploaded via OpenAPI or paste format.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type {
   TestCase,
   MatchResult,
@@ -24,6 +26,7 @@ import type {
   MatchDiagnostics,
 } from "../../types";
 import { matchTestCases } from "./ApiMatchingService";
+import { listServices } from "../project-setup/ServiceRegistrationService";
 
 interface ApiMatchingPanelProps {
   activeProjectId: string | null;
@@ -47,10 +50,43 @@ export function ApiMatchingPanel({
   const [status, setStatus] = useState<PanelStatus>("NOT_MATCHED");
   const [error, setError] = useState("");
   const [matchResponse, setMatchResponse] = useState<MatchTestCasesResponse | null>(null);
+  const [recentServiceIds, setRecentServiceIds] = useState<string[]>([]);
+  const [servicesLoaded, setServicesLoaded] = useState(false);
   // Mapping state is separate from TestCase objects — never mutates them
   const [mappings, setMappings] = useState<Map<string, TestCaseApiMapping>>(new Map());
 
+  // Track the signature of the last auto-matched test case set to avoid
+  // re-matching the same set repeatedly.
+  const lastAutoMatchedSignature = useRef<string>("");
+
   const canMatch = Boolean(activeProjectId) && includedTestCases.length > 0;
+
+  // Load latest services to provide current catalog context to the matcher.
+  // This works with both OpenAPI upload and paste format since both register
+  // services through the same backend endpoint.
+  useEffect(() => {
+    if (!activeProjectId) {
+      setRecentServiceIds([]);
+      setServicesLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const services = await listServices(activeProjectId);
+        if (!cancelled) {
+          setRecentServiceIds(services.map((s) => s.id as string));
+          setServicesLoaded(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setRecentServiceIds([]);
+          setServicesLoaded(true);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeProjectId]);
 
   // Report match count to parent (e.g. WorkflowStatus)
   useEffect(() => {
@@ -68,7 +104,7 @@ export function ApiMatchingPanel({
     setMappings(new Map());
 
     try {
-      const response = await matchTestCases(activeProjectId, includedTestCases);
+      const response = await matchTestCases(activeProjectId, includedTestCases, recentServiceIds);
       setMatchResponse(response);
       setStatus("MATCHED");
 
@@ -95,6 +131,28 @@ export function ApiMatchingPanel({
       setStatus("ERROR");
     }
   };
+
+  // Auto-match: when included test cases are available and services have been
+  // loaded, automatically trigger matching against the registered APIs.
+  // This works with both OpenAPI upload and paste format since both register
+  // services the same way. We track the signature of the matched test case set
+  // to avoid re-matching the same set.
+  useEffect(() => {
+    if (!servicesLoaded) return;
+    if (includedTestCases.length === 0) return;
+    if (status === "MATCHING") return;
+
+    // Build a signature from the included test case IDs to detect changes
+    const signature = includedTestCases.map((tc) => tc.id).sort().join(",");
+
+    // Only auto-match if this is a new set of test cases (not already matched)
+    if (signature === lastAutoMatchedSignature.current && status === "MATCHED") return;
+
+    // Update the signature and trigger matching
+    lastAutoMatchedSignature.current = signature;
+    handleMatch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includedTestCases, servicesLoaded, recentServiceIds]);
 
   // Allow re-running match when included test cases change
   const handleRematch = () => {
@@ -309,8 +367,15 @@ export function ApiMatchingPanel({
                 gap: "8px",
               }}
             >
-              {status === "MATCHING" ? "Matching..." : "Match Test Cases"}
+              {status === "MATCHING" ? "Matching..." : "Re-match Test Cases"}
             </button>
+            <span style={{ marginLeft: "12px", fontSize: "12px", color: "var(--muted)" }}>
+              {status === "MATCHING"
+                ? "Automatically matching test cases with registered APIs..."
+                : status === "MATCHED"
+                  ? "Auto-matched. Review results below or re-match if needed."
+                  : "Matching will start automatically when APIs are registered."}
+            </span>
           </div>
         )}
 

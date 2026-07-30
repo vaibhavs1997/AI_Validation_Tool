@@ -1,16 +1,15 @@
 /**
- * Project Setup Page
+ * Project Management Page
  *
- * Sections:
- * 1. Project selector + create (when no active project)
- * 2. Project Knowledge (instructions) - when project is active
- * 3. Relationships (proposed/confirmed/rejected)
+ * Pure project management — NOT a workflow page.
+ * Allows users to create, select, rename, delete, and search projects.
+ * After creating/selecting a project, the user is automatically navigated
+ * to the Knowledge page (handled by the parent App component).
  */
 
-import { useState, useEffect, useCallback } from "react";
-import type { Project, KnowledgeRelationship } from "../../types";
+import { useState, useEffect } from "react";
+import type { Project } from "../../types";
 import { listProjects, createProject, updateProject, deleteProject } from "./ProjectService";
-import { getProjectKnowledge, updateInstructions, confirmRelationship, rejectRelationship } from "./KnowledgeService";
 import { ProjectCard } from "./ProjectCard";
 import { SortDropdown, SORT_OPTIONS } from "./SortDropdown";
 import type { ProjectCardData } from "./ProjectCard";
@@ -200,39 +199,12 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
   // ─── Delete Confirmation Modal ─────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState<{ type: "single"; projectId: string } | { type: "all" } | null>(null);
 
-  // ─── Knowledge Section ────────────────────────────────────────────────────
-  const [knowledge, setKnowledge] = useState<any>(null);
-  const [instructions, setInstructions] = useState("");
-  const [instructionsDirty, setInstructionsDirty] = useState(false);
-  const [instructionsLoading, setInstructionsLoading] = useState(false);
-  const [instructionsError, setInstructionsError] = useState("");
-
   // ─── Project Load ─────────────────────────────────────────────────────────
   useEffect(() => {
     listProjects()
       .then((response) => setProjects(response.projects))
       .catch(() => {});
   }, []);
-
-  const loadProjectData = useCallback(async (projectId: string) => {
-    try {
-      const kn = await getProjectKnowledge(projectId).catch(() => null);
-      setKnowledge(kn);
-      if (kn) {
-        setInstructions(kn.instructions || "");
-      } else {
-        setInstructions("");
-      }
-    } catch {
-      setKnowledge(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeProjectId) {
-      loadProjectData(activeProjectId);
-    }
-  }, [activeProjectId, loadProjectData]);
 
   // ─── Delete Handlers ─────────────────────────────────────────────────────
   const handleDeleteAllProjects = async () => {
@@ -330,59 +302,6 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
     if (e.key === "Enter") {
       e.preventDefault();
       handleCreateProject();
-    }
-  };
-
-  // ─── Knowledge Handlers ───────────────────────────────────────────────────
-  const handleSaveInstructions = async () => {
-    if (!activeProjectId) return;
-    setInstructionsLoading(true);
-    setInstructionsError("");
-    try {
-      const updated = await updateInstructions(activeProjectId, instructions);
-      setKnowledge(updated);
-      setInstructionsDirty(false);
-    } catch (err) {
-      setInstructionsError(err instanceof Error ? err.message : "Failed to save instructions.");
-    } finally {
-      setInstructionsLoading(false);
-    }
-  };
-
-  // ─── Relationship Handlers ────────────────────────────────────────────────
-  const handleConfirmRelationship = async (rel: KnowledgeRelationship) => {
-    if (!activeProjectId || !knowledge) return;
-    const sourceKey = `${rel.source.serviceId}::${rel.source.operationId}::${rel.source.location}::${rel.target.serviceId}::${rel.target.operationId}::${rel.target.location}`;
-    const updated = await confirmRelationship(activeProjectId, sourceKey);
-    if (updated) {
-      setKnowledge(updated);
-    }
-  };
-
-  const handleRejectRelationship = async (rel: KnowledgeRelationship) => {
-    if (!activeProjectId || !knowledge) return;
-    const sourceKey = `${rel.source.serviceId}::${rel.source.operationId}::${rel.source.location}::${rel.target.serviceId}::${rel.target.operationId}::${rel.target.location}`;
-    const updated = await rejectRelationship(activeProjectId, sourceKey);
-    if (updated) {
-      setKnowledge(updated);
-    }
-  };
-
-  // ─── Helpers ──────────────────────────────────────────────────────────────
-  const formatRelationship = (rel: KnowledgeRelationship): string => {
-    const src = `${rel.source.serviceId}/${rel.source.operationId}`;
-    const tgt = `${rel.target.serviceId}/${rel.target.operationId}`;
-    const srcLocation = rel.source.location.split(".").slice(-1)[0] || rel.source.location;
-    const tgtLocation = rel.target.location.split(".").slice(-1)[0] || rel.target.location;
-    return `${src} ${srcLocation} → ${tgt} ${tgtLocation}`;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "proposed": return { bg: "#fff3e0", text: "#e65100" };
-      case "confirmed": return { bg: "#e3fcef", text: "#0a7c42" };
-      case "rejected": return { bg: "#fce4e2", text: "#b44236" };
-      default: return { bg: "#f5f5f5", text: "#616161" };
     }
   };
 
@@ -776,207 +695,8 @@ export function SetupPage({ activeProjectId, onActiveProjectChange }: SetupPageP
     );
   }
 
-  /* ───────────────────────────────────────────────────────────────────
-     ACTIVE PROJECT — Project Knowledge page
-     ─────────────────────────────────────────────────────────────────── */
-  const activeProject = projects.find((p) => p.id === activeProjectId);
-
-  return (
-    <div style={{ padding: "22px", maxWidth: "1520px", margin: "0 auto" }}>
-      {/* Project header */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: "24px"
-      }}>
-        <div>
-          <span style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)" }}>
-            Active Project
-          </span>
-          <h2 style={{ margin: "4px 0 0 0", color: "var(--color-text-primary)" }}>
-            {activeProject?.name || activeProjectId}
-          </h2>
-          <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-            ID: {activeProjectId}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={() => onActiveProjectChange("")}
-          style={{
-            padding: "6px 12px", fontSize: "13px",
-            border: "1px solid var(--color-border)", borderRadius: "4px",
-            background: "var(--color-bg-surface)", cursor: "pointer", color: "var(--color-text-primary)"
-          }}
-        >
-          Change Project
-        </button>
-      </div>
-
-      {/* ─── Section: Project Knowledge ───────────────────────────────────── */}
-      <section style={{
-        marginBottom: "24px",
-        border: "1px solid var(--color-border)", borderRadius: "8px",
-        background: "var(--color-bg-surface)", overflow: "hidden"
-      }}>
-        <div style={{
-          padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
-          background: "var(--violet-soft)"
-        }}>
-          <h3 style={{ margin: 0, display: "inline", fontSize: "17px", color: "var(--violet)" }}>
-            Project Knowledge
-          </h3>
-        </div>
-        <div style={{ padding: "18px" }}>
-          <label style={{
-            display: "block", fontSize: "12px", fontWeight: 600,
-            color: "var(--color-text-muted)", textTransform: "uppercase", marginBottom: "6px"
-          }}>
-            Instructions
-          </label>
-          <textarea
-            placeholder="Describe how your APIs relate to each other. For example: The token from generate-token is used as Bearer Authorization for login..."
-            value={instructions}
-            onChange={(e) => {
-              setInstructions(e.target.value);
-              setInstructionsDirty(true);
-            }}
-            rows={5}
-            style={{
-              width: "100%", padding: "10px 12px", fontSize: "14px",
-              border: "1px solid var(--color-border)", borderRadius: "6px",
-              background: "var(--color-bg-surface)", color: "var(--color-text-primary)",
-              resize: "vertical", fontFamily: "inherit",
-              boxSizing: "border-box"
-            }}
-          />
-          <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
-            <button
-              type="button"
-              onClick={handleSaveInstructions}
-              disabled={!instructionsDirty || instructionsLoading}
-              style={{
-                padding: "8px 16px", fontSize: "14px", fontWeight: 600,
-                color: "#fff",
-                background: (!instructionsDirty || instructionsLoading) ? "var(--color-border)" : "var(--violet)",
-                border: "none", borderRadius: "6px",
-                cursor: (!instructionsDirty || instructionsLoading) ? "not-allowed" : "pointer"
-              }}
-            >
-              {instructionsLoading ? "Saving..." : "Save & Analyze"}
-            </button>
-            {knowledge && (
-              <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-                Last updated: {new Date(knowledge.updatedAt).toLocaleString()}
-              </span>
-            )}
-          </div>
-          {instructionsError && (
-            <p style={{ color: "var(--red)", fontSize: "13px", marginTop: "8px" }}>
-              {instructionsError}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* ─── Section: Relationships ────────────────────────────────────────── */}
-      {knowledge && knowledge.relationships && knowledge.relationships.length > 0 && (
-        <section style={{
-          border: "1px solid var(--color-border)", borderRadius: "8px",
-          background: "var(--color-bg-surface)", overflow: "hidden"
-        }}>
-          <div style={{
-            padding: "12px 16px", borderBottom: "1px solid var(--color-border)",
-            background: "var(--green-soft)"
-          }}>
-            <span style={{
-              width: "30px", height: "30px", display: "inline-flex",
-              alignItems: "center", justifyContent: "center",
-              borderRadius: "8px", fontWeight: 800,
-              background: "var(--green)", color: "#fff", marginRight: "10px"
-            }}>
-              3
-            </span>
-            <h3 style={{ margin: 0, display: "inline", fontSize: "17px", color: "var(--green-deep)" }}>
-              API Dependencies
-            </h3>
-          </div>
-          <div style={{ padding: "18px" }}>
-            <div style={{ fontSize: "13px", color: "var(--color-text-primary)", marginBottom: "12px" }}>
-              {knowledge.relationships.filter((r: any) => r.status === "confirmed").length} dependency configured
-              {knowledge.relationships.filter((r: any) => r.status === "proposed").length > 0 && (
-                <span style={{ color: "var(--color-text-muted)" }}> · {knowledge.relationships.filter((r: any) => r.status === "proposed").length} pending review</span>
-              )}
-            </div>
-            <details style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>
-              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Advanced Relationships</summary>
-              {(["proposed", "confirmed", "rejected"] as const).map((status) => {
-                const filtered = knowledge.relationships.filter((r: any) => r.status === status);
-                if (filtered.length === 0) return null;
-                const colors = getStatusColor(status);
-                return (
-                  <div key={status} style={{ marginBottom: "12px" }}>
-                    <span style={{
-                      display: "inline-block", padding: "2px 8px", borderRadius: "4px",
-                      fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
-                      background: colors.bg, color: colors.text, marginBottom: "8px"
-                    }}>
-                      {status} ({filtered.length})
-                    </span>
-                    <div style={{ display: "grid", gap: "6px" }}>
-                      {filtered.map((rel: KnowledgeRelationship, idx: number) => (
-                        <div key={idx} style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "8px 12px", border: "1px solid var(--color-border)",
-                          borderRadius: "6px", background: "var(--color-bg-subtle)",
-                          fontSize: "13px"
-                        }}>
-                          <div>
-                            <span style={{ fontWeight: 500 }}>{formatRelationship(rel)}</span>
-                            <span style={{
-                              display: "inline-block", marginLeft: "8px",
-                              padding: "1px 6px", borderRadius: "3px",
-                              fontSize: "11px", fontWeight: 600,
-                              background: colors.bg, color: colors.text
-                            }}>
-                              {rel.type}
-                            </span>
-                          </div>
-                          {rel.status === "proposed" && (
-                            <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                              <button
-                                type="button"
-                                onClick={() => handleConfirmRelationship(rel)}
-                                style={{
-                                  padding: "4px 10px", fontSize: "12px", fontWeight: 600,
-                                  color: "#fff", background: "var(--green)",
-                                  border: "none", borderRadius: "4px", cursor: "pointer"
-                                }}
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRejectRelationship(rel)}
-                                style={{
-                                  padding: "4px 10px", fontSize: "12px", fontWeight: 600,
-                                  color: "#fff", background: "var(--red)",
-                                  border: "none", borderRadius: "4px", cursor: "pointer"
-                                }}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </details>
-          </div>
-        </section>
-      )}
-    </div>
-  );
+  // When a project is active, this page is not shown — the App component
+  // automatically navigates to Knowledge. This page only renders when
+  // no project is active (the early return above handles that case).
+  return null;
 }

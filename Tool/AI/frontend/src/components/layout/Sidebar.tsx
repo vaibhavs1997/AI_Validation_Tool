@@ -1,8 +1,16 @@
 // SVG icon components
-const IconHome = () => (
+const IconFolder = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+  </svg>
+);
+
+const IconFileText = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
   </svg>
 );
 
@@ -39,27 +47,25 @@ const IconClock = () => (
 const IconSettings = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06.06a1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
   </svg>
 );
 
 interface SidebarProps {
-  currentView: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
-  onViewChange: (view: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings") => void;
+  currentView: "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
+  onViewChange: (view: "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings") => void;
   activeProjectId?: string | null;
 }
 
 export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarProps) {
-  // Show compact navigation (only Project Setup + Settings) only when no project is active
-  // and we're on the setup or settings page. When a project is active, show full workflow nav.
   const showCompactNav = !activeProjectId && (currentView === "setup" || currentView === "settings");
 
   const navItems = showCompactNav
     ? [
         {
-          group: "Main",
+          group: "Project Management",
           items: [
-            { id: "setup" as const, label: "Project Setup", icon: IconHome },
+            { id: "setup" as const, label: "Projects", icon: IconFolder },
           ],
         },
         {
@@ -73,21 +79,21 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
         {
           group: "Workflow",
           items: [
-            { id: "setup" as const, label: "Project Setup", icon: IconHome },
-            { id: "knowledge" as const, label: "Knowledge", icon: IconFlask },
+            { id: "knowledge" as const, label: "Knowledge Library", icon: IconFlask },
             { id: "catalog" as const, label: "API Catalog", icon: IconServer },
-            { id: "workspace" as const, label: "Requirements", icon: IconFlask },
+            { id: "requirements" as const, label: "Requirements", icon: IconFileText },
+            { id: "test-cases" as const, label: "Test Cases", icon: IconFileText },
+            { id: "implementation-mappings" as const, label: "Implementation Mappings", icon: IconFlask },
           ],
         },
         {
           group: "Execution",
           items: [
-            { id: "workspace" as const, label: "Test Cases", icon: IconFlask },
-            { id: "workspace" as const, label: "Execution", icon: IconFlask },
+            { id: "execution-workspace" as const, label: "Execution Workspace", icon: IconFlask },
           ],
         },
         {
-          group: "Reports",
+          group: "Reporting",
           items: [
             { id: "results" as const, label: "Reports", icon: IconBarChart },
             { id: "history" as const, label: "History", icon: IconClock },
@@ -103,15 +109,13 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
 
   return (
     <aside id="testforge-sidebar" className="app-sidebar">
-      {/* Brand */}
       <div
         id="testforge-brand"
         className="sidebar-brand"
         onClick={() => {
-          try { sessionStorage.removeItem("testforge:activeProjectId"); } catch {}
-          window.location.hash = "#setup";
-          window.location.reload();
+          onViewChange("setup");
         }}
+        style={{ cursor: "pointer" }}
       >
         <div className="testforge-logo">TF</div>
         <div className="brand-copy">
@@ -120,7 +124,6 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="sidebar-nav" aria-label="Primary navigation">
         {navItems.map((group) => (
           <div key={group.group} className="nav-group">
@@ -131,7 +134,7 @@ export function Sidebar({ currentView, onViewChange, activeProjectId }: SidebarP
               return (
                 <a
                   key={item.label}
-                  href={`#${item.id}`}
+                  href={`/${item.id}`}
                   className={`nav-item ${isActive ? "active" : ""}`}
                   aria-current={isActive ? "page" : undefined}
                   onClick={(e) => {

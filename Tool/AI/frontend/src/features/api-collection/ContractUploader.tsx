@@ -253,7 +253,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
 
   return (
     <div className="input-section">
-      <div className="section-label">Upload API Collection</div>
+      <div className="section-label">Import API</div>
 
       {/* File input area - show when no file selected and no active contract */}
       {!selectedFile && !displayContract && (
@@ -275,7 +275,7 @@ export function ContractUploader({ onContractParsed, activeContract }: ContractU
         >
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "24px" }}>📁</span>
-            <strong style={{ fontSize: "14px" }}>Upload API Collection</strong>
+            <strong style={{ fontSize: "14px" }}>Import API</strong>
             <span style={{ fontSize: "13px", color: "var(--muted)" }}>
               Drag & drop a collection file here<br />or browse from your computer
             </span>

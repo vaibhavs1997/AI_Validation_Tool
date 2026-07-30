@@ -14,12 +14,13 @@ const IconMoon = () => (
 );
 
 interface HeaderProps {
-  view: "setup" | "knowledge" | "catalog" | "workspace" | "results" | "history" | "settings";
+  view: "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
   projectName?: string;
   environment?: string;
+  onNavigateToProjects?: () => void;
 }
 
-export function Header({ view, projectName, environment }: HeaderProps) {
+export function Header({ view, projectName, environment, onNavigateToProjects }: HeaderProps) {
   const [currentTheme, setCurrentTheme] = useState<"slate" | "mist">("slate");
 
   useEffect(() => {
@@ -33,16 +34,19 @@ export function Header({ view, projectName, environment }: HeaderProps) {
     setCurrentTheme(theme);
   };
 
-  const viewConfig: {
-    [key in typeof view]: { eyebrow: string; title: string }
-  } = {
-    setup: { eyebrow: "API TESTING", title: "Project Setup" },
-    knowledge: { eyebrow: "KNOWLEDGE", title: "Knowledge" },
+  const viewConfig: Record<typeof view, { eyebrow: string; title: string }> = {
+    setup: { eyebrow: "PROJECT MANAGEMENT", title: "Projects" },
+    knowledge: { eyebrow: "KNOWLEDGE", title: "Knowledge Library" },
     catalog: { eyebrow: "API CATALOG", title: "API Catalog" },
+    requirements: { eyebrow: "REQUIREMENTS", title: "Requirements" },
+    "test-cases": { eyebrow: "TEST CASES", title: "Test Cases" },
+    "implementation-mappings": { eyebrow: "IMPLEMENTATION", title: "Implementation Mappings" },
+    "executable-tests": { eyebrow: "EXECUTION", title: "Executable Tests" },
+    "execution-workspace": { eyebrow: "EXECUTION WORKSPACE", title: "Execution Workspace" },
     workspace: { eyebrow: "API TESTING", title: "Test Builder" },
     results: { eyebrow: "API TESTING", title: "Reports" },
     history: { eyebrow: "API TESTING", title: "History" },
-    settings: { eyebrow: "SYSTEM", title: "Settings" }
+    settings: { eyebrow: "SYSTEM", title: "Settings" },
   };
 
   const config = viewConfig[view];
@@ -55,6 +59,33 @@ export function Header({ view, projectName, environment }: HeaderProps) {
       </div>
 
       <div className="header-context">
+        {onNavigateToProjects && view !== "setup" && (
+          <button
+            type="button"
+            onClick={onNavigateToProjects}
+            style={{
+              padding: "6px 12px",
+              fontSize: "13px",
+              fontWeight: 600,
+              border: "1px solid var(--color-border)",
+              borderRadius: "4px",
+              background: "var(--color-bg-surface)",
+              cursor: "pointer",
+              color: "var(--color-text-primary)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              marginRight: "12px",
+            }}
+            aria-label="Open Project Management"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Projects
+          </button>
+        )}
         {(projectName || environment) && (
           <div className="header-meta">
             {projectName && (

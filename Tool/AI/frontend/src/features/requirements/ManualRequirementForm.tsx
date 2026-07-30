@@ -30,6 +30,8 @@ Acceptance Criteria:
 
 interface ManualRequirementFormProps {
   onRequirementConfirmed?: (requirement: ManualRequirement) => void;
+  /** Optional pre-filled requirement used when editing an existing one. */
+  initialRequirement?: ManualRequirement;
 }
 
 /**
@@ -74,11 +76,15 @@ function extractAcceptanceCriteria(text: string): string[] {
   return acLines;
 }
 
-export function ManualRequirementForm({ onRequirementConfirmed }: ManualRequirementFormProps) {
-  // Draft state - editable textarea content
-  const [manualDraft, setManualDraft] = useState<string>("");
-  // Confirmed requirement - separate from draft
-  const [confirmedManualRequirement, setConfirmedManualRequirement] = useState<ManualRequirement | null>(null);
+export function ManualRequirementForm({ onRequirementConfirmed, initialRequirement }: ManualRequirementFormProps) {
+  // Draft state - editable textarea content.
+  // When an initialRequirement is provided (edit mode), prefill the draft
+  // with its description so the user can modify it.
+  const [manualDraft, setManualDraft] = useState<string>(initialRequirement?.description ?? "");
+  // Confirmed requirement - separate from draft.
+  // When an initialRequirement is provided, start in the confirmed/read-only
+  // view so the user sees the current requirement and can choose to edit it.
+  const [confirmedManualRequirement, setConfirmedManualRequirement] = useState<ManualRequirement | null>(initialRequirement ?? null);
   // Validation error state
   const [validationError, setValidationError] = useState<string>("");
 

@@ -1,7 +1,7 @@
 /**
- * Requirement source type - distinguishes between Jira and Manual requirements
+ * Requirement source type - distinguishes between requirement input methods
  */
-export type RequirementSource = "jira" | "manual";
+export type RequirementSource = "manual" | "paste" | "upload" | "jira";
 
 /**
  * Common base fields shared by all requirement types
@@ -30,14 +30,12 @@ export interface JiraComment {
 
 /**
  * Jira-specific requirement data
- * Represents ticket data as returned by /api/jira/ticket endpoint
- * and normalized in the legacy app.js
  */
 export interface JiraRequirement extends RequirementBase {
   source: "jira";
   id: string;
   url: string;
-  issueType: string; // e.g., "Story", "Task", "Bug"
+  issueType: string;
   status: string;
   priority: string;
   labels: string[];
@@ -46,7 +44,6 @@ export interface JiraRequirement extends RequirementBase {
 
 /**
  * Manual requirement data
- * Represents plain text or JSON input from user
  */
 export interface ManualRequirement extends RequirementBase {
   source: "manual";
@@ -87,6 +84,151 @@ export type RequirementLoadStatus = "idle" | "loading" | "success" | "error";
 export interface ActiveRequirement {
   source: RequirementSource;
   requirement: Requirement | null;
+}
+
+/**
+ * Workflow step identifiers
+ */
+export type WorkflowStep = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Workflow status
+ */
+export type WorkflowStatus = "in-progress" | "ready-for-validation" | "completed";
+
+/**
+ * Test case in the workflow
+ */
+export interface WorkflowTestCase {
+  id: string;
+  title: string;
+  description: string;
+  type: "positive" | "negative";
+  priority: "low" | "medium" | "high" | "critical";
+  acceptanceCriteriaRef: string[];
+  expectedResult: string;
+  expectedStatusCode: number | null;
+  tags: string[];
+  risk: "low" | "medium" | "high";
+  confidenceScore: number | null;
+  approved: boolean;
+}
+
+/**
+ * API match in the workflow
+ */
+export interface WorkflowApiMatch {
+  testCaseId: string;
+  testCaseTitle: string;
+  matchedApi?: {
+    serviceId: string;
+    serviceName: string;
+    operationId: string;
+    operationName: string;
+    method: string;
+    path: string;
+    authentication: string;
+    confidence: number;
+  };
+  suggestedApi?: {
+    serviceId: string;
+    serviceName: string;
+    operationId: string;
+    operationName: string;
+    method: string;
+    path: string;
+    authentication: string;
+    confidence: number;
+  };
+  status: "matched" | "review-required" | "unmatched";
+  authentication: string;
+  dependencies: string[];
+}
+
+/**
+ * Full RequirementWorkflow from backend
+ */
+export interface RequirementWorkflow {
+  workflowId: string;
+  projectId: string;
+  requirementId: string;
+  requirement: {
+    title: string;
+    description: string;
+    acceptanceCriteria: string[];
+    businessRules: string[];
+    priority: "low" | "medium" | "high" | "critical";
+    labels: string[];
+    epic: string;
+    story: string;
+    dependencies: string[];
+    risk: "low" | "medium" | "high" | "critical";
+    status: "draft" | "needs-review" | "ready";
+    source: RequirementSource;
+    fileName: string | null;
+  };
+  analysis: {
+    completed: boolean;
+    acceptanceCriteria: string[];
+    businessRules: string[];
+    positivePaths: string[];
+    negativePaths: string[];
+    edgeCases: string[];
+    preconditions: string[];
+    postconditions: string[];
+    dependencies: string[];
+    assumptions: string[];
+    missingInformation: string[];
+    ambiguities: string[];
+    analyzedAt: string | null;
+  };
+  generatedTests: {
+    completed: boolean;
+    testCases: WorkflowTestCase[];
+    generatedAt: string | null;
+  };
+  selectedTests: {
+    testCaseIds: string[];
+    selectedAt: string | null;
+  };
+  apiMatches: {
+    completed: boolean;
+    matches: WorkflowApiMatch[];
+    matchedAt: string | null;
+  };
+  approvedMappings: {
+    completed: boolean;
+    mappings: string[];
+    approvedAt: string | null;
+  };
+  draftValidationScenarioIds: string[];
+  scenariosGeneratedAt: string | null;
+  status: WorkflowStatus;
+  currentStep: WorkflowStep;
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  auditHistory: Array<{
+    action: string;
+    timestamp: string;
+    userId: string;
+    details: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * Coverage summary
+ */
+export interface WorkflowSummary {
+  acceptanceCriteriaCount: number;
+  generatedTestCount: number;
+  approvedTestCount: number;
+  matchedApiCount: number;
+  totalApiMatches: number;
+  readiness: number;
+  confidence: number;
+  status: WorkflowStatus;
+  currentStep: WorkflowStep;
 }
 
 /**

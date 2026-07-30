@@ -1,5 +1,5 @@
 import { apiClient } from "../../services";
-import type { GenerateTestCasesRequest, GenerateTestCasesResponse } from "../../types";
+import type { GenerateTestCasesResponse, GenerateTestCasesRequest } from "../../types";
 import type { ActiveRequirement } from "../requirements/RequirementTypes";
 
 export function mapActiveRequirementToTicket(activeRequirement: ActiveRequirement | null): Record<string, unknown> {
@@ -37,10 +37,60 @@ export async function generateTestCases(
     ticket,
   };
 
-  const response = await apiClient.post<GenerateTestCasesResponse>(
+  const response = await apiClient.post<{ projectId: string; generationId: string; status: string }>(
     "/api/test-cases/generate",
     request
   );
 
-  return response;
+  return {
+    projectId: response.projectId,
+    testCases: [],
+    diagnostics: { generated: 0 },
+    warnings: [],
+    generationId: response.generationId,
+    status: response.status,
+  } as GenerateTestCasesResponse;
+}
+
+interface GenerationStatusResponse {
+  generationId: string;
+  status: string;
+  testCases: any[];
+  diagnostics: { generated: number };
+  warnings: string[];
+  error?: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export async function getGenerationStatus(
+  projectId: string,
+  generationId: string
+): Promise<GenerateTestCasesResponse> {
+  const url = "/api/test-cases/generate/status?projectId=" + encodeURIComponent(projectId) + "&generationId=" + encodeURIComponent(generationId);
+  const res = await apiClient.post<GenerationStatusResponse>(url, {});
+
+  const statusValue = res.status;
+
+  if (statusValue === "completed") {
+    return {
+      projectId,
+      testCases: (res.testCases || []) as any,
+      diagnostics: res.diagnostics || { generated: 0 },
+      warnings: res.warnings || [],
+      status: statusValue,
+    };
+  }
+
+  if (statusValue === "failed") {
+    throw new Error(res.error || "Generation failed");
+  }
+
+  return {
+    projectId,
+    testCases: [],
+    diagnostics: res.diagnostics || { generated: 0 },
+    warnings: res.warnings || [],
+    status: statusValue,
+  };
 }

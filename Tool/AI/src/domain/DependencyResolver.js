@@ -1,122 +1,196 @@
 /**
  * DependencyResolver
  *
- * Deterministic resolver for project-confirmed API operation dependencies.
- * Uses only `confirmed` KnowledgeRelationships to derive execution order.
+ * Resolves execution order and detects blocked steps.
+ * Uses topological sort for dependency resolution.
  */
 
-const { STATUSES } = require('./KnowledgeRelationship');
+/**
+ * Build dependency map from steps.
+ * @param {Array<object>} steps
+ * @returns {Map<string, string[]>}
+ */
+function buildDependencyMap(steps) {
+  const map = new Map();
+  for (const step of steps) {
+    map.set(step.id, Array.isArray(step.dependencies) ? step.dependencies : []);
+  }
+  return map;
+}
 
-function buildOperationIndex(apiModels = []) {
-  const index = new Map();
-  for (const model of apiModels) {
-    const serviceId = model.service?.id || model.title || 'api-service';
-    for (const op of model.operations || []) {
-      const operationId = op.id || op.operationId || `${op.method || 'GET'} ${op.path || '/'}`;
-      index.set(`${serviceId}::${operationId}`, {
-        serviceId,
-        operationId,
-        method: op.method,
-        path: op.path,
-        summary: op.summary || '',
-        protocol: op.protocol || model.protocol || 'rest',
-      });
+/**
+ * Resolve execution order using topological sort (Kahn's algorithm).
+ * @param {Array<object>} steps
+ * @returns {{ order: string[], hasCycle: boolean, cycles: Array<Array<string>> }}
+ */
+function resolveExecutionOrder(steps) {
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return { order: [], hasCycle: false, cycles: [] };
+  }
+
+  const depMap = buildDependencyMap(steps);
+  const inDegree = new Map();
+  const queue = [];
+  const order = [];
+
+  // Initialize in-degree for each step
+  for (const step of steps) {
+    const deps = depMap.get(step.id) || [];
+    inDegree.set(step.id, deps.length);
+    if (deps.length === 0) {
+      queue.push(step.id);
     }
   }
-  return index;
-}
 
-function getConfirmedRelationships(relationships = []) {
-  return relationships.filter((rel) => rel.status === 'confirmed');
-}
+  // Process queue
+  while (queue.length > 0) {
+    const current = queue.shift();
+    order.push(current);
 
-function resolveDependencies({ targetServiceId, targetOperationId, services = [], apiModels = [], relationships = [] }) {
-  const operationIndex = buildOperationIndex(apiModels);
-  const confirmed = getConfirmedRelationships(relationships);
-
-  const targetKey = `${targetServiceId}::${targetOperationId}`;
-  const targetOperation = operationIndex.get(targetKey);
-  if (!targetOperation) {
-    return {
-      target: { serviceId: targetServiceId, operationId: targetOperationId },
-      prerequisites: [],
-      sequence: [],
-      mappings: [],
-      errors: [`Target operation not found: ${targetKey}`],
-    };
+    // Find steps that depend on current
+    for (const [stepId, deps] of depMap.entries()) {
+      if (deps.includes(current)) {
+        const newInDegree = inDegree.get(stepId) - 1;
+        inDegree.set(stepId, newInDegree);
+        if (newInDegree === 0) {
+          queue.push(stepId);
+        }
+      }
+    }
   }
 
+  // Check for cycles
+  const hasCycle = order.length !== steps.length;
+  const cycles = hasCycle ? detectCycles(depMap) : [];
+
+  return { order, hasCycle, cycles };
+}
+
+/**
+ * Detect cycles using DFS.
+ * @param {Map<string, string[]>} depMap
+ * @returns {Array<Array<string>>}
+ */
+function detectCycles(depMap) {
+  const cycles = [];
   const visited = new Set();
-  const sequence = [];
-  const prerequisites = new Map();
-  const mappings = [];
-  const errors = [];
-  const duplicateSet = new Set();
-  const relationshipSet = new Set();
+  const recursionStack = new Set();
 
-  function visit(serviceId, operationId, path = []) {
-    const key = `${serviceId}::${operationId}`;
-    if (path.includes(key)) {
-      errors.push(`Circular dependency detected: ${path.join(' -> ')} -> ${key}`);
-      return;
-    }
-    if (visited.has(key)) return;
-    visited.add(key);
-
-    const incoming = confirmed.filter((rel) => rel.target.serviceId === serviceId && rel.target.operationId === operationId);
-    if (incoming.length === 0) {
-      sequence.push({ serviceId, operationId });
+  function dfs(stepId, path) {
+    if (recursionStack.has(stepId)) {
+      const cycleStart = path.indexOf(stepId);
+      cycles.push(path.slice(cycleStart).concat(stepId));
       return;
     }
 
-    for (const rel of incoming) {
-      const sourceKey = `${rel.source.serviceId}::${rel.source.operationId}`;
-      if (!operationIndex.has(sourceKey)) {
-        errors.push(`Missing referenced operation: ${sourceKey}`);
-        continue;
-      }
+    if (visited.has(stepId)) {
+      return;
+    }
 
-      const mappingKey = `${sourceKey}->${key}`;
-      if (relationshipSet.has(mappingKey)) {
-        errors.push(`Duplicate relationship detected: ${mappingKey}`);
-        continue;
-      }
-      relationshipSet.add(mappingKey);
+    visited.add(stepId);
+    recursionStack.add(stepId);
+    path.push(stepId);
 
-      visit(rel.source.serviceId, rel.source.operationId, [...path, key]);
-
-      mappings.push({
-        relationship: {
-          type: rel.type,
-          source: rel.source,
-          target: rel.target,
-          transform: rel.transform || '',
-          confidence: rel.confidence,
-        },
-        from: { serviceId: rel.source.serviceId, operationId: rel.source.operationId, location: rel.source.location },
-        to: { serviceId: rel.target.serviceId, operationId: rel.target.operationId, location: rel.target.location },
-      });
-
-      if (!prerequisites.has(sourceKey)) {
-        prerequisites.set(sourceKey, { serviceId: rel.source.serviceId, operationId: rel.source.operationId });
+    const deps = depMap.get(stepId) || [];
+    for (const depId of deps) {
+      if (depMap.has(depId)) {
+        dfs(depId, [...path]);
       }
     }
 
-    sequence.push({ serviceId, operationId });
+    recursionStack.delete(stepId);
   }
 
-  visit(targetServiceId, targetOperationId);
+  for (const stepId of depMap.keys()) {
+    if (!visited.has(stepId)) {
+      dfs(stepId, []);
+    }
+  }
+
+  return cycles;
+}
+
+/**
+ * Validate dependencies for errors and cycles.
+ * @param {Array<object>} steps
+ * @returns {{ valid: boolean, errors: Array<{ field: string, message: string }>, cycles: Array<Array<string>> }}
+ */
+function validateDependencies(steps) {
+  const errors = [];
+  const stepIds = new Set(steps.map(s => s.id));
+
+  // Check for missing dependencies
+  for (const step of steps) {
+    for (const depId of step.dependencies || []) {
+      if (!stepIds.has(depId)) {
+        errors.push({
+          field: 'dependencies',
+          message: `Step ${step.id} depends on non-existent step ${depId}.`,
+        });
+      }
+    }
+  }
+
+  // Detect cycles
+  const depMap = buildDependencyMap(steps);
+  const { hasCycle, cycles } = resolveExecutionOrder(steps);
+
+  if (hasCycle) {
+    errors.push({
+      field: 'dependencies',
+      message: `Circular dependency detected: ${cycles.map(c => c.join(' → ')).join('; ')}`,
+    });
+  }
 
   return {
-    target: targetOperation,
-    prerequisites: Array.from(prerequisites.values()),
-    sequence,
-    mappings,
+    valid: errors.length === 0,
     errors,
+    cycles,
   };
 }
 
+/**
+ * Identify blocked steps based on failed dependencies.
+ * @param {Array<object>} steps - Steps with status
+ * @returns {Set<string>} Set of blocked step IDs
+ */
+function identifyBlockedSteps(steps) {
+  const blocked = new Set();
+  const statusMap = new Map(steps.map(s => [s.id, s.status]));
+
+  for (const step of steps) {
+    if (step.status === 'failed' || step.status === 'blocked' || step.status === 'cancelled') {
+      // Mark dependent steps as blocked
+      markDependentsAsBlocked(step.id, steps, blocked, statusMap);
+    }
+  }
+
+  return blocked;
+}
+
+/**
+ * Recursively mark dependent steps as blocked.
+ * @param {string} failedStepId
+ * @param {Array<object>} steps
+ * @param {Set<string>} blocked
+ * @param {Map<string, string>} statusMap
+ */
+function markDependentsAsBlocked(failedStepId, steps, blocked, statusMap) {
+  for (const step of steps) {
+    if (step.dependencies.includes(failedStepId) && !blocked.has(step.id)) {
+      const currentStatus = statusMap.get(step.id);
+      if (currentStatus === 'pending' || currentStatus === 'ready') {
+        blocked.add(step.id);
+      }
+      // Recurse to mark transitive dependents
+      markDependentsAsBlocked(step.id, steps, blocked, statusMap);
+    }
+  }
+}
+
 module.exports = {
-  resolveDependencies,
-  buildOperationIndex,
+  resolveExecutionOrder,
+  validateDependencies,
+  identifyBlockedSteps,
+  buildDependencyMap,
 };
