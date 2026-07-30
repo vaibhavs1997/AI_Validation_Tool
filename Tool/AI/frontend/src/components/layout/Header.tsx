@@ -14,7 +14,7 @@ const IconMoon = () => (
 );
 
 interface HeaderProps {
-  view: "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
+  view: "setup" | "knowledge" | "catalog" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
   projectName?: string;
   environment?: string;
   onNavigateToProjects?: () => void;
@@ -38,7 +38,6 @@ export function Header({ view, projectName, environment, onNavigateToProjects }:
     setup: { eyebrow: "PROJECT MANAGEMENT", title: "Projects" },
     knowledge: { eyebrow: "KNOWLEDGE", title: "Knowledge Library" },
     catalog: { eyebrow: "API CATALOG", title: "API Catalog" },
-    requirements: { eyebrow: "REQUIREMENTS", title: "Requirements" },
     "test-cases": { eyebrow: "TEST CASES", title: "Test Cases" },
     "implementation-mappings": { eyebrow: "IMPLEMENTATION", title: "Implementation Mappings" },
     "executable-tests": { eyebrow: "EXECUTION", title: "Executable Tests" },

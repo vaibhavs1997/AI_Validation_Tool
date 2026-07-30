@@ -7,11 +7,10 @@
  * 1. Page Header — title, subtitle
  * 2. Drag & Drop Import Area — reuses ContractUploader (Idle/Drag Over/Uploading/Success/Failure)
  * 3. Recent Imports — table of previously imported collections (empty state supported)
- * 4. Bottom Workflow Card — Recommended Next Step / Continue to API Explorer
  *
  * Reuses existing services and parsers — no new backend endpoints, no duplicate logic:
  *   - parseApiContract (ApiCollectionService)
- *   - registerService / listServices / getService (ServiceRegistrationService)
+ *   - registerService / listServices (ServiceRegistrationService)
  *   - ContractUploader (drag & drop + file upload)
  *   - ContractPaster (paste specification)
  */
@@ -19,11 +18,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { ContractUploader } from "./ContractUploader";
 import { ContractPaster } from "./ContractPaster";
-import { ApiExplorer } from "./ApiExplorer";
 import { parseApiContract } from "./ApiCollectionService";
 import { listServices, registerService, getService } from "../project-setup/ServiceRegistrationService";
 import type { ApiContract, ApiEndpoint } from "./ApiCollectionTypes";
-import type { ServiceDefinition, ApiModel } from "../../types";
 import type { ApiError } from "../../services";
 
 
@@ -128,9 +125,6 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
   const [activeContract, setActiveContract] = useState<ApiContract | null>(
     activeProjectId ? getCachedContract(activeProjectId) : null
   );
-  const [services, setServices] = useState<ServiceDefinition[]>([]);
-  const [apiModels, setApiModels] = useState<Record<string, ApiModel | null>>({});
-  const [loadingEndpoints, setLoadingEndpoints] = useState(false);
   const [importMethod, setImportMethod] = useState<"openapi" | "paste">("openapi");
 
   // Paste-specific state
@@ -141,56 +135,56 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
   // Import history
   const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>([]);
 
-  // ─── Load persisted services / API models from backend on mount ──────────
+  // ─── Load persisted services from backend on mount ───────────────────────
+  // This is still needed to restore the active contract from persisted data
+  // and to refresh the import history after a new import.
   const loadServices = useCallback(async (projectId: string) => {
-    setLoadingEndpoints(true);
     try {
       const svcs = await listServices(projectId);
-      setServices(svcs);
-
-      const models: Record<string, ApiModel | null> = {};
-      const allEndpoints: ApiEndpoint[] = [];
-      for (const svc of svcs) {
-        try {
-          const { apiModel } = await getService(projectId, svc.id);
-          models[svc.id] = apiModel;
-          if (apiModel && Array.isArray(apiModel.operations)) {
-            apiModel.operations.forEach((op: any) => {
-              allEndpoints.push({
-                id: op.id || `${op.method}-${op.path}`,
-                method: (op.method || "GET").toUpperCase() as any,
-                path: op.path || "/",
-                operationId: op.operationId || op.id || "",
-                summary: op.summary || "",
-                description: op.description || "",
-                tags: op.tags || [],
-                parameters: op.parameters || [],
-                requestSchema: op.requestSchema || null,
-                responses: op.responses || {},
-                responseSchemas: op.responseSchemas || {},
-              });
-            });
-          }
-        } catch (err) {
-          console.warn(`[ApiCatalog] Failed to load service ${svc.id}:`, err);
-        }
-      }
-
-      setApiModels(models);
 
       // Restore contract from persisted data when no cached contract exists
       const cached = getCachedContract(projectId);
-      if (allEndpoints.length > 0 && !cached) {
-        const restored: ApiContract = {
-          type: "openapi",
-          title: svcs[0]?.name || "Imported API",
-          version: "1.0.0",
-          baseUrl: "",
-          endpoints: allEndpoints,
-          importedAt: new Date().toISOString(),
-        };
-        setActiveContract(restored);
-        cacheContract(projectId, restored);
+      if (!cached && svcs.length > 0) {
+        // Build endpoints from the first service's API model to restore the
+        // contract view without the Service Explorer.
+        const allEndpoints: ApiEndpoint[] = [];
+        for (const svc of svcs) {
+          try {
+            const { apiModel } = await getService(projectId, svc.id);
+            if (apiModel && Array.isArray(apiModel.operations)) {
+              apiModel.operations.forEach((op: any) => {
+                allEndpoints.push({
+                  id: op.id || `${op.method}-${op.path}`,
+                  method: (op.method || "GET").toUpperCase() as any,
+                  path: op.path || "/",
+                  operationId: op.operationId || op.id || "",
+                  summary: op.summary || "",
+                  description: op.description || "",
+                  tags: op.tags || [],
+                  parameters: op.parameters || [],
+                  requestSchema: op.requestSchema || null,
+                  responses: op.responses || {},
+                  responseSchemas: op.responseSchemas || {},
+                });
+              });
+            }
+          } catch (err) {
+            console.warn(`[ApiCatalog] Failed to load service ${svc.id}:`, err);
+          }
+        }
+
+        if (allEndpoints.length > 0) {
+          const restored: ApiContract = {
+            type: "openapi",
+            title: svcs[0]?.name || "Imported API",
+            version: "1.0.0",
+            baseUrl: "",
+            endpoints: allEndpoints,
+            importedAt: new Date().toISOString(),
+          };
+          setActiveContract(restored);
+          cacheContract(projectId, restored);
+        }
       } else if (cached) {
         setActiveContract(cached);
       }
@@ -200,14 +194,11 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
       setImportHistory(history);
     } catch (err) {
       console.error("[ApiCatalog] Failed to list services:", err);
-    } finally {
-      setLoadingEndpoints(false);
     }
   }, []);
 
   useEffect(() => {
     if (!activeProjectId) {
-      setServices([]);
       setImportHistory([]);
       return;
     }
@@ -288,9 +279,6 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
   const handleSample = () => {
     // Intentionally empty - to be implemented in later step
   };
-
-  // ─── Derived data ────────────────────────────────────────────────────────
-  const hasServices = services.length > 0;
 
   // ─── No project state ────────────────────────────────────────────────────
   if (!activeProjectId) {
@@ -585,17 +573,6 @@ export function ApiCatalogPage({ activeProjectId }: ApiCatalogPageProps) {
           )}
         </div>
       </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          API EXPLORER (shown when services exist)
-          ═══════════════════════════════════════════════════════════════════ */}
-      {hasServices && (
-        <ApiExplorer
-          services={services}
-          apiModels={apiModels}
-          loading={loadingEndpoints}
-        />
-      )}
 
     </div>
   );

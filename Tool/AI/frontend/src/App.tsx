@@ -8,13 +8,12 @@ import { ResultsPage } from "./features/results/ResultsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { ApiCatalogPage } from "./features/api-collection/ApiCatalogPage";
 import { ProjectKnowledgePage } from "./features/knowledge/ProjectKnowledgePage";
-import { RequirementPage } from "./features/requirements/RequirementPage";
 import { ImplementationMappingsPage } from "./features/implementation-mappings/ImplementationMappingsPage";
 import { ExecutableTestsPage } from "./features/executable-tests/ExecutableTestsPage";
 import { ExecutionWorkspacePage } from "./features/execution-workspace/ExecutionWorkspacePage";
 import { TestCasesPage } from "./features/test-cases/TestCasesPage";
 
-type View = "setup" | "knowledge" | "catalog" | "requirements" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
+type View = "setup" | "knowledge" | "catalog" | "test-cases" | "implementation-mappings" | "executable-tests" | "execution-workspace" | "workspace" | "results" | "history" | "settings";
 
 export default function App() {
   const [currentView, setCurrentView] = useState<View>("setup");
@@ -47,8 +46,6 @@ export default function App() {
         setCurrentView("catalog");
       } else if (path.startsWith("/knowledge")) {
         setCurrentView("knowledge");
-      } else if (path.startsWith("/requirements")) {
-        setCurrentView("requirements");
       } else if (path.startsWith("/test-cases")) {
         setCurrentView("test-cases");
       } else if (path.startsWith("/implementation-mappings")) {
@@ -123,7 +120,6 @@ export default function App() {
           {currentView === "history" && <HistoryPage activeProjectId={activeProjectId} />}
           {currentView === "catalog" && <ApiCatalogPage activeProjectId={activeProjectId} />}
           {currentView === "knowledge" && <ProjectKnowledgePage activeProjectId={activeProjectId} />}
-          {currentView === "requirements" && <RequirementPage activeProjectId={activeProjectId} />}
           {currentView === "test-cases" && <TestCasesPage activeProjectId={activeProjectId} />}
           {currentView === "implementation-mappings" && <ImplementationMappingsPage activeProjectId={activeProjectId} />}
           {currentView === "executable-tests" && <ExecutableTestsPage activeProjectId={activeProjectId} />}

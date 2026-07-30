@@ -241,11 +241,205 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { service, apiModel });
   }
 
-  // ─── Knowledge ───────────────────────────────────────────────────────────
+// ─── Knowledge ───────────────────────────────────────────────────────────
   if (req.method === "GET" && url.pathname === "/api/knowledge") {
     const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
     const knowledge = await getProjectKnowledge(projectId);
     return sendJson(res, 200, { knowledge: knowledge || { relationships: [] } });
+  }
+
+  // ─── Knowledge Sources ──────────────────────────────────────────────────
+  if (url.pathname === "/api/knowledge-sources" && req.method === "GET") {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const sources = service.listSources(projectId);
+      return sendJson(res, 200, { sources });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  const knowledgeSourceIdMatch = url.pathname.match(/^\/api\/knowledge-sources\/([^/]+)$/);
+  if (req.method === "GET" && knowledgeSourceIdMatch) {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    const sourceId = knowledgeSourceIdMatch[1];
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const source = service.getSource(projectId, sourceId);
+      if (!source) return sendJson(res, 404, { error: "Knowledge source not found" });
+      return sendJson(res, 200, { source });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (url.pathname === "/api/knowledge-sources" && req.method === "POST") {
+    const projectId = body.projectId || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const source = service.createSource(projectId, body);
+      return sendJson(res, 201, { source });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "PATCH" && knowledgeSourceIdMatch) {
+    const projectId = body.projectId || url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    const sourceId = knowledgeSourceIdMatch[1];
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const source = service.modifySource(projectId, sourceId, body);
+      if (!source) return sendJson(res, 404, { error: "Knowledge source not found" });
+      return sendJson(res, 200, { source });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (req.method === "DELETE" && knowledgeSourceIdMatch) {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    const sourceId = knowledgeSourceIdMatch[1];
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      service.removeSource(projectId, sourceId);
+      return sendJson(res, 200, { success: true, message: "Knowledge source deleted successfully" });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // ─── Knowledge Repository (Aggregated) ──────────────────────────────────
+  if (url.pathname === "/api/knowledge-repository" && req.method === "GET") {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const repository = service.getFullRepository(projectId);
+      return sendJson(res, 200, { repository });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (url.pathname === "/api/knowledge-repository/items" && req.method === "GET") {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const items = service.listRepositoryItems(projectId);
+      return sendJson(res, 200, { items });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (url.pathname === "/api/knowledge-repository/health" && req.method === "GET") {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const health = service.getKnowledgeHealth(projectId);
+      return sendJson(res, 200, { health });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  if (url.pathname === "/api/knowledge-repository/readiness" && req.method === "GET") {
+    const projectId = url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const metrics = service.calculateAIReadiness(projectId);
+      return sendJson(res, 200, { readiness: metrics });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // ─── Confluence Synchronization ──────────────────────────────────────────
+  const confluenceSyncMatch = url.pathname.match(/^\/api\/knowledge-sources\/([^/]+)\/sync$/);
+  if (req.method === "POST" && confluenceSyncMatch) {
+    const projectId = body.projectId || url.searchParams.get("projectId") || DEFAULT_PROJECT.id;
+    const sourceId = confluenceSyncMatch[1];
+    try {
+      const service = require("./domain/KnowledgeSourceService");
+      const result = await service.syncConfluenceSource(projectId, sourceId);
+      return sendJson(res, 200, { sync: result });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // ─── Confluence Connection Test ──────────────────────────────────────────
+  if (url.pathname === "/api/integrations/confluence/test" && req.method === "POST") {
+    const { baseUrl, email, apiToken } = body;
+    if (!baseUrl || !email || !apiToken) {
+      return sendJson(res, 400, { error: "baseUrl, email, and apiToken are required" });
+    }
+    try {
+      const { ConfluenceClient } = require("./integrations/confluenceClient");
+      const client = new ConfluenceClient({ baseUrl, email, apiToken });
+      const result = await client.testConnection();
+      return sendJson(res, 200, result);
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // ─── Confluence Spaces ───────────────────────────────────────────────────
+  if (url.pathname === "/api/integrations/confluence/spaces" && req.method === "GET") {
+    const sourceId = url.searchParams.get("sourceId");
+    if (!sourceId) {
+      return sendJson(res, 400, { error: "sourceId query parameter is required" });
+    }
+    try {
+      const knowledgeService = require("./domain/KnowledgeSourceService");
+      const source = knowledgeService.getSource(DEFAULT_PROJECT.id, sourceId);
+      if (!source || source.type !== 'confluence') {
+        return sendJson(res, 404, { error: "Confluence source not found" });
+      }
+      
+      const { ConfluenceClient } = require("./integrations/confluenceClient");
+      const client = new ConfluenceClient({
+        baseUrl: source.config.baseUrl,
+        email: source.config.email || source.config.username,
+        apiToken: source.config.apiToken,
+      });
+      
+      const spacesResult = await client.getSpaces({ limit: 100 });
+      return sendJson(res, 200, { spaces: spacesResult.spaces, total: spacesResult.total });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // ─── Confluence Pages ────────────────────────────────────────────────────
+  const confluencePagesMatch = url.pathname.match(/^\/api\/integrations\/confluence\/spaces\/([^/]+)\/pages$/);
+  if (req.method === "GET" && confluencePagesMatch) {
+    const sourceId = url.searchParams.get("sourceId");
+    if (!sourceId) {
+      return sendJson(res, 400, { error: "sourceId query parameter is required" });
+    }
+    const spaceId = confluencePagesMatch[1];
+    
+    try {
+      const knowledgeService = require("./domain/KnowledgeSourceService");
+      const source = knowledgeService.getSource(DEFAULT_PROJECT.id, sourceId);
+      if (!source || source.type !== 'confluence') {
+        return sendJson(res, 404, { error: "Confluence source not found" });
+      }
+      
+      const { ConfluenceClient } = require("./integrations/confluenceClient");
+      const client = new ConfluenceClient({
+        baseUrl: source.config.baseUrl,
+        email: source.config.email || source.config.username,
+        apiToken: source.config.apiToken,
+      });
+      
+      const pagesResult = await client.getPages(spaceId, { limit: 100 });
+      return sendJson(res, 200, { pages: pagesResult.pages, total: pagesResult.total });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
   }
 
   const knowledgeRelMatch = url.pathname.match(/^\/api\/knowledge\/relationships\/([^/]+)$/);
@@ -737,6 +931,95 @@ async function handleApi(req, res, url) {
         service: apiModel.service, title: apiModel.title, baseUrl: apiModel.baseUrl, operations: apiModel.operations,
       });
       return sendJson(res, 200, { service: registration.service, apiModel });
+    } catch (error) {
+      return sendJson(res, 400, { error: error.message });
+    }
+  }
+
+  // Knowledge Sources Document Upload
+  if (url.pathname === "/api/knowledge-sources/upload") {
+    const projectId = body.projectId || DEFAULT_PROJECT.id;
+    const sourceId = body.sourceId || `local-documents-${projectId}`;
+    const fileName = body.fileName || "uploaded-document";
+    const mimeType = body.mimeType || "application/octet-stream";
+    const bufferBase64 = body.bufferBase64;
+    
+    if (!bufferBase64) {
+      return sendJson(res, 400, { error: "bufferBase64 is required" });
+    }
+
+    try {
+      // Ensure knowledge source exists
+      const knowledgeService = require("./domain/KnowledgeSourceService");
+      let source = knowledgeService.getSource(projectId, sourceId);
+      if (!source) {
+        source = knowledgeService.createSource(projectId, {
+          type: "local-documents",
+          name: "Local Documents",
+          description: "Uploaded documents",
+          status: "available",
+        });
+      }
+
+      // Extract text from document (supports any file type)
+      const buffer = Buffer.from(bufferBase64, "base64");
+      let text = "";
+      let extractedMime = mimeType;
+      
+      try {
+        const { extractText } = require("./domain/DocumentExtractor");
+        const result = await extractText({ buffer, path: fileName });
+        text = result.text || "";
+        extractedMime = result.mimeType || mimeType;
+      } catch (extractError) {
+        // File type not supported for text extraction; store as binary
+        text = `[Binary file: ${fileName} (${mimeType})]`;
+        extractedMime = mimeType;
+      }
+
+      // Build page index
+      const { buildPageIndex } = require("./domain/knowledge-sources/KnowledgeIndexBuilder");
+      const pageIndex = buildPageIndex(text, {
+        id: `upload-${Date.now()}`,
+        title: fileName,
+        version: 1,
+        lastModified: new Date().toISOString(),
+        author: "upload",
+        labels: [],
+      });
+
+      // Create repository item
+      const { createKnowledgeRepositoryItem } = require("./domain/knowledge-sources/KnowledgeRepositoryItem");
+      const item = createKnowledgeRepositoryItem({
+        ...pageIndex,
+        projectId,
+        sourceId,
+        sourceType: "local-documents",
+        status: "indexed",
+        metadata: {
+          fileName,
+          mimeType: extractedMime || mimeType,
+          fileSize: buffer.length,
+        },
+      });
+
+      // Add to repository
+      const items = knowledgeService.listRepositoryItems(projectId);
+      items.push(item);
+      knowledgeService.saveRepositoryItems(projectId, items);
+
+      // Update source lastSync
+      knowledgeService.modifySource(projectId, sourceId, {
+        lastSync: {
+          status: "completed",
+          timestamp: new Date().toISOString(),
+          pagesIndexed: 1,
+          pagesChanged: 0,
+          errors: [],
+        },
+      });
+
+      return sendJson(res, 201, { item });
     } catch (error) {
       return sendJson(res, 400, { error: error.message });
     }

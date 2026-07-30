@@ -1,12 +1,14 @@
 const fileRepo = require("./repositories/FileServiceRepository");
 const pgRepo = require("./repositories/PostgresServiceRepository");
 
-function usePostgres() {
-  return Boolean(config.pg && config.pg.enabled);
-}
-
 function getRepository() {
-  return selectRepository(fileRepo, pgRepo);
+  try {
+    const config = require("../config");
+    const usePg = Boolean((config.features && config.features.pgEnabled) || (config.pg && config.pg.enabled));
+    return usePg ? pgRepo : fileRepo;
+  } catch {
+    return fileRepo;
+  }
 }
 
 function createService(projectId, input) {
