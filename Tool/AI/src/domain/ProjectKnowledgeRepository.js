@@ -3,7 +3,7 @@ const fileRepo = require("./repositories/FileProjectKnowledgeRepository");
 const pgRepo = require("./repositories/PostgresProjectKnowledgeRepository");
 
 function usePostgres() {
-  return Boolean(config.features && config.features.pgEnabled);
+  return Boolean(config.pg && config.pg.enabled);
 }
 
 function getRepository() {

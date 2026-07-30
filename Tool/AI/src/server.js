@@ -589,7 +589,7 @@ async function startServer() {
     console.warn(`[server] Warning: publicDir does not exist: ${config.publicDir}`);
     console.warn(`[server] Run 'npm run frontend:build' to create the React build.`);
   }
-  if (config.features && config.features.pgEnabled) {
+  if (config.pg && config.pg.enabled) {
     const migrationResult = await migrate();
     if (migrationResult && migrationResult.error) {
       throw new Error(migrationResult.error);

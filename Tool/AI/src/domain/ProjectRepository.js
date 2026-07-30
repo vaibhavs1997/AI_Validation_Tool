@@ -1,6 +1,9 @@
 const fileRepository = require("./repositories/FileProjectRepository");
 const postgresRepository = require("./repositories/PostgresProjectRepository");
-const { selectRepository } = require("../repositories/repositorySelector");
+
+function usePostgres() {
+  return Boolean(config.pg && config.pg.enabled);
+}
 
 function selectedRepository() {
   return selectRepository(fileRepository, postgresRepository);
