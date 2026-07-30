@@ -25,7 +25,8 @@ export function ProjectGrid({ projects, selectedProjectId, onProjectSelect }: Pr
           key={project.id}
           project={project}
           isSelected={selectedProjectId === project.id}
-          onSelect={onProjectSelect}
+          onSelect={() => onProjectSelect?.(project)}
+          onDelete={() => {}}
         />
       ))}
     </div>

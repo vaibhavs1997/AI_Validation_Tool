@@ -148,6 +148,34 @@ function deleteProject(id) {
     throw new Error(`Project not found: ${id}`);
   }
   fs.unlinkSync(file);
+
+  // Clean up all associated project data so that recreating the project
+  // starts fresh with no leftover artifacts from the previous incarnation.
+  const safeId = safeName(id);
+
+  // Remove project services directory
+  const servicesDir = path.join(config.dataDir, "services", safeId);
+  if (fs.existsSync(servicesDir)) {
+    fs.rmSync(servicesDir, { recursive: true, force: true });
+  }
+
+  // Remove project API models directory
+  const apiModelsDir = path.join(config.dataDir, "api-models", safeId);
+  if (fs.existsSync(apiModelsDir)) {
+    fs.rmSync(apiModelsDir, { recursive: true, force: true });
+  }
+
+  // Remove project knowledge file
+  const knowledgeFile = path.join(config.dataDir, "project-knowledge", `${safeId}.json`);
+  if (fs.existsSync(knowledgeFile)) {
+    fs.unlinkSync(knowledgeFile);
+  }
+
+  // Remove project runs directory
+  const runsDir = path.join(config.dataDir, "runs", safeId);
+  if (fs.existsSync(runsDir)) {
+    fs.rmSync(runsDir, { recursive: true, force: true });
+  }
 }
 
 function searchProjects(query) {

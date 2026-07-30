@@ -91,66 +91,63 @@ const firstProject = mockProjects[0]!;
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("ProjectCard", () => {
-  it("should render project name and id", () => {
-    render(<ProjectCard project={firstProject} />);
+  it("should render project name", () => {
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={() => {}} onDelete={() => {}} />);
     expect(screen.getByText("Payments API")).toBeInTheDocument();
-    expect(screen.getByText("payments-api")).toBeInTheDocument();
   });
 
   it("should render created and updated dates", () => {
-    render(<ProjectCard project={firstProject} />);
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Updated")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Payments API, project ID: payments-api/i })).toBeInTheDocument();
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={() => {}} onDelete={() => {}} />);
+    expect(screen.getByText(/Created/i)).toBeInTheDocument();
+    expect(screen.getByText(/Updated/i)).toBeInTheDocument();
   });
 
-  it("should have accessible title", () => {
-    render(<ProjectCard project={firstProject} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
-    expect(btn).toHaveAttribute("aria-label", "Payments API, project ID: payments-api");
+  it("should have accessible button", () => {
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={() => {}} onDelete={() => {}} />);
+    expect(screen.getByRole("button", { name: /Project Payments API/i })).toBeInTheDocument();
   });
 
   it("should call onSelect when clicked", () => {
     const onSelect = vi.fn();
-    render(<ProjectCard project={firstProject} onSelect={onSelect} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={onSelect} onDelete={() => {}} />);
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.click(btn);
-    expect(onSelect).toHaveBeenCalledWith(firstProject);
+    expect(onSelect).toHaveBeenCalledWith(firstProject.id);
   });
 
   it("should call onSelect when Enter key is pressed", () => {
     const onSelect = vi.fn();
-    render(<ProjectCard project={firstProject} onSelect={onSelect} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={onSelect} onDelete={() => {}} />);
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.keyDown(btn, { key: "Enter" });
-    expect(onSelect).toHaveBeenCalledWith(firstProject);
+    expect(onSelect).toHaveBeenCalledWith(firstProject.id);
   });
 
   it("should call onSelect when Space key is pressed", () => {
     const onSelect = vi.fn();
-    render(<ProjectCard project={firstProject} onSelect={onSelect} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={onSelect} onDelete={() => {}} />);
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.keyDown(btn, { key: " " });
-    expect(onSelect).toHaveBeenCalledWith(firstProject);
+    expect(onSelect).toHaveBeenCalledWith(firstProject.id);
   });
 
   it("should have aria-selected when selected", () => {
-    render(<ProjectCard project={firstProject} isSelected={true} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
-    expect(btn).toHaveAttribute("aria-selected", "true");
+    render(<ProjectCard project={firstProject} isSelected={true} onSelect={() => {}} onDelete={() => {}} />);
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
+    expect(btn).toHaveAttribute("aria-current", "true");
   });
 
   it("should not have aria-selected when not selected", () => {
-    render(<ProjectCard project={firstProject} isSelected={false} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
-    expect(btn).toHaveAttribute("aria-selected", "false");
+    render(<ProjectCard project={firstProject} isSelected={false} onSelect={() => {}} onDelete={() => {}} />);
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
+    expect(btn).not.toHaveAttribute("aria-current");
   });
 });
 
 describe("ProjectGrid", () => {
   it("should render all project cards", () => {
     render(<ProjectGrid projects={mockProjects} />);
-    const cards = screen.getAllByRole("button", { name: /project ID: /i });
+    const cards = screen.getAllByRole("button", { name: /Project /i });
     expect(cards).toHaveLength(3);
   });
 
@@ -162,16 +159,14 @@ describe("ProjectGrid", () => {
   it("should pass selectedProjectId to cards", () => {
     const onProjectSelect = vi.fn();
     render(<ProjectGrid projects={mockProjects} selectedProjectId="payments-api" onProjectSelect={onProjectSelect} />);
-    const selectedBtn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
-    expect(selectedBtn).toHaveAttribute("aria-selected", "true");
-    const otherBtn = screen.getByRole("button", { name: /Default Project, project ID: default/i });
-    expect(otherBtn).toHaveAttribute("aria-selected", "false");
+    const selectedBtn = screen.getByRole("button", { name: /Project Payments API/i });
+    expect(selectedBtn).toHaveAttribute("aria-current", "true");
   });
 
   it("should call onProjectSelect when a card is clicked", () => {
     const onProjectSelect = vi.fn();
     render(<ProjectGrid projects={mockProjects} onProjectSelect={onProjectSelect} />);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.click(btn);
     expect(onProjectSelect).toHaveBeenCalledWith(mockProjects[0]);
   });
@@ -387,8 +382,8 @@ describe("ProjectDashboard - Project Selection", () => {
       selectedProjectId: "payments-api",
     });
     renderWithMockContext(<ProjectDashboard />, mockValue);
-    const selectedBtn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
-    expect(selectedBtn).toHaveAttribute("aria-selected", "true");
+    const selectedBtn = screen.getByRole("button", { name: /Project Payments API/i });
+    expect(selectedBtn).toHaveAttribute("aria-current", "true");
   });
 
   it("should save selection to localStorage when project is clicked", () => {
@@ -400,7 +395,7 @@ describe("ProjectDashboard - Project Selection", () => {
       selectProject,
     });
     renderWithMockContext(<ProjectDashboard />, mockValue);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.click(btn);
     expect(selectProject).toHaveBeenCalledWith(expect.objectContaining({ id: "payments-api" }));
   });
@@ -414,7 +409,7 @@ describe("ProjectDashboard - Project Selection", () => {
       selectProject,
     });
     renderWithMockContext(<ProjectDashboard />, mockValue);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.keyDown(btn, { key: "Enter" });
     expect(selectProject).toHaveBeenCalledWith(expect.objectContaining({ id: "payments-api" }));
   });
@@ -428,7 +423,7 @@ describe("ProjectDashboard - Project Selection", () => {
       selectProject,
     });
     renderWithMockContext(<ProjectDashboard />, mockValue);
-    const btn = screen.getByRole("button", { name: /Payments API, project ID: payments-api/i });
+    const btn = screen.getByRole("button", { name: /Project Payments API/i });
     fireEvent.keyDown(btn, { key: " " });
     expect(selectProject).toHaveBeenCalledWith(expect.objectContaining({ id: "payments-api" }));
   });

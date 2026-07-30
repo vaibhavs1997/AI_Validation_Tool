@@ -1,4 +1,3 @@
-const config = require("../config");
 const fileRepository = require("./repositories/FileProjectRepository");
 const postgresRepository = require("./repositories/PostgresProjectRepository");
 
@@ -7,7 +6,7 @@ function usePostgres() {
 }
 
 function selectedRepository() {
-  return usePostgres() ? postgresRepository : fileRepository;
+  return selectRepository(fileRepository, postgresRepository);
 }
 
 function createProject(input) {

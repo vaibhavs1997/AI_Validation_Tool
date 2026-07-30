@@ -8,7 +8,9 @@
  */
 
 import { useState, useEffect } from "react";
-import { listRuns, type RunSummary } from "../runs/RunService";
+import { listRuns } from "../runs/RunService";
+import type { RunSummary } from "../../types";
+import { createSampleRunSummary } from "../results/demoData";
 
 interface HistoryPageProps {
   activeProjectId: string | null;
@@ -244,24 +246,7 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
   }
 
   if (runs.length === 0) {
-    const sampleRun: RunSummary = {
-      id: "sample-run-1",
-      projectId: activeProjectId || "default",
-      testSpecificationId: "ts-1",
-      title: "Sample Validation Run",
-      description: "Sample run to demonstrate the History page.",
-      status: "passed",
-      targetServiceId: "auth-api",
-      targetOperationId: "login",
-      stepCount: 3,
-      passedSteps: 2,
-      failedSteps: 1,
-      blockedSteps: 0,
-      startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: 3420,
-    };
-
+    const demoRun = createSampleRunSummary(activeProjectId || "default");
     return (
       <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
         <div className="panel-head" style={{ padding: "14px 18px", borderBottom: "1px solid var(--color-border)", background: "var(--blue-soft)" }}>
@@ -274,7 +259,7 @@ export function HistoryPage({ activeProjectId }: HistoryPageProps) {
           <div style={{ marginBottom: "12px", fontSize: "13px", color: "var(--muted)" }}>
             1 run for project "{activeProjectId}"
           </div>
-          {renderRunRow(sampleRun)}
+          {renderRunRow(demoRun)}
         </div>
       </section>
     );

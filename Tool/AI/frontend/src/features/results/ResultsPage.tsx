@@ -8,7 +8,9 @@
  */
 
 import { useState, useEffect } from "react";
-import { getRun, type RunDetail } from "../runs/RunService";
+import { getRun } from "../runs/RunService";
+import type { RunDetail } from "../../types";
+import { sampleRunDetail } from "./demoData";
 
 interface ResultsPageProps {
   activeProjectId: string | null;
@@ -288,11 +290,11 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
         <div className="panel-body" style={{ padding: "18px" }}>
           <div style={{
             padding: "10px 12px",
-            background: "var(--red-soft)",
-            border: "1px solid var(--red)",
+            background: "var(--violet-soft)",
+            border: "1px solid var(--violet)",
             borderRadius: "6px",
             fontSize: "13px",
-            color: "var(--red-deep)",
+            color: "var(--violet-deep)",
             marginBottom: "12px",
           }}>
             <div style={{ fontWeight: 600, marginBottom: "4px" }}>Could not load this result.</div>
@@ -306,9 +308,9 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
                 padding: "6px 12px",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "var(--red-deep)",
+                color: "var(--violet-deep)",
                 background: "var(--surface)",
-                border: "1px solid var(--red)",
+                border: "1px solid var(--violet)",
                 borderRadius: "6px",
                 cursor: "pointer",
               }}
@@ -338,66 +340,16 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
   }
 
   if (!run) {
-    const sampleRun: RunDetail = {
-      id: "sample-run-1",
-      title: "Sample Validation Run",
-      description: "This is a sample report to demonstrate the Results page.",
-      status: "passed",
-      startedAt: new Date().toISOString(),
-      completedAt: new Date().toISOString(),
-      durationMs: 3420,
+    const demoRun: RunDetail = {
+      ...sampleRunDetail,
       projectId: activeProjectId || "default",
-      testSpecification: {
-        id: "ts-1",
-        title: "User login flow",
-        description: "Sample test specification for demonstration",
-        requirementRefs: [{ acIndex: 1, acText: "Valid login returns token" }],
-        operationRefs: [
-          { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
-          { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
-          { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" }
-        ],
-        expectedBehavior: { status: 200, responseAssertions: ["token exists", "expiresIn > 0"] }
-      },
-      targetOperation: { serviceId: "auth-api", operationId: "login" },
-      results: [
-        {
-          step: 1,
-          operation: { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
-          status: "passed",
-          response: { id: 1, name: "Test User", email: "test@example.com" }
-        },
-        {
-          step: 2,
-          operation: { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
-          status: "passed",
-          response: { id: 2, name: "New User", email: "new@example.com" }
-        },
-        {
-          step: 3,
-          operation: { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" },
-          status: "failed",
-          request: { username: "test", password: "wrong" },
-          error: "401 Unauthorized: Invalid credentials"
-        }
-      ],
-      executionPlanSummary: {
-        target: { serviceId: "auth-api", operationId: "login" },
-        stepCount: 3,
-        operations: [
-          { serviceId: "user-api", operationId: "getUser", method: "GET", path: "/users/{id}" },
-          { serviceId: "user-api", operationId: "createUser", method: "POST", path: "/users" },
-          { serviceId: "auth-api", operationId: "login", method: "POST", path: "/auth/login" }
-        ]
-      },
-      errors: []
     };
 
-    const total = sampleRun.results.length;
-    const passed = sampleRun.results.filter(r => r.status === "passed").length;
-    const failed = sampleRun.results.filter(r => r.status === "failed").length;
-    const blocked = sampleRun.results.filter(r => r.status === "blocked").length;
-    const isSuccess = sampleRun.status === "passed";
+    const total = demoRun.results.length;
+    const passed = demoRun.results.filter(r => r.status === "passed").length;
+    const failed = demoRun.results.filter(r => r.status === "failed").length;
+    const blocked = demoRun.results.filter(r => r.status === "blocked").length;
+    const isSuccess = demoRun.status === "passed";
 
     return (
       <section className="panel span-12" style={{ background: "var(--color-bg-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-lg)", overflow: "hidden" }}>
@@ -407,7 +359,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
               <span className="step-indicator results">R</span>
               <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
             </div>
-            <div style={{ display: "flex", gap: "8px" }} className="no-print">
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }} className="no-print">
               <button
                 type="button"
                 onClick={() => { window.location.hash = "#history"; }}
@@ -425,21 +377,21 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
         <div className="panel-body" style={{ padding: "18px" }}>
           <div style={{
             padding: "14px 16px",
-            border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
+            border: "2px solid var(--violet)",
             borderRadius: "8px",
-            background: isSuccess ? "var(--green-soft)" : "var(--red-soft)",
+            background: "var(--violet-soft)",
             marginBottom: "14px",
           }}>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
-              {sampleRun.title}
+              {demoRun.title}
             </div>
             <div style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "8px" }}>
-              {sampleRun.description}
+              {demoRun.description}
             </div>
             <div style={{
               fontSize: "24px",
               fontWeight: 800,
-              color: isSuccess ? "var(--green-deep)" : "var(--red-deep)",
+              color: "var(--violet-deep)",
               marginBottom: "4px",
             }}>
               {isSuccess ? "PASSED" : "FAILED"}
@@ -448,7 +400,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
               {total} step{total !== 1 ? "s" : ""} · {passed} passed · {failed} failed · {blocked} blocked
             </div>
             <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "4px" }}>
-              Duration: {formatDuration(sampleRun.durationMs)} · {formatDateTime(sampleRun.completedAt)}
+              Duration: {formatDuration(demoRun.durationMs)} · {formatDateTime(demoRun.completedAt)}
             </div>
           </div>
 
@@ -463,7 +415,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
             }}>
               Step Details
             </h3>
-            {sampleRun.results.map((r, idx) => renderStepResult(r, idx))}
+            {demoRun.results.map((r, idx) => renderStepResult(r, idx))}
           </div>
         </div>
       </section>
@@ -484,7 +436,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
             <span className="step-indicator results">R</span>
             <h2 style={{ margin: 0, fontSize: "17px", color: "var(--blue-deep)" }}>Results</h2>
           </div>
-          <div style={{ display: "flex", gap: "8px" }} className="no-print">
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }} className="no-print">
             <button
               type="button"
               onClick={() => { window.location.hash = "#workspace"; }}
@@ -537,9 +489,9 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
         <div className="print-area">
           <div style={{
             padding: "14px 16px",
-            border: `2px solid ${isSuccess ? "var(--green)" : "var(--red)"}`,
+            border: "2px solid var(--violet)",
             borderRadius: "8px",
-            background: isSuccess ? "var(--green-soft)" : "var(--red-soft)",
+            background: "var(--violet-soft)",
             marginBottom: "14px",
           }}>
             <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--ink)", marginBottom: "6px" }}>
@@ -553,7 +505,7 @@ export function ResultsPage({ activeProjectId }: ResultsPageProps) {
             <div style={{
               fontSize: "24px",
               fontWeight: 800,
-              color: isSuccess ? "var(--green-deep)" : "var(--red-deep)",
+              color: "var(--violet-deep)",
               marginBottom: "4px",
             }}>
               {isSuccess ? "PASSED" : "FAILED"}
